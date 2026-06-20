@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getRepository } from "@/lib/data";
+import { ensurePropertyArchive, isDriveConfigured } from "@/lib/integrations/drive";
 import {
   OPERATIONS,
   PROPERTY_STATUSES,
@@ -155,6 +156,14 @@ export async function createPropertyAction(
   try {
     const created = await getRepository().properties.create(input);
     slug = created.slug;
+
+    // Archivo operativo en Google Drive (best-effort, no bloquea la creación).
+    if (!created.driveFolderId && isDriveConfigured()) {
+      const folderId = await ensurePropertyArchive(created);
+      if (folderId) {
+        await getRepository().properties.update(created.id, { driveFolderId: folderId });
+      }
+    }
   } catch (err) {
     console.error("[admin] Error al crear inmueble:", err);
     return { error: "No se pudo crear el inmueble." };
