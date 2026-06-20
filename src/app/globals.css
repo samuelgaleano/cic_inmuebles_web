@@ -1,0 +1,60 @@
+@import "tailwindcss";
+
+/*
+  Sistema de diseño CIC Inmuebles.
+  Paleta: azul marino (confianza) + acento ámbar/dorado (premium).
+  Tailwind v4: los tokens se exponen como utilidades (bg-brand-600, text-accent-500, ...).
+*/
+@theme {
+  --color-brand-50: #eef6ff;
+  --color-brand-100: #d9eaff;
+  --color-brand-200: #bcd9ff;
+  --color-brand-300: #8ec0ff;
+  --color-brand-400: #599cff;
+  --color-brand-500: #3578f6;
+  --color-brand-600: #1f59db;
+  --color-brand-700: #1b46b0;
+  --color-brand-800: #1c3d8c;
+  --color-brand-900: #0d2a5e;
+  --color-brand-950: #091a3d;
+
+  --color-accent-400: #fbbf3f;
+  --color-accent-500: #f5a623;
+  --color-accent-600: #d9870f;
+
+  --color-ink: #0f1b2d;
+  --color-muted: #5b6b80;
+  --color-surface: #f6f8fb;
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+:root {
+  --background: #ffffff;
+  --foreground: var(--color-ink);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
+
+/* Línea de recorte para descripciones en tarjetas */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
