@@ -4,8 +4,14 @@ import { SiteFooter } from "@/components/public/site-footer";
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
   return (
     <>
+      <a
+        href="#contenido"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-brand-700 focus:px-4 focus:py-2 focus:text-white"
+      >
+        Saltar al contenido
+      </a>
       <SiteHeader />
-      <main className="flex-1">{children}</main>
+      <main id="contenido" className="flex-1">{children}</main>
       <SiteFooter />
     </>
   );

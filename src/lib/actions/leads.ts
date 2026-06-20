@@ -3,7 +3,9 @@
 import { z } from "zod";
 import { getRepository } from "@/lib/data";
 import { sendLeadNotification } from "@/lib/notifications/email";
-import type { LeadInput } from "@/lib/domain";
+import { whatsappLink } from "@/lib/config/site";
+import type { Lead, LeadInput } from "@/lib/domain";
+import { LEAD_INTENT_LABELS } from "@/lib/domain";
 
 /**
  * Acción de servidor para crear leads desde los formularios públicos.
@@ -41,6 +43,40 @@ export interface LeadFormState {
   status: "idle" | "success" | "error";
   message?: string;
   errors?: Record<string, string>;
+  /** Enlace wa.me prellenado para continuar la conversación (click-to-chat). */
+  whatsappUrl?: string;
+}
+
+/** Construye el enlace de WhatsApp (click-to-chat) con el resumen del lead. */
+async function buildLeadWhatsappUrl(lead: Lead): Promise<string> {
+  const partes: string[] = [`Hola, soy ${lead.nombre}.`];
+
+  if (lead.tipo === "vendedor") {
+    const detalle = [lead.tipoInmueble, lead.ciudad].filter(Boolean).join(" en ");
+    partes.push(
+      detalle
+        ? `Quiero vender/arrendar mi inmueble (${detalle}).`
+        : "Quiero vender/arrendar mi inmueble.",
+    );
+  } else {
+    let titulo = lead.propertySlug;
+    if (lead.propertySlug) {
+      try {
+        const prop = await getRepository().properties.getPublicBySlug(lead.propertySlug);
+        if (prop) titulo = `${prop.titulo} (${prop.codigo})`;
+      } catch {
+        // se usa el slug como respaldo
+      }
+    }
+    const accion = lead.intencion ? LEAD_INTENT_LABELS[lead.intencion].toLowerCase() : "más información";
+    partes.push(titulo ? `Me interesa "${titulo}" — ${accion}.` : `Quiero ${accion}.`);
+  }
+
+  if (lead.preferencia) partes.push(`Preferencia: ${lead.preferencia}.`);
+  if (lead.mensaje) partes.push(lead.mensaje);
+  partes.push(`Mi teléfono: ${lead.telefono}.`);
+
+  return whatsappLink(partes.join(" "));
 }
 
 export async function createLeadAction(
@@ -85,8 +121,9 @@ export async function createLeadAction(
     fuente: data.fuente,
   };
 
+  let lead: Lead;
   try {
-    const lead = await getRepository().leads.create(input);
+    lead = await getRepository().leads.create(input);
     await sendLeadNotification(lead);
   } catch (err) {
     console.error("[leads] Error al crear lead:", err);
@@ -100,7 +137,8 @@ export async function createLeadAction(
     status: "success",
     message:
       data.tipo === "vendedor"
-        ? "¡Gracias! Recibimos los datos de tu inmueble y te contactaremos muy pronto."
-        : "¡Listo! Recibimos tu solicitud. Te contactaremos muy pronto.",
+        ? "¡Gracias! Recibimos los datos de tu inmueble."
+        : "¡Listo! Recibimos tu solicitud.",
+    whatsappUrl: await buildLeadWhatsappUrl(lead),
   };
 }
