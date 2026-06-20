@@ -1,15 +1,31 @@
 import Link from "next/link";
-import { ExternalLink, Pencil, Plus, Trash2 } from "lucide-react";
+import { ExternalLink, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { getRepository } from "@/lib/data";
 import { deletePropertyAction } from "@/lib/actions/admin-properties";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { OPERATION_LABELS, PROPERTY_TYPE_LABELS } from "@/lib/domain";
+import {
+  OPERATION_LABELS,
+  PROPERTY_STATUSES,
+  PROPERTY_STATUS_LABELS,
+  PROPERTY_TYPE_LABELS,
+  type PropertyFilters,
+  type PropertyStatus,
+} from "@/lib/domain";
 import { formatPrice } from "@/lib/utils/format";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminInmueblesPage() {
-  const properties = await getRepository().properties.list();
+export default async function AdminInmueblesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; estado?: string }>;
+}) {
+  const sp = await searchParams;
+  const estado = PROPERTY_STATUSES.includes(sp.estado as PropertyStatus)
+    ? (sp.estado as PropertyStatus)
+    : undefined;
+  const filters: PropertyFilters = { q: sp.q || undefined, estado };
+  const properties = await getRepository().properties.list(filters);
 
   return (
     <div className="space-y-6">
@@ -25,6 +41,36 @@ export default async function AdminInmueblesPage() {
           <Plus className="h-4 w-4" /> Nuevo inmueble
         </Link>
       </div>
+
+      <form method="get" className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3">
+        <div className="relative min-w-48 flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            name="q"
+            defaultValue={sp.q ?? ""}
+            placeholder="Buscar por título, ciudad, código..."
+            className="h-10 w-full rounded-lg border border-slate-300 pl-9 pr-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+          />
+        </div>
+        <select
+          name="estado"
+          defaultValue={estado ?? ""}
+          className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm"
+        >
+          <option value="">Todos los estados</option>
+          {PROPERTY_STATUSES.map((s) => (
+            <option key={s} value={s}>{PROPERTY_STATUS_LABELS[s]}</option>
+          ))}
+        </select>
+        <button className="h-10 rounded-lg bg-brand-700 px-4 text-sm font-semibold text-white hover:bg-brand-800">
+          Filtrar
+        </button>
+        {(sp.q || estado) && (
+          <Link href="/admin/inmuebles" className="text-sm text-slate-500 hover:text-slate-700">
+            Limpiar
+          </Link>
+        )}
+      </form>
 
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
         <table className="w-full text-left text-sm">
