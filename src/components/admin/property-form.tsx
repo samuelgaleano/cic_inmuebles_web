@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import Link from "next/link";
 import { Loader2, Save } from "lucide-react";
+import { CloudinaryUploader } from "./cloudinary-uploader";
 import type { PropertyFormState } from "@/lib/actions/admin-properties";
 import {
   OPERATIONS,
@@ -66,8 +67,13 @@ export function PropertyForm({
   const [state, formAction, isPending] = useActionState(action, {});
   const c = property?.caracteristicas;
   const u = property?.ubicacion;
-  const imagenes = property?.medios.filter((m) => m.type === "image").map((m) => m.url).join("\n");
   const videoUrl = property?.medios.find((m) => m.type === "video")?.url;
+  const [imagenes, setImagenes] = useState(
+    property?.medios.filter((m) => m.type === "image").map((m) => m.url).join("\n") ?? "",
+  );
+
+  const appendImages = (urls: string[]) =>
+    setImagenes((prev) => [prev.trim(), ...urls].filter(Boolean).join("\n"));
 
   return (
     <form action={formAction} className="space-y-8">
@@ -164,12 +170,20 @@ export function PropertyForm({
       <section className="rounded-xl border border-slate-200 bg-white p-5">
         <h2 className="mb-1 text-lg font-semibold text-slate-900">Medios</h2>
         <p className="mb-4 text-sm text-slate-500">
-          Próximamente: carga directa a Cloudinary. Por ahora pega URLs de imágenes (la primera será la portada).
+          Sube imágenes (se almacenan en Cloudinary) o pega URLs, una por línea. La primera será la portada.
         </p>
         <div className="space-y-4">
+          <CloudinaryUploader onUploaded={appendImages} />
           <div>
             <label className={label} htmlFor="imagenes">Imágenes (una URL por línea)</label>
-            <textarea id="imagenes" name="imagenes" rows={4} defaultValue={imagenes} className="w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-xs" />
+            <textarea
+              id="imagenes"
+              name="imagenes"
+              rows={4}
+              value={imagenes}
+              onChange={(e) => setImagenes(e.target.value)}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-xs"
+            />
           </div>
           <Field name="videoUrl" label="URL de video (YouTube, opcional)" defaultValue={videoUrl} placeholder="https://youtu.be/..." />
         </div>
