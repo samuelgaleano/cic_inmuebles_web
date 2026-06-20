@@ -41,3 +41,8 @@ export interface Appointment {
   notas?: string;
   creadoEn: string;
 }
+
+/** Datos para crear una cita (sin campos generados por el sistema). */
+export type AppointmentInput = Omit<Appointment, "id" | "creadoEn" | "estado"> & {
+  estado?: AppointmentStatus;
+};

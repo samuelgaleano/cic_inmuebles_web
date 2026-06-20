@@ -1,5 +1,12 @@
 import {
   toPublicProperty,
+  type Agent,
+  type AgentAvailability,
+  type AgentInput,
+  type Appointment,
+  type AppointmentInput,
+  type AppointmentStatus,
+  type AvailabilitySlot,
   type Lead,
   type LeadInput,
   type LeadStatus,
@@ -12,6 +19,11 @@ import {
 import { slugify } from "@/lib/utils/slug";
 import { getSupabaseAdmin } from "./supabase/client";
 import {
+  agentInputToRow,
+  agentRowToDomain,
+  appointmentInputToRow,
+  appointmentRowToDomain,
+  availabilityRowToDomain,
   leadInputToRow,
   leadRowToDomain,
   mediaInputToRows,
@@ -19,7 +31,13 @@ import {
   propertyRowToDomain,
 } from "./supabase/mappers";
 import { matchesFilters, sortByRelevance } from "./filtering";
-import type { LeadRepository, PropertyRepository, Repository } from "./repository";
+import type {
+  AgentRepository,
+  AppointmentRepository,
+  LeadRepository,
+  PropertyRepository,
+  Repository,
+} from "./repository";
 
 const PROPERTY_SELECT = "*, property_media(*)";
 
@@ -204,9 +222,124 @@ class SupabaseLeadRepository implements LeadRepository {
   }
 }
 
+class SupabaseAgentRepository implements AgentRepository {
+  async list(): Promise<Agent[]> {
+    const { data, error } = await getSupabaseAdmin()
+      .from("agents")
+      .select("*")
+      .order("nombre");
+    if (error) throw error;
+    return (data ?? []).map(agentRowToDomain);
+  }
+
+  async getById(id: string): Promise<Agent | null> {
+    const { data, error } = await getSupabaseAdmin()
+      .from("agents")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle();
+    if (error) throw error;
+    return data ? agentRowToDomain(data) : null;
+  }
+
+  async create(input: AgentInput): Promise<Agent> {
+    const { data, error } = await getSupabaseAdmin()
+      .from("agents")
+      .insert(agentInputToRow(input))
+      .select("*")
+      .single();
+    if (error) throw error;
+    return agentRowToDomain(data);
+  }
+
+  async update(id: string, patch: Partial<AgentInput>): Promise<Agent | null> {
+    const current = await this.getById(id);
+    if (!current) return null;
+    const { data, error } = await getSupabaseAdmin()
+      .from("agents")
+      .update(agentInputToRow({ ...current, ...patch }))
+      .eq("id", id)
+      .select("*")
+      .maybeSingle();
+    if (error) throw error;
+    return data ? agentRowToDomain(data) : null;
+  }
+
+  async remove(id: string): Promise<boolean> {
+    const { error } = await getSupabaseAdmin().from("agents").delete().eq("id", id);
+    if (error) throw error;
+    return true;
+  }
+
+  async listAvailability(agentId: string): Promise<AgentAvailability[]> {
+    const { data, error } = await getSupabaseAdmin()
+      .from("agent_availability")
+      .select("*")
+      .eq("agent_id", agentId)
+      .order("dia_semana");
+    if (error) throw error;
+    return (data ?? []).map(availabilityRowToDomain);
+  }
+
+  async setAvailability(agentId: string, slots: AvailabilitySlot[]): Promise<void> {
+    const db = getSupabaseAdmin();
+    await db.from("agent_availability").delete().eq("agent_id", agentId);
+    if (slots.length > 0) {
+      const rows = slots.map((s) => ({
+        agent_id: agentId,
+        dia_semana: s.diaSemana,
+        hora_inicio: s.horaInicio,
+        hora_fin: s.horaFin,
+      }));
+      const { error } = await db.from("agent_availability").insert(rows);
+      if (error) throw error;
+    }
+  }
+}
+
+class SupabaseAppointmentRepository implements AppointmentRepository {
+  async list(): Promise<Appointment[]> {
+    const { data, error } = await getSupabaseAdmin()
+      .from("appointments")
+      .select("*")
+      .order("inicio_en");
+    if (error) throw error;
+    return (data ?? []).map(appointmentRowToDomain);
+  }
+
+  async create(input: AppointmentInput): Promise<Appointment> {
+    const { data, error } = await getSupabaseAdmin()
+      .from("appointments")
+      .insert(appointmentInputToRow(input))
+      .select("*")
+      .single();
+    if (error) throw error;
+    return appointmentRowToDomain(data);
+  }
+
+  async updateStatus(id: string, estado: AppointmentStatus): Promise<Appointment | null> {
+    const { data, error } = await getSupabaseAdmin()
+      .from("appointments")
+      .update({ estado })
+      .eq("id", id)
+      .select("*")
+      .maybeSingle();
+    if (error) throw error;
+    return data ? appointmentRowToDomain(data) : null;
+  }
+
+  async remove(id: string): Promise<boolean> {
+    const { error } = await getSupabaseAdmin().from("appointments").delete().eq("id", id);
+    if (error) throw error;
+    return true;
+  }
+}
+
 export function createSupabaseRepository(): Repository {
   return {
     properties: new SupabasePropertyRepository(),
     leads: new SupabaseLeadRepository(),
+    agents: new SupabaseAgentRepository(),
+    appointments: new SupabaseAppointmentRepository(),
   };
 }

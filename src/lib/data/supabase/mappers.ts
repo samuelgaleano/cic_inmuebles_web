@@ -1,4 +1,9 @@
 import type {
+  Agent,
+  AgentAvailability,
+  AgentInput,
+  Appointment,
+  AppointmentInput,
   Lead,
   LeadInput,
   Property,
@@ -165,5 +170,78 @@ export function leadInputToRow(input: LeadInput): Record<string, unknown> {
     tipo_inmueble: input.tipoInmueble ?? null,
     ciudad: input.ciudad ?? null,
     fuente: input.fuente,
+  };
+}
+
+/** Fila de `agents` -> dominio. */
+export function agentRowToDomain(row: any): Agent {
+  return {
+    id: row.id,
+    userId: row.user_id ?? undefined,
+    nombre: row.nombre,
+    email: row.email,
+    telefono: row.telefono ?? undefined,
+    fotoUrl: row.foto_url ?? undefined,
+    rol: row.rol,
+    activo: Boolean(row.activo),
+    creadoEn: row.created_at,
+  };
+}
+
+/** AgentInput -> fila de `agents`. */
+export function agentInputToRow(input: AgentInput): Record<string, unknown> {
+  return {
+    user_id: input.userId ?? null,
+    nombre: input.nombre,
+    email: input.email,
+    telefono: input.telefono ?? null,
+    foto_url: input.fotoUrl ?? null,
+    rol: input.rol,
+    activo: input.activo,
+  };
+}
+
+/** Fila de `agent_availability` -> dominio. */
+export function availabilityRowToDomain(row: any): AgentAvailability {
+  return {
+    id: row.id,
+    agentId: row.agent_id,
+    diaSemana: row.dia_semana,
+    horaInicio: row.hora_inicio,
+    horaFin: row.hora_fin,
+  };
+}
+
+/** Fila de `appointments` -> dominio. */
+export function appointmentRowToDomain(row: any): Appointment {
+  return {
+    id: row.id,
+    propertyId: row.property_id,
+    agentId: row.agent_id ?? undefined,
+    leadId: row.lead_id ?? undefined,
+    clienteNombre: row.cliente_nombre,
+    clienteTelefono: row.cliente_telefono,
+    clienteEmail: row.cliente_email ?? undefined,
+    inicioEn: row.inicio_en,
+    duracionMin: row.duracion_min ?? 60,
+    estado: row.estado,
+    notas: row.notas ?? undefined,
+    creadoEn: row.created_at,
+  };
+}
+
+/** AppointmentInput -> fila de `appointments`. */
+export function appointmentInputToRow(input: AppointmentInput): Record<string, unknown> {
+  return {
+    property_id: input.propertyId,
+    agent_id: input.agentId ?? null,
+    lead_id: input.leadId ?? null,
+    cliente_nombre: input.clienteNombre,
+    cliente_telefono: input.clienteTelefono,
+    cliente_email: input.clienteEmail ?? null,
+    inicio_en: input.inicioEn,
+    duracion_min: input.duracionMin,
+    estado: input.estado ?? "solicitada",
+    notas: input.notas ?? null,
   };
 }

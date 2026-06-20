@@ -1,6 +1,13 @@
 import { randomUUID } from "node:crypto";
 import {
   toPublicProperty,
+  type Agent,
+  type AgentAvailability,
+  type AgentInput,
+  type Appointment,
+  type AppointmentInput,
+  type AppointmentStatus,
+  type AvailabilitySlot,
   type Lead,
   type LeadInput,
   type LeadStatus,
@@ -12,7 +19,13 @@ import {
 import { slugify } from "@/lib/utils/slug";
 import { seedProperties } from "./seed";
 import { matchesFilters, sortByRelevance } from "./filtering";
-import type { LeadRepository, PropertyRepository, Repository } from "./repository";
+import type {
+  AgentRepository,
+  AppointmentRepository,
+  LeadRepository,
+  PropertyRepository,
+  Repository,
+} from "./repository";
 
 /**
  * Implementación en memoria del repositorio.
@@ -148,10 +161,100 @@ class MemoryLeadRepository implements LeadRepository {
   }
 }
 
+class MemoryAgentRepository implements AgentRepository {
+  private readonly agents: Agent[] = [
+    {
+      id: "a1",
+      nombre: "Agente Master",
+      email: "agente@cicinmuebles.com",
+      telefono: "+57 300 000 0000",
+      rol: "agente_master",
+      activo: true,
+      creadoEn: new Date().toISOString(),
+    },
+  ];
+  private availability: AgentAvailability[] = [];
+
+  async list(): Promise<Agent[]> {
+    return [...this.agents];
+  }
+
+  async getById(id: string): Promise<Agent | null> {
+    return this.agents.find((a) => a.id === id) ?? null;
+  }
+
+  async create(input: AgentInput): Promise<Agent> {
+    const agent: Agent = { ...input, id: randomUUID(), creadoEn: new Date().toISOString() };
+    this.agents.push(agent);
+    return agent;
+  }
+
+  async update(id: string, patch: Partial<AgentInput>): Promise<Agent | null> {
+    const agent = this.agents.find((a) => a.id === id);
+    if (!agent) return null;
+    Object.assign(agent, patch);
+    return agent;
+  }
+
+  async remove(id: string): Promise<boolean> {
+    const idx = this.agents.findIndex((a) => a.id === id);
+    if (idx === -1) return false;
+    this.agents.splice(idx, 1);
+    this.availability = this.availability.filter((s) => s.agentId !== id);
+    return true;
+  }
+
+  async listAvailability(agentId: string): Promise<AgentAvailability[]> {
+    return this.availability.filter((s) => s.agentId === agentId);
+  }
+
+  async setAvailability(agentId: string, slots: AvailabilitySlot[]): Promise<void> {
+    this.availability = this.availability.filter((s) => s.agentId !== agentId);
+    for (const slot of slots) {
+      this.availability.push({ ...slot, id: randomUUID(), agentId });
+    }
+  }
+}
+
+class MemoryAppointmentRepository implements AppointmentRepository {
+  private readonly appointments: Appointment[] = [];
+
+  async list(): Promise<Appointment[]> {
+    return [...this.appointments].sort((a, b) => a.inicioEn.localeCompare(b.inicioEn));
+  }
+
+  async create(input: AppointmentInput): Promise<Appointment> {
+    const appt: Appointment = {
+      ...input,
+      id: randomUUID(),
+      estado: input.estado ?? "solicitada",
+      creadoEn: new Date().toISOString(),
+    };
+    this.appointments.push(appt);
+    return appt;
+  }
+
+  async updateStatus(id: string, estado: AppointmentStatus): Promise<Appointment | null> {
+    const appt = this.appointments.find((a) => a.id === id);
+    if (!appt) return null;
+    appt.estado = estado;
+    return appt;
+  }
+
+  async remove(id: string): Promise<boolean> {
+    const idx = this.appointments.findIndex((a) => a.id === id);
+    if (idx === -1) return false;
+    this.appointments.splice(idx, 1);
+    return true;
+  }
+}
+
 export function createMemoryRepository(): Repository {
   return {
     // copia para no mutar el arreglo de seed exportado
     properties: new MemoryPropertyRepository(seedProperties.map((p) => ({ ...p }))),
     leads: new MemoryLeadRepository(),
+    agents: new MemoryAgentRepository(),
+    appointments: new MemoryAppointmentRepository(),
   };
 }

@@ -6,6 +6,13 @@ import type {
   Lead,
   LeadInput,
   LeadStatus,
+  Agent,
+  AgentInput,
+  AgentAvailability,
+  AvailabilitySlot,
+  Appointment,
+  AppointmentInput,
+  AppointmentStatus,
 } from "@/lib/domain";
 
 /**
@@ -43,7 +50,26 @@ export interface LeadRepository {
   remove(id: string): Promise<boolean>;
 }
 
+export interface AgentRepository {
+  list(): Promise<Agent[]>;
+  getById(id: string): Promise<Agent | null>;
+  create(input: AgentInput): Promise<Agent>;
+  update(id: string, patch: Partial<AgentInput>): Promise<Agent | null>;
+  remove(id: string): Promise<boolean>;
+  listAvailability(agentId: string): Promise<AgentAvailability[]>;
+  setAvailability(agentId: string, slots: AvailabilitySlot[]): Promise<void>;
+}
+
+export interface AppointmentRepository {
+  list(): Promise<Appointment[]>;
+  create(input: AppointmentInput): Promise<Appointment>;
+  updateStatus(id: string, estado: AppointmentStatus): Promise<Appointment | null>;
+  remove(id: string): Promise<boolean>;
+}
+
 export interface Repository {
   properties: PropertyRepository;
   leads: LeadRepository;
+  agents: AgentRepository;
+  appointments: AppointmentRepository;
 }

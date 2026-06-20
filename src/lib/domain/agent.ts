@@ -28,6 +28,9 @@ export interface Agent {
   creadoEn: string;
 }
 
+/** Datos para crear/editar un agente. */
+export type AgentInput = Omit<Agent, "id" | "creadoEn">;
+
 /** Disponibilidad recurrente semanal de un agente. */
 export interface AgentAvailability {
   id: string;
@@ -38,3 +41,16 @@ export interface AgentAvailability {
   horaInicio: string;
   horaFin: string;
 }
+
+/** Franja de disponibilidad sin identificadores (para guardar en bloque). */
+export type AvailabilitySlot = Pick<AgentAvailability, "diaSemana" | "horaInicio" | "horaFin">;
+
+export const WEEKDAY_LABELS = [
+  "Domingo",
+  "Lunes",
+  "Martes",
+  "Miércoles",
+  "Jueves",
+  "Viernes",
+  "Sábado",
+] as const;
