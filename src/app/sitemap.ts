@@ -1,10 +1,16 @@
 import type { MetadataRoute } from "next";
 import { getRepository } from "@/lib/data";
+import type { PublicProperty } from "@/lib/domain";
 import { siteConfig } from "@/lib/config/site";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = siteConfig.url.replace(/\/$/, "");
-  const properties = await getRepository().properties.listPublic();
+  let properties: PublicProperty[] = [];
+  try {
+    properties = await getRepository().properties.listPublic();
+  } catch (err) {
+    console.error("[sitemap] no se pudo listar inmuebles:", err);
+  }
 
   const staticRoutes: MetadataRoute.Sitemap = [
     { url: `${base}/`, changeFrequency: "daily", priority: 1 },

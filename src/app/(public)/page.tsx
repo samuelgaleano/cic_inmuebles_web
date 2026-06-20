@@ -15,8 +15,18 @@ import { siteConfig } from "@/lib/config/site";
 
 export default async function HomePage() {
   const repo = getRepository();
-  const destacados = (await repo.properties.listPublic({ destacado: true })).slice(0, 3);
-  const recientes = (await repo.properties.listPublic()).slice(0, 6);
+  let destacados: Awaited<ReturnType<typeof repo.properties.listPublic>> = [];
+  let recientes: typeof destacados = [];
+  try {
+    [destacados, recientes] = await Promise.all([
+      repo.properties.listPublic({ destacado: true }),
+      repo.properties.listPublic(),
+    ]);
+    destacados = destacados.slice(0, 3);
+    recientes = recientes.slice(0, 6);
+  } catch (err) {
+    console.error("[home] no se pudo cargar el catálogo:", err);
+  }
 
   return (
     <>

@@ -26,8 +26,14 @@ import { formatArea, formatPrice } from "@/lib/utils/format";
 import { siteConfig } from "@/lib/config/site";
 
 export async function generateStaticParams() {
-  const properties = await getRepository().properties.listPublic();
-  return properties.map((p) => ({ slug: p.slug }));
+  try {
+    const properties = await getRepository().properties.listPublic();
+    return properties.map((p) => ({ slug: p.slug }));
+  } catch (err) {
+    // Si la base de datos no está disponible en build, generamos bajo demanda.
+    console.error("[inmuebles] generateStaticParams:", err);
+    return [];
+  }
 }
 
 export async function generateMetadata({
