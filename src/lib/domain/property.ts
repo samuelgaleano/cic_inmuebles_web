@@ -144,6 +144,15 @@ export type PublicProperty = Omit<Property, "propietario"> & {
   ubicacion: Omit<PropertyLocation, "direccion">;
 };
 
+/** Datos para crear/editar un inmueble (sin campos generados por el sistema). */
+export type PropertyInput = Omit<
+  Property,
+  "id" | "codigo" | "slug" | "creadoEn" | "actualizadoEn"
+> & {
+  codigo?: string;
+  slug?: string;
+};
+
 /** Filtros del catálogo. */
 export interface PropertyFilters {
   q?: string;

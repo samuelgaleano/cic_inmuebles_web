@@ -3,19 +3,23 @@ import {
   toPublicProperty,
   type Lead,
   type LeadInput,
+  type LeadStatus,
   type Property,
   type PropertyFilters,
+  type PropertyInput,
   type PublicProperty,
 } from "@/lib/domain";
+import { slugify } from "@/lib/utils/slug";
 import { seedProperties } from "./seed";
 import type { LeadRepository, PropertyRepository, Repository } from "./repository";
 
 /**
  * Implementación en memoria del repositorio.
  *
- * Pensada para desarrollo y demostración: el catálogo proviene de los datos
- * de ejemplo y los leads se guardan en un arreglo efímero (se pierden al
- * reiniciar el servidor). En producción se reemplaza por SupabaseRepository.
+ * Pensada para desarrollo y demostración: el catálogo arranca con los datos de
+ * ejemplo y las mutaciones (crear/editar inmuebles, leads) viven en memoria
+ * (se pierden al reiniciar el servidor). En producción se reemplaza por
+ * SupabaseRepository, que implementa las mismas interfaces.
  */
 
 function matchesFilters(p: Property, f?: PropertyFilters): boolean {
@@ -47,7 +51,8 @@ function matchesFilters(p: Property, f?: PropertyFilters): boolean {
 
 function sortByRelevance(a: Property, b: Property): number {
   // Disponibles primero, luego destacados, luego más recientes.
-  const estadoRank = (p: Property) => (p.estado === "disponible" ? 0 : p.estado === "en_proceso" ? 1 : 2);
+  const estadoRank = (p: Property) =>
+    p.estado === "disponible" ? 0 : p.estado === "en_proceso" ? 1 : 2;
   const byEstado = estadoRank(a) - estadoRank(b);
   if (byEstado !== 0) return byEstado;
   if (a.destacado !== b.destacado) return a.destacado ? -1 : 1;
@@ -70,6 +75,10 @@ class MemoryPropertyRepository implements PropertyRepository {
     return this.properties.find((p) => p.slug === slug) ?? null;
   }
 
+  async getById(id: string): Promise<Property | null> {
+    return this.properties.find((p) => p.id === id) ?? null;
+  }
+
   async getPublicBySlug(slug: string): Promise<PublicProperty | null> {
     const p = await this.getBySlug(slug);
     if (!p || !p.publicado) return null;
@@ -78,6 +87,67 @@ class MemoryPropertyRepository implements PropertyRepository {
 
   async listCities(): Promise<string[]> {
     return [...new Set(this.properties.map((p) => p.ubicacion.ciudad))].sort();
+  }
+
+  private nextCodigo(): string {
+    const max = this.properties.reduce((acc, p) => {
+      const n = Number(p.codigo.replace(/\D/g, ""));
+      return Number.isFinite(n) && n > acc ? n : acc;
+    }, 0);
+    return `CIC-${String(max + 1).padStart(4, "0")}`;
+  }
+
+  private uniqueSlug(base: string, ignoreId?: string): string {
+    let slug = base || "inmueble";
+    let i = 2;
+    while (this.properties.some((p) => p.slug === slug && p.id !== ignoreId)) {
+      slug = `${base}-${i++}`;
+    }
+    return slug;
+  }
+
+  async create(input: PropertyInput): Promise<Property> {
+    const now = new Date().toISOString();
+    const slug = this.uniqueSlug(input.slug ? slugify(input.slug) : slugify(input.titulo));
+    const property: Property = {
+      ...input,
+      id: randomUUID(),
+      codigo: input.codigo ?? this.nextCodigo(),
+      slug,
+      creadoEn: now,
+      actualizadoEn: now,
+    };
+    this.properties.unshift(property);
+    return property;
+  }
+
+  async update(id: string, patch: Partial<PropertyInput>): Promise<Property | null> {
+    const idx = this.properties.findIndex((p) => p.id === id);
+    if (idx === -1) return null;
+    const prev = this.properties[idx];
+    const slug = patch.slug
+      ? this.uniqueSlug(slugify(patch.slug), id)
+      : patch.titulo
+        ? this.uniqueSlug(slugify(patch.titulo), id)
+        : prev.slug;
+    const updated: Property = {
+      ...prev,
+      ...patch,
+      slug,
+      id: prev.id,
+      codigo: patch.codigo ?? prev.codigo,
+      creadoEn: prev.creadoEn,
+      actualizadoEn: new Date().toISOString(),
+    };
+    this.properties[idx] = updated;
+    return updated;
+  }
+
+  async remove(id: string): Promise<boolean> {
+    const idx = this.properties.findIndex((p) => p.id === id);
+    if (idx === -1) return false;
+    this.properties.splice(idx, 1);
+    return true;
   }
 }
 
@@ -98,11 +168,26 @@ class MemoryLeadRepository implements LeadRepository {
   async list(): Promise<Lead[]> {
     return [...this.leads];
   }
+
+  async updateStatus(id: string, estado: LeadStatus): Promise<Lead | null> {
+    const lead = this.leads.find((l) => l.id === id);
+    if (!lead) return null;
+    lead.estado = estado;
+    return lead;
+  }
+
+  async remove(id: string): Promise<boolean> {
+    const idx = this.leads.findIndex((l) => l.id === id);
+    if (idx === -1) return false;
+    this.leads.splice(idx, 1);
+    return true;
+  }
 }
 
 export function createMemoryRepository(): Repository {
   return {
-    properties: new MemoryPropertyRepository(seedProperties),
+    // copia para no mutar el arreglo de seed exportado
+    properties: new MemoryPropertyRepository(seedProperties.map((p) => ({ ...p }))),
     leads: new MemoryLeadRepository(),
   };
 }
