@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  BarChart3,
   Building2,
   CalendarDays,
+  FileText,
   Home,
   Inbox,
   LogOut,
@@ -18,6 +20,8 @@ const nav = [
   { href: "/admin/inmuebles", label: "Inmuebles", icon: Building2 },
   { href: "/admin/leads", label: "Leads", icon: Inbox },
   { href: "/admin/agenda", label: "Agenda", icon: CalendarDays },
+  { href: "/admin/plantillas", label: "Plantillas", icon: FileText },
+  { href: "/admin/reportes", label: "Reportes", icon: BarChart3 },
 ];
 
 export function AdminShell({ email, children }: { email: string; children: React.ReactNode }) {

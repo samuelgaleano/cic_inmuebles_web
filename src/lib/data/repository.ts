@@ -13,6 +13,8 @@ import type {
   Appointment,
   AppointmentInput,
   AppointmentStatus,
+  Template,
+  TemplateInput,
 } from "@/lib/domain";
 
 /**
@@ -67,9 +69,18 @@ export interface AppointmentRepository {
   remove(id: string): Promise<boolean>;
 }
 
+export interface TemplateRepository {
+  list(): Promise<Template[]>;
+  getById(id: string): Promise<Template | null>;
+  create(input: TemplateInput): Promise<Template>;
+  update(id: string, patch: Partial<TemplateInput>): Promise<Template | null>;
+  remove(id: string): Promise<boolean>;
+}
+
 export interface Repository {
   properties: PropertyRepository;
   leads: LeadRepository;
   agents: AgentRepository;
   appointments: AppointmentRepository;
+  templates: TemplateRepository;
 }

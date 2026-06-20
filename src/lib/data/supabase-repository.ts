@@ -15,6 +15,8 @@ import {
   type PropertyInput,
   type PropertyMedia,
   type PublicProperty,
+  type Template,
+  type TemplateInput,
 } from "@/lib/domain";
 import { slugify } from "@/lib/utils/slug";
 import { getSupabaseAdmin } from "./supabase/client";
@@ -29,6 +31,8 @@ import {
   mediaInputToRows,
   propertyInputToRow,
   propertyRowToDomain,
+  templateInputToRow,
+  templateRowToDomain,
 } from "./supabase/mappers";
 import { matchesFilters, sortByRelevance } from "./filtering";
 import type {
@@ -37,6 +41,7 @@ import type {
   LeadRepository,
   PropertyRepository,
   Repository,
+  TemplateRepository,
 } from "./repository";
 
 const PROPERTY_SELECT = "*, property_media(*)";
@@ -335,11 +340,59 @@ class SupabaseAppointmentRepository implements AppointmentRepository {
   }
 }
 
+class SupabaseTemplateRepository implements TemplateRepository {
+  async list(): Promise<Template[]> {
+    const { data, error } = await getSupabaseAdmin().from("templates").select("*").order("nombre");
+    if (error) throw error;
+    return (data ?? []).map(templateRowToDomain);
+  }
+
+  async getById(id: string): Promise<Template | null> {
+    const { data, error } = await getSupabaseAdmin()
+      .from("templates")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle();
+    if (error) throw error;
+    return data ? templateRowToDomain(data) : null;
+  }
+
+  async create(input: TemplateInput): Promise<Template> {
+    const { data, error } = await getSupabaseAdmin()
+      .from("templates")
+      .insert(templateInputToRow(input))
+      .select("*")
+      .single();
+    if (error) throw error;
+    return templateRowToDomain(data);
+  }
+
+  async update(id: string, patch: Partial<TemplateInput>): Promise<Template | null> {
+    const current = await this.getById(id);
+    if (!current) return null;
+    const { data, error } = await getSupabaseAdmin()
+      .from("templates")
+      .update(templateInputToRow({ ...current, ...patch }))
+      .eq("id", id)
+      .select("*")
+      .maybeSingle();
+    if (error) throw error;
+    return data ? templateRowToDomain(data) : null;
+  }
+
+  async remove(id: string): Promise<boolean> {
+    const { error } = await getSupabaseAdmin().from("templates").delete().eq("id", id);
+    if (error) throw error;
+    return true;
+  }
+}
+
 export function createSupabaseRepository(): Repository {
   return {
     properties: new SupabasePropertyRepository(),
     leads: new SupabaseLeadRepository(),
     agents: new SupabaseAgentRepository(),
     appointments: new SupabaseAppointmentRepository(),
+    templates: new SupabaseTemplateRepository(),
   };
 }

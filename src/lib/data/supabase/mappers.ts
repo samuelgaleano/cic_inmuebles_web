@@ -9,6 +9,8 @@ import type {
   Property,
   PropertyInput,
   PropertyMedia,
+  Template,
+  TemplateInput,
 } from "@/lib/domain";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -243,5 +245,26 @@ export function appointmentInputToRow(input: AppointmentInput): Record<string, u
     duracion_min: input.duracionMin,
     estado: input.estado ?? "solicitada",
     notas: input.notas ?? null,
+  };
+}
+
+/** Fila de `templates` -> dominio. */
+export function templateRowToDomain(row: any): Template {
+  return {
+    id: row.id,
+    nombre: row.nombre,
+    tipo: row.tipo,
+    contenido: row.contenido,
+    creadoEn: row.created_at,
+    actualizadoEn: row.updated_at,
+  };
+}
+
+/** TemplateInput -> fila de `templates`. */
+export function templateInputToRow(input: TemplateInput): Record<string, unknown> {
+  return {
+    nombre: input.nombre,
+    tipo: input.tipo,
+    contenido: input.contenido,
   };
 }

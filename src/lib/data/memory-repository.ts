@@ -15,6 +15,8 @@ import {
   type PropertyFilters,
   type PropertyInput,
   type PublicProperty,
+  type Template,
+  type TemplateInput,
 } from "@/lib/domain";
 import { slugify } from "@/lib/utils/slug";
 import { seedProperties } from "./seed";
@@ -25,6 +27,7 @@ import type {
   LeadRepository,
   PropertyRepository,
   Repository,
+  TemplateRepository,
 } from "./repository";
 
 /**
@@ -249,6 +252,49 @@ class MemoryAppointmentRepository implements AppointmentRepository {
   }
 }
 
+class MemoryTemplateRepository implements TemplateRepository {
+  private readonly templates: Template[] = [
+    {
+      id: "t1",
+      nombre: "Promesa de compraventa (ejemplo)",
+      tipo: "promesa_compraventa",
+      contenido:
+        "PROMESA DE COMPRAVENTA\n\nEntre los suscritos, [VENDEDOR], identificado con C.C. [CC], y [COMPRADOR], identificado con C.C. [CC], se celebra la presente promesa de compraventa sobre el inmueble ubicado en [DIRECCIÓN], por valor de [PRECIO]...\n\n(Edita esta plantilla con el formato oficial de la inmobiliaria.)",
+      creadoEn: new Date().toISOString(),
+      actualizadoEn: new Date().toISOString(),
+    },
+  ];
+
+  async list(): Promise<Template[]> {
+    return [...this.templates].sort((a, b) => a.nombre.localeCompare(b.nombre));
+  }
+
+  async getById(id: string): Promise<Template | null> {
+    return this.templates.find((t) => t.id === id) ?? null;
+  }
+
+  async create(input: TemplateInput): Promise<Template> {
+    const now = new Date().toISOString();
+    const tpl: Template = { ...input, id: randomUUID(), creadoEn: now, actualizadoEn: now };
+    this.templates.push(tpl);
+    return tpl;
+  }
+
+  async update(id: string, patch: Partial<TemplateInput>): Promise<Template | null> {
+    const tpl = this.templates.find((t) => t.id === id);
+    if (!tpl) return null;
+    Object.assign(tpl, patch, { actualizadoEn: new Date().toISOString() });
+    return tpl;
+  }
+
+  async remove(id: string): Promise<boolean> {
+    const idx = this.templates.findIndex((t) => t.id === id);
+    if (idx === -1) return false;
+    this.templates.splice(idx, 1);
+    return true;
+  }
+}
+
 export function createMemoryRepository(): Repository {
   return {
     // copia para no mutar el arreglo de seed exportado
@@ -256,5 +302,6 @@ export function createMemoryRepository(): Repository {
     leads: new MemoryLeadRepository(),
     agents: new MemoryAgentRepository(),
     appointments: new MemoryAppointmentRepository(),
+    templates: new MemoryTemplateRepository(),
   };
 }
