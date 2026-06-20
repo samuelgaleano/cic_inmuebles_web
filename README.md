@@ -19,16 +19,29 @@ prácticas de software escalables desde el inicio.
 - **Google Drive** (archivo por inmueble) *(Fase 2)*
 - Despliegue: **Vercel** + **GitHub**
 
-## Estado actual (Fase 1a)
+## Estado actual
 
-Sitio público funcionando con **datos de ejemplo** (no requiere servicios
-externos para correr):
+Funciona de inmediato con **datos de ejemplo** (sin servicios externos). Para
+producción, ver [`docs/ACTIVACION.md`](docs/ACTIVACION.md).
 
+**Sitio público**
 - Catálogo con filtros (operación, tipo, ciudad, habitaciones, estado).
 - Ficha de inmueble: galería, video, especificaciones, estado y descripción.
 - Captación de **compradores** (agendar visita / más información) y de
   **vendedores**, con mínima fricción + contacto por WhatsApp.
 - SEO: `sitemap.xml`, `robots.txt`, metadatos Open Graph.
+
+**Panel de administración** (`/admin`, protegido)
+- Autenticación con sesión firmada.
+- Inmuebles: CRUD completo con carga de imágenes (Cloudinary) y revalidación
+  automática del catálogo público.
+- Leads: bandeja con estados y contacto por WhatsApp.
+- Agenda: agentes, disponibilidad semanal y visitas.
+- Plantillas (promesa de compraventa, contratos) y Reportes.
+
+**Integraciones (listas, se activan con credenciales)**
+- Supabase (persistencia), Cloudinary (imágenes), Resend (correos),
+  Google Drive (carpeta + ficha por inmueble).
 
 ## Desarrollo local
 
@@ -63,7 +76,11 @@ docs/                 # documentación de arquitectura
 
 ## Hoja de ruta
 
-- **Fase 1b**: Supabase (BD + Auth), panel admin con CRUD de inmuebles/medios,
-  bandeja de leads y correo real.
-- **Fase 2**: agenda de visitas con disponibilidad de agentes + Google Drive.
-- **Fase 3**: WhatsApp Business, plantillas (promesa de venta) y reportes.
+- ✅ **Fase 1a**: sitio público (catálogo, ficha, captación de leads, SEO).
+- ✅ **Fase 1b**: panel admin (auth, CRUD de inmuebles, leads).
+- ✅ **Fase 1c**: persistencia con Supabase (drop-in por credenciales).
+- ✅ **Fase 2**: agenda (agentes, disponibilidad, visitas) + archivo en Drive.
+- ✅ **Fase 3**: plantillas + reportes + carga de imágenes a Cloudinary.
+- ⏳ **Pendiente de credenciales**: activar Supabase/Cloudinary/Resend/Drive
+  (ver `docs/ACTIVACION.md`) y, a futuro, WhatsApp Business API (hoy con
+  enlaces `wa.me`).
