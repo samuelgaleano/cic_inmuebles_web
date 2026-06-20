@@ -126,6 +126,38 @@ export function PropertyFilters({ cities }: { cities: string[] }) {
         </select>
       </div>
 
+      <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <input
+          type="number"
+          inputMode="numeric"
+          aria-label="Precio mínimo"
+          placeholder="Precio mín."
+          defaultValue={params.get("precioMin") ?? ""}
+          onBlur={(e) => update("precioMin", e.target.value)}
+          className={selectClass}
+        />
+        <input
+          type="number"
+          inputMode="numeric"
+          aria-label="Precio máximo"
+          placeholder="Precio máx."
+          defaultValue={params.get("precioMax") ?? ""}
+          onBlur={(e) => update("precioMax", e.target.value)}
+          className={selectClass}
+        />
+        <select
+          aria-label="Ordenar"
+          className={`${selectClass} sm:col-span-2`}
+          value={params.get("orden") ?? ""}
+          onChange={(e) => update("orden", e.target.value)}
+        >
+          <option value="">Ordenar: relevancia</option>
+          <option value="precio_asc">Precio: menor a mayor</option>
+          <option value="precio_desc">Precio: mayor a menor</option>
+          <option value="recientes">Más recientes</option>
+        </select>
+      </div>
+
       {hasFilters && (
         <button
           type="button"

@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { PropertyGallery } from "@/components/public/property-gallery";
 import { PropertyContactCard } from "@/components/public/property-contact-card";
+import { PropertyMap } from "@/components/public/property-map";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { getRepository } from "@/lib/data";
 import {
@@ -179,6 +180,8 @@ export default async function PropertyDetailPage({
               </ul>
             </section>
           )}
+
+          <PropertyMap lat={ubicacion.lat} lng={ubicacion.lng} label={property.titulo} />
         </div>
 
         {/* Barra lateral */}
