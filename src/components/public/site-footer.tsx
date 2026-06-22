@@ -58,16 +58,14 @@ export function SiteFooter() {
       <div className="border-t border-white/10">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-2 px-4 py-6 text-xs text-white/40 sm:flex-row sm:px-6 lg:px-8">
           <p>© {year} {siteConfig.name}. Todos los derechos reservados.</p>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             <p>Hecho con dedicación para tu próximo hogar.</p>
-            {/* Acceso discreto al panel (camuflado en la esquina) */}
+            {/* Acceso al panel de administración */}
             <Link
               href="/admin/login"
-              aria-label="Acceso administrador"
-              title="Acceso administrador"
-              className="text-white/15 transition-colors duration-300 hover:text-brand-400"
+              className="inline-flex items-center gap-1.5 font-medium text-white/45 transition-colors duration-300 hover:text-brand-400"
             >
-              <Lock className="h-3.5 w-3.5" />
+              <Lock className="h-3.5 w-3.5" /> Panel
             </Link>
           </div>
         </div>

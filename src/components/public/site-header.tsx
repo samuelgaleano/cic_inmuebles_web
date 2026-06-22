@@ -19,8 +19,7 @@ export function SiteHeader() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
-  // Cierra el menú al navegar y bloquea el scroll cuando está abierto.
-  useEffect(() => setOpen(false), [pathname]);
+  // Bloquea el scroll del body cuando el menú móvil está abierto.
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
     return () => {
@@ -114,6 +113,7 @@ export function SiteHeader() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={() => setOpen(false)}
               className={cn(
                 "border-b border-line py-4 font-display text-3xl font-bold tracking-tight transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]",
                 isActive(item.href) ? "text-brand-700" : "text-ink",
@@ -126,6 +126,7 @@ export function SiteHeader() {
           ))}
           <Link
             href="/inmuebles"
+            onClick={() => setOpen(false)}
             className={buttonVariants({
               variant: "primary",
               size: "lg",

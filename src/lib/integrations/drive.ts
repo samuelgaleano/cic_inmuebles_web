@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import type { Property, PropertyInput } from "@/lib/domain";
 import { PROPERTY_STATUS_LABELS, PROPERTY_TYPE_LABELS, OPERATION_LABELS } from "@/lib/domain";
+import { getGoogleAccessToken, isGoogleServiceAccountConfigured } from "./google-auth";
 
 /**
  * Integración con Google Drive (archivo operativo por inmueble).
@@ -18,49 +19,12 @@ import { PROPERTY_STATUS_LABELS, PROPERTY_TYPE_LABELS, OPERATION_LABELS } from "
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive";
 
 export function isDriveConfigured(): boolean {
-  return Boolean(
-    process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL &&
-      process.env.GOOGLE_PRIVATE_KEY &&
-      process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID,
-  );
+  return isGoogleServiceAccountConfigured() && Boolean(process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID);
 }
 
-function b64url(input: string | Buffer): string {
-  return Buffer.from(input).toString("base64url");
-}
-
+/** Access token de la cuenta de servicio con el scope de Drive. */
 async function getAccessToken(): Promise<string> {
-  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!;
-  const privateKey = (process.env.GOOGLE_PRIVATE_KEY ?? "").replace(/\\n/g, "\n");
-
-  const now = Math.floor(Date.now() / 1000);
-  const header = b64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
-  const claim = b64url(
-    JSON.stringify({
-      iss: email,
-      scope: DRIVE_SCOPE,
-      aud: "https://oauth2.googleapis.com/token",
-      iat: now,
-      exp: now + 3600,
-    }),
-  );
-  const signature = crypto
-    .createSign("RSA-SHA256")
-    .update(`${header}.${claim}`)
-    .sign(privateKey, "base64url");
-  const assertion = `${header}.${claim}.${signature}`;
-
-  const res = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-      assertion,
-    }),
-  });
-  if (!res.ok) throw new Error(`Drive token error: ${res.status} ${await res.text()}`);
-  const data = (await res.json()) as { access_token: string };
-  return data.access_token;
+  return getGoogleAccessToken(DRIVE_SCOPE);
 }
 
 /** Enlace directo a una carpeta de Drive (para abrir en el navegador). */

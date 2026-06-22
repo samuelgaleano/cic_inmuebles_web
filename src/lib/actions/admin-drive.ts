@@ -12,6 +12,7 @@ import {
   makeFilePublic,
   parseSpecDoc,
 } from "@/lib/integrations/drive";
+import { isSheetsConfigured, syncAllPropertiesToSheet } from "@/lib/integrations/sheets";
 import {
   OPERATIONS,
   OPERATION_LABELS,
@@ -187,6 +188,11 @@ export async function importPropertiesFromDriveAction(
   } catch (err) {
     console.error("[drive-import] Error general:", err);
     return { ran: true, ok: false, message: "No se pudo conectar con Google Drive. Revisa las credenciales y el acceso a la carpeta." };
+  }
+
+  // Refleja los nuevos inmuebles en el catálogo de Google Sheets (best-effort).
+  if (created.length && isSheetsConfigured()) {
+    await syncAllPropertiesToSheet(await repo.properties.list());
   }
 
   revalidatePath("/admin/inmuebles");

@@ -1,3 +1,4 @@
+import { ExternalLink, FileText, RotateCw } from "lucide-react";
 import { getRepository } from "@/lib/data";
 import {
   LEAD_STATUS_LABELS,
@@ -6,6 +7,8 @@ import {
   LEAD_STATUSES,
 } from "@/lib/domain";
 import { formatPrice } from "@/lib/utils/format";
+import { isSheetsConfigured, sheetUrl } from "@/lib/integrations/sheets";
+import { resyncSheetAction } from "@/lib/actions/admin-sheets";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +41,9 @@ export default async function AdminReportesPage() {
     { label: "Visitas agendadas", value: String(appointments.length) },
   ];
 
+  const sheetsOn = isSheetsConfigured();
+  const sheetLink = sheetUrl();
+
   return (
     <div className="space-y-8">
       <div>
@@ -53,6 +59,39 @@ export default async function AdminReportesPage() {
           </div>
         ))}
       </div>
+
+      {/* Catálogo en Google Sheets */}
+      <section className="rounded-2xl border border-line bg-white p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="flex items-center gap-2 font-semibold text-ink">
+            <FileText className="h-5 w-5 text-brand-600" /> Catálogo en Google Sheets
+          </h2>
+          {sheetsOn && (
+            <div className="flex flex-wrap items-center gap-2">
+              {sheetLink && (
+                <a
+                  href={sheetLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-line px-3 text-sm font-medium text-ink-soft transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
+                >
+                  <ExternalLink className="h-4 w-4" /> Abrir catálogo
+                </a>
+              )}
+              <form action={resyncSheetAction}>
+                <button className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-brand-700 px-3.5 text-sm font-semibold text-white transition-colors hover:bg-brand-800">
+                  <RotateCw className="h-4 w-4" /> Sincronizar ahora
+                </button>
+              </form>
+            </div>
+          )}
+        </div>
+        <p className="mt-2 text-sm text-muted">
+          {sheetsOn
+            ? "El catálogo se sincroniza automáticamente al crear, editar o eliminar inmuebles (incluido el estado). Usa “Sincronizar ahora” para reescribir todo de una vez."
+            : "Conecta una hoja agregando GOOGLE_SHEETS_SPREADSHEET_ID en Vercel (con la misma cuenta de servicio de Drive) y compártela como editor. El inventario se mantendrá actualizado solo."}
+        </p>
+      </section>
 
       <div className="grid gap-6 lg:grid-cols-3">
         <section className="rounded-2xl border border-line bg-white p-6">
