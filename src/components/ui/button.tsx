@@ -4,20 +4,23 @@ type Variant = "primary" | "accent" | "outline" | "ghost" | "whatsapp";
 type Size = "sm" | "md" | "lg";
 
 const base =
-  "inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2 disabled:opacity-60 disabled:pointer-events-none";
+  "group relative inline-flex items-center justify-center gap-2 rounded-xl font-semibold tracking-tight transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 active:scale-[0.98] disabled:opacity-60 disabled:pointer-events-none";
 
 const variants: Record<Variant, string> = {
-  primary: "bg-brand-700 text-white hover:bg-brand-800",
-  accent: "bg-accent-500 text-brand-950 hover:bg-accent-600",
-  outline: "border border-brand-200 bg-white text-brand-800 hover:bg-brand-50",
-  ghost: "text-brand-800 hover:bg-brand-50",
-  whatsapp: "bg-[#25D366] text-white hover:bg-[#1ebe5d]",
+  primary:
+    "bg-brand-700 text-white shadow-[0_10px_26px_-10px_rgba(4,125,91,0.8)] hover:bg-brand-800 hover:shadow-[0_14px_32px_-10px_rgba(4,125,91,0.9)]",
+  accent:
+    "bg-accent-500 text-ink shadow-[0_10px_26px_-12px_rgba(226,173,78,0.9)] hover:bg-accent-400",
+  outline:
+    "border border-line bg-white text-ink hover:border-brand-300 hover:bg-brand-50 hover:text-brand-800",
+  ghost: "text-ink hover:bg-brand-50 hover:text-brand-800",
+  whatsapp: "bg-[#25D366] text-white shadow-[0_10px_26px_-12px_rgba(37,211,102,0.9)] hover:bg-[#1ebe5d]",
 };
 
 const sizes: Record<Size, string> = {
-  sm: "h-9 px-3 text-sm",
+  sm: "h-9 px-3.5 text-sm",
   md: "h-11 px-5 text-sm",
-  lg: "h-12 px-6 text-base",
+  lg: "h-12 px-6 text-[15px]",
 };
 
 /** Devuelve las clases del botón (útil para aplicar a <Link> o <a>). */

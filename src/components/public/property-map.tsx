@@ -22,12 +22,12 @@ export function PropertyMap({
   const link = `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=15/${lat}/${lng}`;
 
   return (
-    <section className="mt-8">
-      <h2 className="flex items-center gap-2 text-xl font-bold text-slate-900">
+    <section className="mt-10">
+      <h2 className="flex items-center gap-2 text-xl font-bold tracking-tight text-ink">
         <MapPin className="h-5 w-5 text-brand-600" /> Ubicación
       </h2>
-      <p className="mt-1 text-sm text-slate-500">Zona aproximada del inmueble.</p>
-      <div className="mt-3 overflow-hidden rounded-xl border border-slate-200">
+      <p className="mt-1 text-sm text-muted">Zona aproximada del inmueble.</p>
+      <div className="mt-3 overflow-hidden rounded-[1.4rem] border border-line">
         <iframe
           title={`Mapa de ${label}`}
           src={src}

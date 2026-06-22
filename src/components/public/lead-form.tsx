@@ -8,7 +8,7 @@ import type { LeadIntent, LeadType } from "@/lib/domain";
 const initialState: LeadFormState = { status: "idle" };
 
 const inputClass =
-  "h-11 w-full rounded-lg border border-slate-300 px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200 aria-[invalid=true]:border-rose-400";
+  "h-11 w-full rounded-xl border border-line bg-surface px-3.5 text-sm text-ink transition-colors focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-200 aria-[invalid=true]:border-rose-400";
 
 interface LeadFormProps {
   tipo: LeadType;
@@ -73,7 +73,7 @@ export function LeadForm({
       <input type="text" name="website" tabIndex={-1} autoComplete="off" className="hidden" aria-hidden="true" />
 
       <div>
-        <label htmlFor={`${formId}-nombre`} className="mb-1 block text-sm font-medium text-slate-700">
+        <label htmlFor={`${formId}-nombre`} className="mb-1.5 block text-sm font-medium text-ink-soft">
           Nombre <span className="text-rose-500">*</span>
         </label>
         <input
@@ -93,7 +93,7 @@ export function LeadForm({
 
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
-          <label htmlFor={`${formId}-tel`} className="mb-1 block text-sm font-medium text-slate-700">
+          <label htmlFor={`${formId}-tel`} className="mb-1.5 block text-sm font-medium text-ink-soft">
             WhatsApp / teléfono <span className="text-rose-500">*</span>
           </label>
           <input
@@ -113,7 +113,7 @@ export function LeadForm({
           )}
         </div>
         <div>
-          <label htmlFor={`${formId}-email`} className="mb-1 block text-sm font-medium text-slate-700">
+          <label htmlFor={`${formId}-email`} className="mb-1.5 block text-sm font-medium text-ink-soft">
             Correo (opcional)
           </label>
           <input
@@ -135,11 +135,11 @@ export function LeadForm({
       {isSeller && (
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
-            <label htmlFor={`${formId}-ciudad`} className="mb-1 block text-sm font-medium text-slate-700">Ciudad del inmueble</label>
+            <label htmlFor={`${formId}-ciudad`} className="mb-1.5 block text-sm font-medium text-ink-soft">Ciudad del inmueble</label>
             <input id={`${formId}-ciudad`} name="ciudad" autoComplete="address-level2" placeholder="Ciudad" className={inputClass} />
           </div>
           <div>
-            <label htmlFor={`${formId}-tipoInmueble`} className="mb-1 block text-sm font-medium text-slate-700">Tipo de inmueble</label>
+            <label htmlFor={`${formId}-tipoInmueble`} className="mb-1.5 block text-sm font-medium text-ink-soft">Tipo de inmueble</label>
             <input id={`${formId}-tipoInmueble`} name="tipoInmueble" placeholder="Apto, casa, lote..." className={inputClass} />
           </div>
         </div>
@@ -147,7 +147,7 @@ export function LeadForm({
 
       {!isSeller && intencion === "visita" && (
         <div>
-          <label htmlFor={`${formId}-pref`} className="mb-1 block text-sm font-medium text-slate-700">
+          <label htmlFor={`${formId}-pref`} className="mb-1.5 block text-sm font-medium text-ink-soft">
             ¿Qué día/hora te gustaría visitarlo? (opcional)
           </label>
           <input id={`${formId}-pref`} name="preferencia" placeholder="Ej. sábado en la mañana" className={inputClass} />
@@ -155,7 +155,7 @@ export function LeadForm({
       )}
 
       <div>
-        <label htmlFor={`${formId}-msg`} className="mb-1 block text-sm font-medium text-slate-700">
+        <label htmlFor={`${formId}-msg`} className="mb-1.5 block text-sm font-medium text-ink-soft">
           Mensaje (opcional)
         </label>
         <textarea
@@ -163,7 +163,7 @@ export function LeadForm({
           name="mensaje"
           rows={isSeller ? 3 : 2}
           placeholder={isSeller ? "Cuéntanos sobre tu inmueble" : "¿En qué te ayudamos?"}
-          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+          className="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink transition-colors focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-200"
         />
       </div>
 
@@ -176,12 +176,12 @@ export function LeadForm({
       <button
         type="submit"
         disabled={isPending}
-        className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-accent-500 px-6 font-semibold text-brand-950 transition-colors hover:bg-accent-600 disabled:opacity-60"
+        className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-brand-700 px-6 font-semibold text-white shadow-[0_10px_26px_-10px_rgba(4,125,91,0.8)] transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-brand-800 active:scale-[0.98] disabled:opacity-60"
       >
         {isPending && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
         {submitLabel ?? (isSeller ? "Quiero vender mi inmueble" : "Enviar y abrir WhatsApp")}
       </button>
-      <p className="text-center text-xs text-slate-400">
+      <p className="text-center text-xs text-muted">
         Al enviar, registramos tu solicitud y abrimos WhatsApp para contactarte. No compartimos tus datos.
       </p>
     </form>

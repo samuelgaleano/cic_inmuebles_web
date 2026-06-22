@@ -96,10 +96,10 @@ export default async function PropertyDetailPage({
   const whatsappMessage = `Hola ${siteConfig.name}, me interesa el inmueble "${property.titulo}" (${property.codigo}). ${siteConfig.url}/inmuebles/${property.slug}`;
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
       <Link
         href="/inmuebles"
-        className="inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-brand-700"
+        className="inline-flex items-center gap-1.5 text-sm font-medium text-muted transition-colors hover:gap-2 hover:text-brand-700"
       >
         <ArrowLeft className="h-4 w-4" /> Volver al catálogo
       </Link>
@@ -110,7 +110,7 @@ export default async function PropertyDetailPage({
           <PropertyGallery images={images} title={property.titulo} />
 
           {videoId && (
-            <div className="mt-6 aspect-video overflow-hidden rounded-xl">
+            <div className="mt-6 aspect-video overflow-hidden rounded-[1.4rem] border border-line">
               <iframe
                 src={`https://www.youtube.com/embed/${videoId}`}
                 title={`Video de ${property.titulo}`}
@@ -128,17 +128,17 @@ export default async function PropertyDetailPage({
                 <span className="rounded-full bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-700">
                   {PROPERTY_TYPE_LABELS[property.tipo]}
                 </span>
-                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                <span className="rounded-full bg-surface px-2.5 py-1 text-xs font-semibold text-ink-soft">
                   {OPERATION_LABELS[property.operacion]}
                 </span>
                 <StatusBadge status={property.estado} />
-                <span className="text-xs text-slate-400">Cód. {property.codigo}</span>
+                <span className="text-xs text-muted">Cód. {property.codigo}</span>
               </div>
-              <h1 className="mt-3 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+              <h1 className="mt-3 text-2xl font-bold tracking-tight text-ink sm:text-3xl">
                 {property.titulo}
               </h1>
-              <p className="mt-1 flex items-center gap-1 text-slate-600">
-                <MapPin className="h-4 w-4" />
+              <p className="mt-1.5 flex items-center gap-1.5 text-muted">
+                <MapPin className="h-4 w-4 text-brand-500" />
                 {ubicacion.barrio ? `${ubicacion.barrio}, ` : ""}
                 {ubicacion.ciudad}, {ubicacion.departamento}
               </p>
@@ -148,31 +148,33 @@ export default async function PropertyDetailPage({
           {/* Especificaciones */}
           <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
             {specs.map((s) => (
-              <div key={s.label} className="rounded-lg border border-slate-200 bg-white p-3">
-                <s.icon className="h-5 w-5 text-brand-600" />
-                <p className="mt-2 text-xs text-slate-500">{s.label}</p>
-                <p className="font-semibold text-slate-900">{s.value}</p>
+              <div key={s.label} className="rounded-xl border border-line bg-white p-4 transition-colors hover:border-brand-200">
+                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-50 text-brand-700">
+                  <s.icon className="h-5 w-5" />
+                </span>
+                <p className="mt-3 text-xs text-muted">{s.label}</p>
+                <p className="font-semibold text-ink">{s.value}</p>
               </div>
             ))}
           </div>
 
           {/* Descripción */}
-          <section className="mt-8">
-            <h2 className="text-xl font-bold text-slate-900">Descripción</h2>
-            <p className="mt-3 whitespace-pre-line leading-relaxed text-slate-700">
+          <section className="mt-10">
+            <h2 className="text-xl font-bold tracking-tight text-ink">Descripción</h2>
+            <p className="mt-3 whitespace-pre-line leading-relaxed text-ink-soft">
               {property.descripcion}
             </p>
           </section>
 
           {/* Amenidades */}
           {property.amenidades.length > 0 && (
-            <section className="mt-8">
-              <h2 className="text-xl font-bold text-slate-900">Amenidades</h2>
+            <section className="mt-10">
+              <h2 className="text-xl font-bold tracking-tight text-ink">Amenidades</h2>
               <ul className="mt-3 flex flex-wrap gap-2">
                 {property.amenidades.map((a) => (
                   <li
                     key={a}
-                    className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-sm text-slate-700"
+                    className="rounded-full border border-line bg-surface px-3.5 py-1.5 text-sm font-medium text-ink-soft"
                   >
                     {a}
                   </li>
@@ -186,17 +188,17 @@ export default async function PropertyDetailPage({
 
         {/* Barra lateral */}
         <aside className="lg:col-span-1">
-          <div className="lg:sticky lg:top-20 space-y-4">
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <p className="text-sm text-slate-500">Precio</p>
-              <p className="text-3xl font-bold text-brand-900">
+          <div className="lg:sticky lg:top-24 space-y-4">
+            <div className="rounded-[1.4rem] border border-line bg-white p-6 shadow-[0_10px_40px_-28px_rgba(11,26,21,0.35)]">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-600">Precio</p>
+              <p className="mt-1 font-display text-3xl font-extrabold tracking-tight text-ink">
                 {formatPrice(property.precio, property.moneda)}
                 {property.operacion === "arriendo" && (
-                  <span className="text-base font-normal text-slate-500">/mes</span>
+                  <span className="text-base font-medium text-muted">/mes</span>
                 )}
               </p>
               {property.estado === "vendido" && (
-                <p className="mt-2 text-sm font-medium text-rose-600">
+                <p className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700">
                   Este inmueble ya fue vendido. Escríbenos para ver opciones similares.
                 </p>
               )}

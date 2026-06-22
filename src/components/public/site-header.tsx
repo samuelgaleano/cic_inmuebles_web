@@ -1,26 +1,41 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Building2, Menu } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { ArrowUpRight } from "lucide-react";
+import { Logo } from "@/components/brand/brand-mark";
 import { buttonVariants } from "@/components/ui/button";
-import { siteConfig } from "@/lib/config/site";
+import { cn } from "@/lib/utils/cn";
 
 const navItems = [
   { href: "/", label: "Inicio" },
   { href: "/inmuebles", label: "Inmuebles" },
-  { href: "/vender", label: "Vende tu inmueble" },
+  { href: "/vender", label: "Vender" },
   { href: "/contacto", label: "Contacto" },
 ];
 
 export function SiteHeader() {
+  const pathname = usePathname();
+  const [open, setOpen] = useState(false);
+
+  // Cierra el menú al navegar y bloquea el scroll cuando está abierto.
+  useEffect(() => setOpen(false), [pathname]);
+  useEffect(() => {
+    document.body.style.overflow = open ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [open]);
+
+  const isActive = (href: string) =>
+    href === "/" ? pathname === "/" : pathname.startsWith(href);
+
   return (
-    <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-        <Link href="/" className="flex items-center gap-2">
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-700 text-white">
-            <Building2 className="h-5 w-5" />
-          </span>
-          <span className="text-lg font-bold tracking-tight text-brand-900">
-            {siteConfig.name}
-          </span>
+    <header className="sticky top-0 z-50 px-4 pt-4 sm:pt-5">
+      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between rounded-full border border-line bg-white/80 pl-4 pr-2 shadow-[0_10px_40px_-20px_rgba(11,26,21,0.35)] backdrop-blur-xl sm:pl-5">
+        <Link href="/" aria-label="CIC Inmuebles — inicio">
+          <Logo />
         </Link>
 
         <nav className="hidden items-center gap-1 md:flex">
@@ -28,7 +43,12 @@ export function SiteHeader() {
             <Link
               key={item.href}
               href={item.href}
-              className="rounded-md px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-brand-50 hover:text-brand-800"
+              className={cn(
+                "rounded-full px-3.5 py-2 text-sm font-medium transition-colors duration-300",
+                isActive(item.href)
+                  ? "bg-brand-50 text-brand-800"
+                  : "text-ink-soft hover:bg-brand-50/70 hover:text-brand-800",
+              )}
             >
               {item.label}
             </Link>
@@ -38,18 +58,87 @@ export function SiteHeader() {
         <div className="flex items-center gap-2">
           <Link
             href="/inmuebles"
-            className={buttonVariants({ variant: "primary", size: "sm", className: "hidden sm:inline-flex" })}
+            className={buttonVariants({
+              variant: "primary",
+              size: "sm",
+              className: "hidden rounded-full sm:inline-flex",
+            })}
+          >
+            Ver catálogo
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5">
+              <ArrowUpRight className="h-3 w-3" />
+            </span>
+          </Link>
+
+          {/* Hamburguesa móvil que se transforma en X */}
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            aria-label={open ? "Cerrar menú" : "Abrir menú"}
+            aria-expanded={open}
+            className="relative z-50 flex h-10 w-10 items-center justify-center rounded-full text-ink transition-colors hover:bg-brand-50 md:hidden"
+          >
+            <span className="relative block h-4 w-5">
+              <span
+                className={cn(
+                  "absolute left-0 block h-0.5 w-5 rounded-full bg-current transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
+                  open ? "top-1/2 -translate-y-1/2 rotate-45" : "top-0.5",
+                )}
+              />
+              <span
+                className={cn(
+                  "absolute left-0 top-1/2 block h-0.5 w-5 -translate-y-1/2 rounded-full bg-current transition-opacity duration-300",
+                  open && "opacity-0",
+                )}
+              />
+              <span
+                className={cn(
+                  "absolute left-0 block h-0.5 w-5 rounded-full bg-current transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
+                  open ? "top-1/2 -translate-y-1/2 -rotate-45" : "bottom-0.5",
+                )}
+              />
+            </span>
+          </button>
+        </div>
+      </div>
+
+      {/* Overlay móvil a pantalla completa */}
+      <div
+        className={cn(
+          "fixed inset-0 z-40 origin-top bg-white/85 backdrop-blur-2xl transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] md:hidden",
+          open ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0",
+        )}
+      >
+        <nav className="flex h-full flex-col justify-center gap-2 px-8">
+          {navItems.map((item, i) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                "border-b border-line py-4 font-display text-3xl font-bold tracking-tight transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]",
+                isActive(item.href) ? "text-brand-700" : "text-ink",
+                open ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0",
+              )}
+              style={{ transitionDelay: open ? `${120 + i * 70}ms` : "0ms" }}
+            >
+              {item.label}
+            </Link>
+          ))}
+          <Link
+            href="/inmuebles"
+            className={buttonVariants({
+              variant: "primary",
+              size: "lg",
+              className: cn(
+                "mt-6 w-full transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]",
+                open ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0",
+              ),
+            })}
+            style={{ transitionDelay: open ? `${120 + navItems.length * 70}ms` : "0ms" }}
           >
             Ver catálogo
           </Link>
-          <Link
-            href="/inmuebles"
-            aria-label="Abrir menú"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-md text-slate-700 hover:bg-slate-100 md:hidden"
-          >
-            <Menu className="h-5 w-5" />
-          </Link>
-        </div>
+        </nav>
       </div>
     </header>
   );
