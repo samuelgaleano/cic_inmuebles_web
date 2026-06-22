@@ -214,3 +214,113 @@ export async function ensurePropertyArchive(p: Property): Promise<string | null>
     return null;
   }
 }
+
+/* ───────────────────────── Importación desde Drive ───────────────────────── */
+
+export interface DriveFolder {
+  id: string;
+  name: string;
+}
+
+/** Lista las subcarpetas de la carpeta raíz (cada una = un inmueble candidato). */
+export async function listRootFolders(): Promise<DriveFolder[]> {
+  if (!isDriveConfigured()) return [];
+  try {
+    const token = await getAccessToken();
+    const params = new URLSearchParams({
+      q: `'${process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
+      fields: "files(id,name)",
+      orderBy: "name",
+      pageSize: "200",
+      supportsAllDrives: "true",
+      includeItemsFromAllDrives: "true",
+    });
+    const res = await fetch(`https://www.googleapis.com/drive/v3/files?${params}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error(`Drive root list error: ${res.status} ${await res.text()}`);
+    const data = (await res.json()) as { files?: DriveFolder[] };
+    return data.files ?? [];
+  } catch (err) {
+    console.error("[drive] No se pudieron listar las carpetas raíz:", err);
+    return [];
+  }
+}
+
+/** Descarga el contenido de texto de un archivo (p. ej. la ficha .md). */
+export async function getFileText(fileId: string): Promise<string | null> {
+  if (!isDriveConfigured()) return null;
+  try {
+    const token = await getAccessToken();
+    const res = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&supportsAllDrives=true`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    if (!res.ok) return null;
+    return await res.text();
+  } catch {
+    return null;
+  }
+}
+
+/** Comparte un archivo como "cualquiera con el enlace puede ver" (best-effort). */
+export async function makeFilePublic(fileId: string): Promise<void> {
+  try {
+    const token = await getAccessToken();
+    await fetch(
+      `https://www.googleapis.com/drive/v3/files/${fileId}/permissions?supportsAllDrives=true`,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ role: "reader", type: "anyone" }),
+      },
+    );
+  } catch (err) {
+    console.error("[drive] No se pudo hacer pública la imagen:", err);
+  }
+}
+
+/** URL embebible de una imagen pública de Drive (compatible con next/image). */
+export function drivePublicImageUrl(fileId: string): string {
+  return `https://lh3.googleusercontent.com/d/${fileId}=w1600`;
+}
+
+export interface ParsedSpec {
+  fields: Record<string, string>;
+  descripcionCorta: string;
+  descripcion: string;
+}
+
+/**
+ * Parsea el documento de especificaciones (el que genera `generateSpecDoc`).
+ * Tolerante: ignora líneas vacías y admite el formato `clave: valor` antes del
+ * separador `---`, y el bloque de descripción después.
+ */
+export function parseSpecDoc(text: string): ParsedSpec {
+  const fields: Record<string, string> = {};
+  let descripcionCorta = "";
+  const descLines: string[] = [];
+
+  const [head, ...rest] = text.split(/^---\s*$/m);
+  for (const line of head.split("\n")) {
+    const m = line.match(/^([a-z_]+):\s*(.*)$/i);
+    if (m) fields[m[1].trim().toLowerCase()] = m[2].trim();
+  }
+
+  const tail = rest.join("---");
+  let inDesc = false;
+  for (const line of tail.split("\n")) {
+    const corta = line.match(/^descripcion_corta:\s*(.*)$/i);
+    if (corta) {
+      descripcionCorta = corta[1].trim();
+      continue;
+    }
+    if (/^descripcion:\s*$/i.test(line)) {
+      inDesc = true;
+      continue;
+    }
+    if (inDesc) descLines.push(line);
+  }
+
+  return { fields, descripcionCorta, descripcion: descLines.join("\n").trim() };
+}
