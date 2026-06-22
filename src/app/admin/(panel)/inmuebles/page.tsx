@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ExternalLink, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { ExternalLink, FolderInput, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { getRepository } from "@/lib/data";
 import { deletePropertyAction } from "@/lib/actions/admin-properties";
@@ -35,9 +35,14 @@ export default async function AdminInmueblesPage({
           <h1 className="text-2xl font-bold tracking-tight text-ink">Inmuebles</h1>
           <p className="mt-0.5 text-sm text-muted">{properties.length} en el inventario</p>
         </div>
-        <Link href="/admin/inmuebles/nuevo" className={buttonVariants({ variant: "primary", size: "md" })}>
-          <Plus className="h-4 w-4" /> Nuevo inmueble
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link href="/admin/inmuebles/importar" className={buttonVariants({ variant: "outline", size: "md" })}>
+            <FolderInput className="h-4 w-4" /> Importar de Drive
+          </Link>
+          <Link href="/admin/inmuebles/nuevo" className={buttonVariants({ variant: "primary", size: "md" })}>
+            <Plus className="h-4 w-4" /> Nuevo inmueble
+          </Link>
+        </div>
       </div>
 
       <form method="get" className="flex flex-wrap items-center gap-2 rounded-2xl border border-line bg-white p-3">
