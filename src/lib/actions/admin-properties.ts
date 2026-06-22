@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getRepository } from "@/lib/data";
 import { ensurePropertyArchive, isDriveConfigured } from "@/lib/integrations/drive";
+import { isSheetsConfigured, syncAllPropertiesToSheet, syncPropertyToSheet } from "@/lib/integrations/sheets";
 import {
   OPERATIONS,
   PROPERTY_STATUSES,
@@ -164,6 +165,12 @@ export async function createPropertyAction(
         await getRepository().properties.update(created.id, { driveFolderId: folderId });
       }
     }
+
+    // Catálogo en Google Sheets (best-effort).
+    if (isSheetsConfigured()) {
+      const fresh = await getRepository().properties.getById(created.id);
+      await syncPropertyToSheet(fresh ?? created);
+    }
   } catch (err) {
     console.error("[admin] Error al crear inmueble:", err);
     return { error: "No se pudo crear el inmueble." };
@@ -186,6 +193,7 @@ export async function updatePropertyAction(
     const updated = await getRepository().properties.update(id, input);
     if (!updated) return { error: "El inmueble no existe." };
     slug = updated.slug;
+    if (isSheetsConfigured()) await syncPropertyToSheet(updated);
   } catch (err) {
     console.error("[admin] Error al actualizar inmueble:", err);
     return { error: "No se pudo actualizar el inmueble." };
@@ -210,7 +218,10 @@ export async function createPropertyArchiveAction(formData: FormData): Promise<v
     const property = await repo.properties.getById(id);
     if (property) {
       const folderId = await ensurePropertyArchive(property);
-      if (folderId) await repo.properties.update(id, { driveFolderId: folderId });
+      if (folderId) {
+        const updated = await repo.properties.update(id, { driveFolderId: folderId });
+        if (updated && isSheetsConfigured()) await syncPropertyToSheet(updated);
+      }
     }
   } catch (err) {
     console.error("[admin] No se pudo crear el archivo en Drive:", err);
@@ -222,7 +233,10 @@ export async function createPropertyArchiveAction(formData: FormData): Promise<v
 export async function deletePropertyAction(formData: FormData): Promise<void> {
   const id = str(formData.get("id"));
   if (id) {
-    await getRepository().properties.remove(id);
+    const repo = getRepository();
+    await repo.properties.remove(id);
+    // Reescribe el catálogo de Sheets para reflejar la eliminación (best-effort).
+    if (isSheetsConfigured()) await syncAllPropertiesToSheet(await repo.properties.list());
     revalidatePublic();
   }
   redirect("/admin/inmuebles");
