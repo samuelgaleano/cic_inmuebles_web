@@ -40,10 +40,10 @@ export function Pagination({
           href={hrefFor(p)}
           aria-current={p === currentPage ? "page" : undefined}
           className={cn(
-            "flex h-10 min-w-10 items-center justify-center rounded-lg px-3 text-sm font-medium",
+            "flex h-10 min-w-10 items-center justify-center rounded-xl px-3 text-sm font-semibold transition-colors",
             p === currentPage
-              ? "bg-brand-700 text-white"
-              : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
+              ? "bg-brand-700 text-white shadow-[0_8px_20px_-10px_rgba(4,125,91,0.8)]"
+              : "border border-line bg-white text-ink-soft hover:border-brand-200 hover:bg-brand-50",
           )}
         >
           {p}
@@ -72,7 +72,7 @@ function PageLink({
       <span
         {...rest}
         aria-disabled="true"
-        className="flex h-10 items-center justify-center rounded-lg border border-slate-100 bg-slate-50 px-3 text-slate-300"
+        className="flex h-10 items-center justify-center rounded-xl border border-line bg-surface px-3 text-muted/40"
       >
         {children}
       </span>
@@ -82,7 +82,7 @@ function PageLink({
     <Link
       href={href}
       {...rest}
-      className="flex h-10 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 text-slate-700 hover:bg-slate-50"
+      className="flex h-10 items-center justify-center rounded-xl border border-line bg-white px-3 text-ink-soft transition-colors hover:border-brand-200 hover:bg-brand-50"
     >
       {children}
     </Link>

@@ -91,16 +91,17 @@ export default async function InmueblesPage({
   const pageItems = sorted.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
-      <header className="mb-6">
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900">Catálogo de inmuebles</h1>
-        <p className="mt-1 text-slate-600">
-          {total} inmueble{total === 1 ? "" : "s"} encontrado{total === 1 ? "" : "s"}
+    <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
+      <header className="mb-8">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-600">Catálogo</p>
+        <h1 className="mt-2 text-3xl font-bold tracking-tight text-ink sm:text-4xl">Encuentra tu inmueble</h1>
+        <p className="mt-2 text-muted">
+          <span className="font-semibold text-ink">{total}</span> inmueble{total === 1 ? "" : "s"} disponible{total === 1 ? "" : "s"}
         </p>
       </header>
 
       <div className="mb-8">
-        <Suspense fallback={<div className="h-40 rounded-xl bg-slate-100" />}>
+        <Suspense fallback={<div className="h-40 rounded-[1.4rem] bg-surface" />}>
           <PropertyFilters cities={cities} />
         </Suspense>
       </div>

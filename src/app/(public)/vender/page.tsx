@@ -19,28 +19,31 @@ const benefits = [
 
 export default function VenderPage() {
   return (
-    <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
       <div className="grid gap-10 lg:grid-cols-2">
         <div>
-          <span className="inline-flex items-center gap-2 rounded-full bg-brand-50 px-3 py-1 text-sm font-medium text-brand-700">
+          <span className="inline-flex items-center gap-2 rounded-full bg-brand-50 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">
             Para propietarios
           </span>
-          <h1 className="mt-4 text-4xl font-bold tracking-tight text-slate-900">
-            Vende o arrienda tu inmueble sin complicaciones
+          <h1 className="mt-5 text-4xl font-bold tracking-tight text-ink sm:text-5xl">
+            Vende o arrienda sin complicaciones
           </h1>
-          <p className="mt-4 text-lg text-slate-600">
+          <p className="mt-4 text-lg leading-relaxed text-muted">
             Déjanos los datos de tu inmueble y un asesor te contactará. Nosotros nos
             encargamos del resto para que vendas de forma rápida y segura.
           </p>
 
           <div className="mt-8 grid gap-4 sm:grid-cols-2">
             {benefits.map((b) => (
-              <div key={b.title} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-50 text-brand-700">
+              <div
+                key={b.title}
+                className="group rounded-2xl border border-line bg-white p-5 transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-1 hover:shadow-[0_24px_44px_-28px_rgba(11,26,21,0.3)]"
+              >
+                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-600 text-white shadow-[0_10px_24px_-12px_rgba(7,162,118,0.7)]">
                   <b.icon className="h-5 w-5" />
                 </span>
-                <h3 className="mt-3 font-semibold text-slate-900">{b.title}</h3>
-                <p className="mt-1 text-sm text-slate-600">{b.desc}</p>
+                <h3 className="mt-4 font-bold text-ink">{b.title}</h3>
+                <p className="mt-1 text-sm leading-relaxed text-muted">{b.desc}</p>
               </div>
             ))}
           </div>
@@ -55,9 +58,9 @@ export default function VenderPage() {
         </div>
 
         <div className="lg:pl-6">
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm lg:sticky lg:top-20">
-            <h2 className="text-xl font-bold text-slate-900">Cuéntanos sobre tu inmueble</h2>
-            <p className="mt-1 text-sm text-slate-500">
+          <div className="rounded-[1.6rem] border border-line bg-white p-6 shadow-[0_20px_50px_-30px_rgba(11,26,21,0.4)] lg:sticky lg:top-24 sm:p-7">
+            <h2 className="text-xl font-bold tracking-tight text-ink">Cuéntanos sobre tu inmueble</h2>
+            <p className="mt-1 text-sm text-muted">
               Solo necesitamos lo básico para contactarte. Toma menos de un minuto.
             </p>
             <div className="mt-5">

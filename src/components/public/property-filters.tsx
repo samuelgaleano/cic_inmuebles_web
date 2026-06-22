@@ -13,7 +13,7 @@ import {
 } from "@/lib/domain";
 
 const selectClass =
-  "h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200";
+  "h-11 rounded-xl border border-line bg-surface px-3 text-sm text-ink-soft transition-colors focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-200";
 
 export function PropertyFilters({ cities }: { cities: string[] }) {
   const router = useRouter();
@@ -44,21 +44,21 @@ export function PropertyFilters({ cities }: { cities: string[] }) {
   const hasFilters = [...params.keys()].length > 0;
 
   return (
-    <div className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm ${isPending ? "opacity-70" : ""}`}>
+    <div className={`rounded-[1.4rem] border border-line bg-white p-4 shadow-[0_10px_40px_-28px_rgba(11,26,21,0.35)] ${isPending ? "opacity-70" : ""}`}>
       <form onSubmit={onSearch} className="flex gap-2">
         <div className="relative flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
           <input
             type="search"
             name="q"
             defaultValue={params.get("q") ?? ""}
             placeholder="Buscar por ciudad, barrio, código..."
-            className="h-11 w-full rounded-lg border border-slate-300 pl-9 pr-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+            className="h-11 w-full rounded-xl border border-line bg-surface pl-10 pr-3 text-sm text-ink transition-colors focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-200"
           />
         </div>
         <button
           type="submit"
-          className="h-11 rounded-lg bg-brand-700 px-4 text-sm font-medium text-white hover:bg-brand-800"
+          className="h-11 shrink-0 rounded-xl bg-brand-700 px-5 text-sm font-semibold text-white shadow-[0_10px_26px_-12px_rgba(4,125,91,0.8)] transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-brand-800 active:scale-[0.98]"
         >
           Buscar
         </button>

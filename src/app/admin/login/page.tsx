@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
-import { Building2 } from "lucide-react";
-import { redirect } from "next/navigation";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
+import { Logo } from "@/components/brand/brand-mark";
 import { LoginForm } from "@/components/admin/login-form";
 import { getAdminSession } from "@/lib/auth";
-import { siteConfig } from "@/lib/config/site";
+import { redirect } from "next/navigation";
 
 export const metadata: Metadata = {
   title: "Acceso administrador",
@@ -16,20 +17,37 @@ export default async function AdminLoginPage({
   searchParams: Promise<{ next?: string }>;
 }) {
   const { next } = await searchParams;
-  // Si ya hay sesión, ir directo al panel.
   if (await getAdminSession()) redirect("/admin");
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
-      <div className="w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-7 shadow-sm">
-        <div className="mb-6 flex flex-col items-center text-center">
-          <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-700 text-white">
-            <Building2 className="h-6 w-6" />
-          </span>
-          <h1 className="mt-3 text-xl font-bold text-brand-900">{siteConfig.name}</h1>
-          <p className="text-sm text-slate-500">Panel de administración</p>
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-ink px-4 py-10">
+      <div className="absolute inset-0 bg-aurora" />
+      <div className="pointer-events-none absolute inset-0 bg-grain opacity-[0.04]" />
+
+      <div className="relative w-full max-w-sm">
+        <Link
+          href="/"
+          className="mb-6 inline-flex items-center gap-1.5 text-sm font-medium text-white/55 transition-colors hover:text-white"
+        >
+          <ArrowLeft className="h-4 w-4" /> Volver al sitio
+        </Link>
+
+        <div className="rounded-[1.6rem] border border-white/10 bg-white/[0.04] p-1.5 backdrop-blur">
+          <div className="rounded-[1.25rem] border border-line bg-white p-7 shadow-2xl">
+            <Logo />
+            <h1 className="mt-6 font-display text-xl font-bold tracking-tight text-ink">
+              Panel de administración
+            </h1>
+            <p className="mt-1 text-sm text-muted">Ingresa con tus credenciales para continuar.</p>
+            <div className="mt-6">
+              <LoginForm next={next ?? "/admin"} />
+            </div>
+          </div>
         </div>
-        <LoginForm next={next ?? "/admin"} />
+
+        <p className="mt-6 text-center text-xs text-white/35">
+          Acceso restringido · CIC Inmuebles
+        </p>
       </div>
     </div>
   );

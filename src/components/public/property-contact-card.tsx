@@ -22,17 +22,17 @@ export function PropertyContactCard({
   const [tab, setTab] = useState<Tab>("visita");
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <h2 className="text-lg font-semibold text-slate-900">¿Te interesa este inmueble?</h2>
-      <p className="mt-1 text-sm text-slate-500">Te respondemos en el menor tiempo posible.</p>
+    <div className="rounded-[1.4rem] border border-line bg-white p-6 shadow-[0_10px_40px_-28px_rgba(11,26,21,0.35)]">
+      <h2 className="text-lg font-bold tracking-tight text-ink">¿Te interesa este inmueble?</h2>
+      <p className="mt-1 text-sm text-muted">Te respondemos en el menor tiempo posible.</p>
 
-      <div className="mt-4 grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1">
+      <div className="mt-4 grid grid-cols-2 gap-1 rounded-xl bg-surface p-1">
         <button
           type="button"
           onClick={() => setTab("visita")}
           className={cn(
-            "flex items-center justify-center gap-1.5 rounded-md py-2 text-sm font-medium transition",
-            tab === "visita" ? "bg-white text-brand-800 shadow-sm" : "text-slate-600",
+            "flex items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-semibold transition-all duration-300",
+            tab === "visita" ? "bg-white text-brand-700 shadow-sm" : "text-muted hover:text-ink",
           )}
         >
           <CalendarCheck className="h-4 w-4" /> Agendar visita
@@ -41,8 +41,8 @@ export function PropertyContactCard({
           type="button"
           onClick={() => setTab("info")}
           className={cn(
-            "flex items-center justify-center gap-1.5 rounded-md py-2 text-sm font-medium transition",
-            tab === "info" ? "bg-white text-brand-800 shadow-sm" : "text-slate-600",
+            "flex items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-semibold transition-all duration-300",
+            tab === "info" ? "bg-white text-brand-700 shadow-sm" : "text-muted hover:text-ink",
           )}
         >
           <Info className="h-4 w-4" /> Más información
@@ -61,10 +61,10 @@ export function PropertyContactCard({
         />
       </div>
 
-      <div className="mt-4 flex items-center gap-3">
-        <span className="h-px flex-1 bg-slate-200" />
-        <span className="text-xs text-slate-400">o</span>
-        <span className="h-px flex-1 bg-slate-200" />
+      <div className="mt-5 flex items-center gap-3">
+        <span className="h-px flex-1 bg-line" />
+        <span className="text-xs text-muted">o</span>
+        <span className="h-px flex-1 bg-line" />
       </div>
 
       <WhatsAppButton

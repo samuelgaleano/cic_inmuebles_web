@@ -1,48 +1,65 @@
 import Link from "next/link";
-import { Building2, Mail, Phone } from "lucide-react";
-import { siteConfig } from "@/lib/config/site";
+import { Mail, MapPin, Phone } from "lucide-react";
+import { Logo } from "@/components/brand/brand-mark";
+import { siteConfig, whatsappLink } from "@/lib/config/site";
 
 export function SiteFooter() {
   const year = new Date().getFullYear();
+
   return (
-    <footer className="mt-auto border-t border-slate-200 bg-brand-950 text-slate-300">
-      <div className="mx-auto grid max-w-7xl gap-8 px-4 py-12 sm:px-6 md:grid-cols-3 lg:px-8">
-        <div>
-          <div className="flex items-center gap-2 text-white">
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-700">
-              <Building2 className="h-5 w-5" />
-            </span>
-            <span className="text-lg font-bold">{siteConfig.name}</span>
+    <footer className="mt-auto bg-ink text-white/70">
+      <div className="bg-aurora">
+        <div className="mx-auto grid max-w-6xl gap-10 px-4 py-16 sm:px-6 md:grid-cols-[1.4fr_1fr_1fr] lg:px-8">
+          <div>
+            <Logo tone="dark" />
+            <p className="mt-5 max-w-xs text-sm leading-relaxed text-white/55">
+              {siteConfig.description}
+            </p>
+            <Link
+              href={whatsappLink(`Hola ${siteConfig.name}, quiero más información.`)}
+              className="mt-6 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white transition-colors hover:border-brand-400/50 hover:bg-brand-500/10"
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-brand-400" />
+              Escríbenos por WhatsApp
+            </Link>
           </div>
-          <p className="mt-3 max-w-xs text-sm text-slate-400">{siteConfig.description}</p>
-        </div>
 
-        <div>
-          <h3 className="text-sm font-semibold text-white">Navegación</h3>
-          <ul className="mt-3 space-y-2 text-sm">
-            <li><Link href="/inmuebles" className="hover:text-white">Inmuebles</Link></li>
-            <li><Link href="/vender" className="hover:text-white">Vende tu inmueble</Link></li>
-            <li><Link href="/contacto" className="hover:text-white">Contacto</Link></li>
-          </ul>
-        </div>
+          <div>
+            <h3 className="font-display text-sm font-semibold text-white">Navegación</h3>
+            <ul className="mt-4 space-y-2.5 text-sm">
+              <li><Link href="/inmuebles" className="transition-colors hover:text-white">Inmuebles</Link></li>
+              <li><Link href="/vender" className="transition-colors hover:text-white">Vender mi inmueble</Link></li>
+              <li><Link href="/contacto" className="transition-colors hover:text-white">Contacto</Link></li>
+            </ul>
+          </div>
 
-        <div>
-          <h3 className="text-sm font-semibold text-white">Contacto</h3>
-          <ul className="mt-3 space-y-2 text-sm">
-            <li className="flex items-center gap-2">
-              <Mail className="h-4 w-4" />
-              <a href={`mailto:${siteConfig.email}`} className="hover:text-white">{siteConfig.email}</a>
-            </li>
-            <li className="flex items-center gap-2">
-              <Phone className="h-4 w-4" />
-              <span>{siteConfig.phoneDisplay}</span>
-            </li>
-          </ul>
+          <div>
+            <h3 className="font-display text-sm font-semibold text-white">Contacto</h3>
+            <ul className="mt-4 space-y-2.5 text-sm">
+              <li className="flex items-center gap-2.5">
+                <Mail className="h-4 w-4 text-brand-400" />
+                <a href={`mailto:${siteConfig.email}`} className="transition-colors hover:text-white">
+                  {siteConfig.email}
+                </a>
+              </li>
+              <li className="flex items-center gap-2.5">
+                <Phone className="h-4 w-4 text-brand-400" />
+                <span>{siteConfig.phoneDisplay}</span>
+              </li>
+              <li className="flex items-center gap-2.5">
+                <MapPin className="h-4 w-4 text-brand-400" />
+                <span>{siteConfig.city}</span>
+              </li>
+            </ul>
+          </div>
         </div>
       </div>
 
-      <div className="border-t border-white/10 py-5 text-center text-xs text-slate-500">
-        © {year} {siteConfig.name}. Todos los derechos reservados.
+      <div className="border-t border-white/10">
+        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-2 px-4 py-6 text-xs text-white/40 sm:flex-row sm:px-6 lg:px-8">
+          <p>© {year} {siteConfig.name}. Todos los derechos reservados.</p>
+          <p>Hecho con dedicación para tu próximo hogar.</p>
+        </div>
       </div>
     </footer>
   );
