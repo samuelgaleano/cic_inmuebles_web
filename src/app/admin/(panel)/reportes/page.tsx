@@ -41,57 +41,57 @@ export default async function AdminReportesPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">Reportes</h1>
-        <p className="text-slate-500">Indicadores del negocio.</p>
+        <h1 className="text-2xl font-bold tracking-tight text-ink">Reportes</h1>
+        <p className="mt-0.5 text-sm text-muted">Indicadores del negocio.</p>
       </div>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
         {cards.map((c) => (
-          <div key={c.label} className="rounded-xl border border-slate-200 bg-white p-5">
-            <p className="text-sm text-slate-500">{c.label}</p>
-            <p className="mt-1 text-2xl font-bold text-slate-900">{c.value}</p>
+          <div key={c.label} className="rounded-2xl border border-line bg-white p-5">
+            <p className="text-sm text-muted">{c.label}</p>
+            <p className="mt-1 font-display text-2xl font-extrabold tracking-tight text-ink">{c.value}</p>
           </div>
         ))}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <section className="rounded-xl border border-slate-200 bg-white p-5">
-          <h2 className="mb-3 font-semibold text-slate-900">Inventario por estado</h2>
-          <dl className="space-y-2 text-sm">
+        <section className="rounded-2xl border border-line bg-white p-6">
+          <h2 className="mb-4 font-semibold text-ink">Inventario por estado</h2>
+          <dl className="space-y-2.5 text-sm">
             {PROPERTY_STATUSES.map((s) => (
               <div key={s} className="flex justify-between">
-                <dt className="text-slate-600">{PROPERTY_STATUS_LABELS[s]}</dt>
-                <dd className="font-semibold">{properties.filter((p) => p.estado === s).length}</dd>
+                <dt className="text-muted">{PROPERTY_STATUS_LABELS[s]}</dt>
+                <dd className="font-semibold text-ink">{properties.filter((p) => p.estado === s).length}</dd>
               </div>
             ))}
           </dl>
         </section>
 
-        <section className="rounded-xl border border-slate-200 bg-white p-5">
-          <h2 className="mb-3 font-semibold text-slate-900">Leads por estado</h2>
-          <dl className="space-y-2 text-sm">
+        <section className="rounded-2xl border border-line bg-white p-6">
+          <h2 className="mb-4 font-semibold text-ink">Leads por estado</h2>
+          <dl className="space-y-2.5 text-sm">
             {LEAD_STATUSES.map((s) => (
               <div key={s} className="flex justify-between">
-                <dt className="text-slate-600">{LEAD_STATUS_LABELS[s]}</dt>
-                <dd className="font-semibold">{leads.filter((l) => l.estado === s).length}</dd>
+                <dt className="text-muted">{LEAD_STATUS_LABELS[s]}</dt>
+                <dd className="font-semibold text-ink">{leads.filter((l) => l.estado === s).length}</dd>
               </div>
             ))}
           </dl>
         </section>
 
-        <section className="rounded-xl border border-slate-200 bg-white p-5">
-          <h2 className="mb-3 font-semibold text-slate-900">Inmuebles por ciudad</h2>
-          <dl className="space-y-2 text-sm">
+        <section className="rounded-2xl border border-line bg-white p-6">
+          <h2 className="mb-4 font-semibold text-ink">Inmuebles por ciudad</h2>
+          <dl className="space-y-2.5 text-sm">
             {Object.entries(porCiudad)
               .sort((a, b) => b[1] - a[1])
               .map(([ciudad, n]) => (
                 <div key={ciudad} className="flex justify-between">
-                  <dt className="text-slate-600">{ciudad}</dt>
-                  <dd className="font-semibold">{n}</dd>
+                  <dt className="text-muted">{ciudad}</dt>
+                  <dd className="font-semibold text-ink">{n}</dd>
                 </div>
               ))}
             {Object.keys(porCiudad).length === 0 && (
-              <p className="text-slate-400">Sin datos.</p>
+              <p className="text-muted">Sin datos.</p>
             )}
           </dl>
         </section>

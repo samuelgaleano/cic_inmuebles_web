@@ -13,7 +13,7 @@ export function LeadStatusForm({ id, estado }: { id: string; estado: LeadStatus 
         name="estado"
         defaultValue={estado}
         onChange={() => ref.current?.requestSubmit()}
-        className="h-9 rounded-lg border border-slate-300 bg-white px-2 text-xs font-medium text-slate-700 focus:border-brand-500 focus:outline-none"
+        className="h-9 rounded-lg border border-line bg-surface px-2.5 text-xs font-semibold text-ink-soft transition-colors focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-200"
       >
         {LEAD_STATUSES.map((s) => (
           <option key={s} value={s}>{LEAD_STATUS_LABELS[s]}</option>

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ExternalLink, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { buttonVariants } from "@/components/ui/button";
 import { getRepository } from "@/lib/data";
 import { deletePropertyAction } from "@/lib/actions/admin-properties";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -31,85 +32,82 @@ export default async function AdminInmueblesPage({
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Inmuebles</h1>
-          <p className="text-slate-500">{properties.length} en el inventario</p>
+          <h1 className="text-2xl font-bold tracking-tight text-ink">Inmuebles</h1>
+          <p className="mt-0.5 text-sm text-muted">{properties.length} en el inventario</p>
         </div>
-        <Link
-          href="/admin/inmuebles/nuevo"
-          className="inline-flex h-10 items-center gap-2 rounded-lg bg-brand-700 px-4 text-sm font-semibold text-white hover:bg-brand-800"
-        >
+        <Link href="/admin/inmuebles/nuevo" className={buttonVariants({ variant: "primary", size: "md" })}>
           <Plus className="h-4 w-4" /> Nuevo inmueble
         </Link>
       </div>
 
-      <form method="get" className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-3">
+      <form method="get" className="flex flex-wrap items-center gap-2 rounded-2xl border border-line bg-white p-3">
         <div className="relative min-w-48 flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
           <input
             name="q"
             defaultValue={sp.q ?? ""}
             placeholder="Buscar por título, ciudad, código..."
-            className="h-10 w-full rounded-lg border border-slate-300 pl-9 pr-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+            className="h-10 w-full rounded-xl border border-line bg-surface pl-10 pr-3 text-sm text-ink transition-colors focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-200"
           />
         </div>
         <select
           name="estado"
           defaultValue={estado ?? ""}
-          className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm"
+          className="h-10 rounded-xl border border-line bg-surface px-3 text-sm text-ink-soft transition-colors focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-200"
         >
           <option value="">Todos los estados</option>
           {PROPERTY_STATUSES.map((s) => (
             <option key={s} value={s}>{PROPERTY_STATUS_LABELS[s]}</option>
           ))}
         </select>
-        <button className="h-10 rounded-lg bg-brand-700 px-4 text-sm font-semibold text-white hover:bg-brand-800">
+        <button className="h-10 shrink-0 rounded-xl bg-brand-700 px-4 text-sm font-semibold text-white shadow-[0_10px_26px_-12px_rgba(4,125,91,0.8)] transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-brand-800 active:scale-[0.98]">
           Filtrar
         </button>
         {(sp.q || estado) && (
-          <Link href="/admin/inmuebles" className="text-sm text-slate-500 hover:text-slate-700">
+          <Link href="/admin/inmuebles" className="text-sm font-medium text-muted hover:text-ink">
             Limpiar
           </Link>
         )}
       </form>
 
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+      <div className="overflow-x-auto rounded-2xl border border-line bg-white">
         <table className="w-full text-left text-sm">
-          <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
+          <thead className="border-b border-line bg-surface text-xs uppercase tracking-wider text-muted">
             <tr>
-              <th className="px-4 py-3">Código</th>
-              <th className="px-4 py-3">Título</th>
-              <th className="px-4 py-3">Ciudad</th>
-              <th className="px-4 py-3">Operación</th>
-              <th className="px-4 py-3">Precio</th>
-              <th className="px-4 py-3">Estado</th>
-              <th className="px-4 py-3 text-right">Acciones</th>
+              <th className="px-4 py-3 font-semibold">Código</th>
+              <th className="px-4 py-3 font-semibold">Título</th>
+              <th className="px-4 py-3 font-semibold">Ciudad</th>
+              <th className="px-4 py-3 font-semibold">Operación</th>
+              <th className="px-4 py-3 font-semibold">Precio</th>
+              <th className="px-4 py-3 font-semibold">Estado</th>
+              <th className="px-4 py-3 text-right font-semibold">Acciones</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-line">
             {properties.map((p) => (
-              <tr key={p.id} className="hover:bg-slate-50">
-                <td className="px-4 py-3 font-mono text-xs text-slate-500">{p.codigo}</td>
+              <tr key={p.id} className="transition-colors hover:bg-surface">
+                <td className="px-4 py-3 font-mono text-xs text-muted">{p.codigo}</td>
                 <td className="px-4 py-3">
-                  <p className="font-medium text-slate-800">{p.titulo}</p>
-                  <p className="text-xs text-slate-400">{PROPERTY_TYPE_LABELS[p.tipo]}{p.publicado ? "" : " · borrador"}</p>
+                  <p className="font-medium text-ink">{p.titulo}</p>
+                  <p className="text-xs text-muted">{PROPERTY_TYPE_LABELS[p.tipo]}{p.publicado ? "" : " · borrador"}</p>
                 </td>
-                <td className="px-4 py-3 text-slate-600">{p.ubicacion.ciudad}</td>
-                <td className="px-4 py-3 text-slate-600">{OPERATION_LABELS[p.operacion]}</td>
-                <td className="px-4 py-3 font-medium text-slate-800">{formatPrice(p.precio, p.moneda)}</td>
+                <td className="px-4 py-3 text-ink-soft">{p.ubicacion.ciudad}</td>
+                <td className="px-4 py-3 text-ink-soft">{OPERATION_LABELS[p.operacion]}</td>
+                <td className="px-4 py-3 font-semibold text-ink">{formatPrice(p.precio, p.moneda)}</td>
                 <td className="px-4 py-3"><StatusBadge status={p.estado} /></td>
                 <td className="px-4 py-3">
                   <div className="flex items-center justify-end gap-1">
                     <Link
                       href={`/inmuebles/${p.slug}`}
                       target="_blank"
-                      className="rounded-md p-2 text-slate-400 hover:bg-slate-100 hover:text-brand-700"
+                      className="rounded-lg p-2 text-muted transition-colors hover:bg-brand-50 hover:text-brand-700"
                       aria-label="Ver en el sitio"
                     >
                       <ExternalLink className="h-4 w-4" />
                     </Link>
                     <Link
                       href={`/admin/inmuebles/${p.id}`}
-                      className="rounded-md p-2 text-slate-400 hover:bg-slate-100 hover:text-brand-700"
+                      className="rounded-lg p-2 text-muted transition-colors hover:bg-brand-50 hover:text-brand-700"
                       aria-label="Editar"
                     >
                       <Pencil className="h-4 w-4" />
@@ -117,7 +115,7 @@ export default async function AdminInmueblesPage({
                     <form action={deletePropertyAction}>
                       <input type="hidden" name="id" value={p.id} />
                       <button
-                        className="rounded-md p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                        className="rounded-lg p-2 text-muted transition-colors hover:bg-rose-50 hover:text-rose-600"
                         aria-label="Eliminar"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -129,7 +127,7 @@ export default async function AdminInmueblesPage({
             ))}
             {properties.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-10 text-center text-slate-400">
+                <td colSpan={7} className="px-4 py-12 text-center text-muted">
                   No hay inmuebles. Crea el primero.
                 </td>
               </tr>

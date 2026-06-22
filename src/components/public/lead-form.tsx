@@ -181,7 +181,7 @@ export function LeadForm({
         {isPending && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
         {submitLabel ?? (isSeller ? "Quiero vender mi inmueble" : "Enviar y abrir WhatsApp")}
       </button>
-      <p className="text-center text-xs text-slate-400">
+      <p className="text-center text-xs text-muted">
         Al enviar, registramos tu solicitud y abrimos WhatsApp para contactarte. No compartimos tus datos.
       </p>
     </form>

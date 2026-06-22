@@ -162,7 +162,7 @@ export function PropertyFilters({ cities }: { cities: string[] }) {
         <button
           type="button"
           onClick={() => startTransition(() => router.push("/inmuebles", { scroll: false }))}
-          className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-brand-700"
+          className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-muted hover:text-brand-700"
         >
           <X className="h-4 w-4" /> Limpiar filtros
         </button>

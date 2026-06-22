@@ -18,8 +18,10 @@ import {
 type Action = (prev: PropertyFormState, formData: FormData) => Promise<PropertyFormState>;
 
 const input =
-  "h-11 w-full rounded-lg border border-slate-300 px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200";
-const label = "mb-1 block text-sm font-medium text-slate-700";
+  "h-11 w-full rounded-xl border border-line bg-surface px-3.5 text-sm text-ink transition-colors focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-200";
+const label = "mb-1.5 block text-sm font-medium text-ink-soft";
+const textareaClass =
+  "w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-sm text-ink transition-colors focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-200";
 
 function Field({
   name,
@@ -84,8 +86,8 @@ export function PropertyForm({
       )}
 
       {/* Datos principales */}
-      <section className="rounded-xl border border-slate-200 bg-white p-5">
-        <h2 className="mb-4 text-lg font-semibold text-slate-900">Datos principales</h2>
+      <section className="rounded-2xl border border-line bg-white p-6">
+        <h2 className="mb-4 text-lg font-bold tracking-tight text-ink">Datos principales</h2>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">
             <Field name="titulo" label="Título" defaultValue={property?.titulo} required error={state.errors?.titulo} />
@@ -119,8 +121,8 @@ export function PropertyForm({
       </section>
 
       {/* Ubicación */}
-      <section className="rounded-xl border border-slate-200 bg-white p-5">
-        <h2 className="mb-4 text-lg font-semibold text-slate-900">Ubicación</h2>
+      <section className="rounded-2xl border border-line bg-white p-6">
+        <h2 className="mb-4 text-lg font-bold tracking-tight text-ink">Ubicación</h2>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field name="departamento" label="Departamento" defaultValue={u?.departamento} required error={state.errors?.departamento} />
           <Field name="ciudad" label="Ciudad" defaultValue={u?.ciudad} required error={state.errors?.ciudad} />
@@ -132,8 +134,8 @@ export function PropertyForm({
       </section>
 
       {/* Características */}
-      <section className="rounded-xl border border-slate-200 bg-white p-5">
-        <h2 className="mb-4 text-lg font-semibold text-slate-900">Características</h2>
+      <section className="rounded-2xl border border-line bg-white p-6">
+        <h2 className="mb-4 text-lg font-bold tracking-tight text-ink">Características</h2>
         <div className="grid gap-4 sm:grid-cols-3">
           <Field name="habitaciones" label="Habitaciones" type="number" defaultValue={c?.habitaciones} />
           <Field name="banos" label="Baños" type="number" defaultValue={c?.banos} />
@@ -147,29 +149,29 @@ export function PropertyForm({
         </div>
         <div className="mt-4">
           <label className={label} htmlFor="amenidades">Amenidades (una por línea o separadas por coma)</label>
-          <textarea id="amenidades" name="amenidades" rows={2} defaultValue={property?.amenidades.join(", ")} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+          <textarea id="amenidades" name="amenidades" rows={2} defaultValue={property?.amenidades.join(", ")} className={textareaClass} />
         </div>
       </section>
 
       {/* Descripción */}
-      <section className="rounded-xl border border-slate-200 bg-white p-5">
-        <h2 className="mb-4 text-lg font-semibold text-slate-900">Descripción</h2>
+      <section className="rounded-2xl border border-line bg-white p-6">
+        <h2 className="mb-4 text-lg font-bold tracking-tight text-ink">Descripción</h2>
         <div className="space-y-4">
           <div>
             <label className={label} htmlFor="descripcionCorta">Descripción corta (para WhatsApp/redes)</label>
-            <textarea id="descripcionCorta" name="descripcionCorta" rows={2} defaultValue={property?.descripcionCorta} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+            <textarea id="descripcionCorta" name="descripcionCorta" rows={2} defaultValue={property?.descripcionCorta} className={textareaClass} />
           </div>
           <div>
             <label className={label} htmlFor="descripcion">Descripción larga (ficha)</label>
-            <textarea id="descripcion" name="descripcion" rows={5} defaultValue={property?.descripcion} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+            <textarea id="descripcion" name="descripcion" rows={5} defaultValue={property?.descripcion} className={textareaClass} />
           </div>
         </div>
       </section>
 
       {/* Medios */}
-      <section className="rounded-xl border border-slate-200 bg-white p-5">
-        <h2 className="mb-1 text-lg font-semibold text-slate-900">Medios</h2>
-        <p className="mb-4 text-sm text-slate-500">
+      <section className="rounded-2xl border border-line bg-white p-6">
+        <h2 className="mb-1 text-lg font-bold tracking-tight text-ink">Medios</h2>
+        <p className="mb-4 text-sm text-muted">
           Sube imágenes (se almacenan en Cloudinary) o pega URLs, una por línea. La primera será la portada.
         </p>
         <div className="space-y-4">
@@ -182,7 +184,7 @@ export function PropertyForm({
               rows={4}
               value={imagenes}
               onChange={(e) => setImagenes(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-xs"
+              className="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 font-mono text-xs text-ink transition-colors focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-200"
             />
           </div>
           <Field name="videoUrl" label="URL de video (YouTube, opcional)" defaultValue={videoUrl} placeholder="https://youtu.be/..." />
@@ -190,8 +192,8 @@ export function PropertyForm({
       </section>
 
       {/* Propietario + publicación */}
-      <section className="rounded-xl border border-slate-200 bg-white p-5">
-        <h2 className="mb-4 text-lg font-semibold text-slate-900">Propietario (privado) y publicación</h2>
+      <section className="rounded-2xl border border-line bg-white p-6">
+        <h2 className="mb-4 text-lg font-bold tracking-tight text-ink">Propietario (privado) y publicación</h2>
         <div className="grid gap-4 sm:grid-cols-3">
           <Field name="propietarioNombre" label="Nombre" defaultValue={property?.propietario?.nombre} />
           <Field name="propietarioTelefono" label="Teléfono" defaultValue={property?.propietario?.telefono} />
@@ -201,12 +203,12 @@ export function PropertyForm({
           <Field name="driveFolderId" label="ID carpeta de Google Drive (opcional)" defaultValue={property?.driveFolderId} />
         </div>
         <div className="mt-4 flex flex-wrap gap-6">
-          <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
-            <input type="checkbox" name="publicado" defaultChecked={property?.publicado ?? true} className="h-4 w-4" />
+          <label className="flex items-center gap-2 text-sm font-medium text-ink-soft">
+            <input type="checkbox" name="publicado" defaultChecked={property?.publicado ?? true} className="h-4 w-4 accent-brand-600" />
             Publicado (visible en el sitio)
           </label>
-          <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
-            <input type="checkbox" name="destacado" defaultChecked={property?.destacado ?? false} className="h-4 w-4" />
+          <label className="flex items-center gap-2 text-sm font-medium text-ink-soft">
+            <input type="checkbox" name="destacado" defaultChecked={property?.destacado ?? false} className="h-4 w-4 accent-brand-600" />
             Destacado
           </label>
         </div>
@@ -216,12 +218,12 @@ export function PropertyForm({
         <button
           type="submit"
           disabled={isPending}
-          className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-brand-700 px-6 font-semibold text-white hover:bg-brand-800 disabled:opacity-60"
+          className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-brand-700 px-6 font-semibold text-white shadow-[0_10px_26px_-10px_rgba(4,125,91,0.8)] transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-brand-800 active:scale-[0.98] disabled:opacity-60"
         >
           {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           Guardar
         </button>
-        <Link href="/admin/inmuebles" className="text-sm font-medium text-slate-500 hover:text-slate-700">
+        <Link href="/admin/inmuebles" className="text-sm font-medium text-muted hover:text-ink">
           Cancelar
         </Link>
       </div>

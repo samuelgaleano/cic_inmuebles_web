@@ -7,10 +7,10 @@ export default function NuevaPlantillaPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
-        <Link href="/admin/plantillas" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700">
+        <Link href="/admin/plantillas" className="inline-flex items-center gap-1.5 text-sm font-medium text-muted transition-colors hover:gap-2 hover:text-brand-700">
           <ArrowLeft className="h-4 w-4" /> Plantillas
         </Link>
-        <h1 className="mt-2 text-2xl font-bold text-slate-900">Nueva plantilla</h1>
+        <h1 className="mt-2 text-2xl font-bold tracking-tight text-ink">Nueva plantilla</h1>
       </div>
       <TemplateForm action={createTemplateAction} />
     </div>
