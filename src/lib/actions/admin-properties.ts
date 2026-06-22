@@ -195,6 +195,30 @@ export async function updatePropertyAction(
   redirect("/admin/inmuebles");
 }
 
+/**
+ * Crea (o recrea) la carpeta de archivo en Google Drive para un inmueble
+ * existente y guarda su id. Útil para inmuebles creados antes de configurar
+ * Drive. Best-effort.
+ */
+export async function createPropertyArchiveAction(formData: FormData): Promise<void> {
+  const id = str(formData.get("id"));
+  if (!id || !isDriveConfigured()) {
+    redirect(id ? `/admin/inmuebles/${id}` : "/admin/inmuebles");
+  }
+  try {
+    const repo = getRepository();
+    const property = await repo.properties.getById(id);
+    if (property) {
+      const folderId = await ensurePropertyArchive(property);
+      if (folderId) await repo.properties.update(id, { driveFolderId: folderId });
+    }
+  } catch (err) {
+    console.error("[admin] No se pudo crear el archivo en Drive:", err);
+  }
+  revalidatePath(`/admin/inmuebles/${id}`);
+  redirect(`/admin/inmuebles/${id}`);
+}
+
 export async function deletePropertyAction(formData: FormData): Promise<void> {
   const id = str(formData.get("id"));
   if (id) {

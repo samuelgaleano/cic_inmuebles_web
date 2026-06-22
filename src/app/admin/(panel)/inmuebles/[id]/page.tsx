@@ -2,8 +2,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import { PropertyForm } from "@/components/admin/property-form";
+import { DriveArchivePanel } from "@/components/admin/drive-archive";
 import { updatePropertyAction } from "@/lib/actions/admin-properties";
 import { getRepository } from "@/lib/data";
+import { isDriveConfigured, listFolderFiles } from "@/lib/integrations/drive";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +19,8 @@ export default async function EditarInmueblePage({
   if (!property) notFound();
 
   const action = updatePropertyAction.bind(null, id);
+  const driveConfigured = isDriveConfigured();
+  const driveFiles = property.driveFolderId ? await listFolderFiles(property.driveFolderId) : [];
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -37,6 +41,13 @@ export default async function EditarInmueblePage({
         </Link>
       </div>
       <PropertyForm action={action} property={property} />
+
+      <DriveArchivePanel
+        configured={driveConfigured}
+        folderId={property.driveFolderId}
+        files={driveFiles}
+        propertyId={property.id}
+      />
     </div>
   );
 }

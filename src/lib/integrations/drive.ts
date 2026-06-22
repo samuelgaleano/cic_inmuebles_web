@@ -63,6 +63,56 @@ async function getAccessToken(): Promise<string> {
   return data.access_token;
 }
 
+/** Enlace directo a una carpeta de Drive (para abrir en el navegador). */
+export function driveFolderLink(folderId: string): string {
+  return `https://drive.google.com/drive/folders/${folderId}`;
+}
+
+export interface DriveFile {
+  id: string;
+  name: string;
+  mimeType: string;
+  webViewLink?: string;
+  thumbnailLink?: string;
+  iconLink?: string;
+  modifiedTime?: string;
+}
+
+/** ¿Es una imagen el archivo de Drive? */
+export function isDriveImage(file: DriveFile): boolean {
+  return file.mimeType.startsWith("image/");
+}
+
+/**
+ * Lista los archivos de una carpeta del inmueble para verificarlos desde la
+ * web. Best-effort: si Drive no está configurado o falla, devuelve []. La
+ * carpeta debe estar compartida con la cuenta de servicio.
+ */
+export async function listFolderFiles(folderId: string): Promise<DriveFile[]> {
+  if (!isDriveConfigured() || !folderId) return [];
+  try {
+    const token = await getAccessToken();
+    const params = new URLSearchParams({
+      q: `'${folderId}' in parents and trashed = false`,
+      fields:
+        "files(id,name,mimeType,webViewLink,thumbnailLink,iconLink,modifiedTime)",
+      orderBy: "folder,name",
+      pageSize: "200",
+      supportsAllDrives: "true",
+      includeItemsFromAllDrives: "true",
+    });
+    const res = await fetch(`https://www.googleapis.com/drive/v3/files?${params}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error(`Drive list error: ${res.status} ${await res.text()}`);
+    const data = (await res.json()) as { files?: DriveFile[] };
+    return data.files ?? [];
+  } catch (err) {
+    console.error("[drive] No se pudieron listar los archivos:", err);
+    return [];
+  }
+}
+
 /** Crea una carpeta dentro de la carpeta raíz y devuelve su id. */
 async function createFolder(token: string, name: string): Promise<string> {
   const res = await fetch("https://www.googleapis.com/drive/v3/files?fields=id", {
