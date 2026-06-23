@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { generateSpecDoc, parseSpecDoc } from "./drive";
-import { PROPERTY_TYPE_LABELS } from "@/lib/domain";
+import {
+  OPERATION_LABELS,
+  OPERATIONS,
+  PROPERTY_STATUS_LABELS,
+  PROPERTY_STATUSES,
+  PROPERTY_TYPE_LABELS,
+  PROPERTY_TYPES,
+} from "@/lib/domain";
 import { seedProperties } from "@/lib/data/seed";
 
 describe("parseSpecDoc (round-trip con generateSpecDoc)", () => {
@@ -26,5 +35,30 @@ describe("parseSpecDoc (round-trip con generateSpecDoc)", () => {
   it("ignora líneas sin formato clave: valor", () => {
     const parsed = parseSpecDoc("texto suelto\nciudad: Medellín\n");
     expect(parsed.fields.ciudad).toBe("Medellín");
+  });
+});
+
+describe("plantilla especificaciones.md (docs/)", () => {
+  const text = readFileSync(
+    path.join(process.cwd(), "docs/plantilla-especificaciones.md"),
+    "utf8",
+  );
+  const parsed = parseSpecDoc(text);
+
+  it("extrae los campos esenciales (las notas con # se ignoran)", () => {
+    expect(parsed.fields.titulo).toBeTruthy();
+    expect(parsed.fields.ciudad).toBeTruthy();
+    expect(Number(parsed.fields.precio)).toBeGreaterThan(0);
+    expect(parsed.descripcionCorta).toBeTruthy();
+    expect(parsed.descripcion.length).toBeGreaterThan(0);
+  });
+
+  it("usa valores válidos para tipo, operación y estado", () => {
+    const okTipo = PROPERTY_TYPES.some((k) => PROPERTY_TYPE_LABELS[k] === parsed.fields.tipo);
+    const okOper = OPERATIONS.some((k) => OPERATION_LABELS[k] === parsed.fields.operacion);
+    const okEstado = PROPERTY_STATUSES.some((k) => PROPERTY_STATUS_LABELS[k] === parsed.fields.estado);
+    expect(okTipo).toBe(true);
+    expect(okOper).toBe(true);
+    expect(okEstado).toBe(true);
   });
 });
