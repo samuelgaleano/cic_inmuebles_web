@@ -77,20 +77,44 @@ export async function listFolderFiles(folderId: string): Promise<DriveFile[]> {
   }
 }
 
-/** Crea una carpeta dentro de la carpeta raíz y devuelve su id. */
-async function createFolder(token: string, name: string): Promise<string> {
-  const res = await fetch("https://www.googleapis.com/drive/v3/files?fields=id", {
+/** Crea una carpeta dentro de `parentId` (o la raíz) y devuelve su id. */
+async function createFolder(
+  token: string,
+  name: string,
+  parentId: string | undefined = process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID,
+): Promise<string> {
+  const res = await fetch("https://www.googleapis.com/drive/v3/files?fields=id&supportsAllDrives=true", {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       name,
       mimeType: "application/vnd.google-apps.folder",
-      parents: [process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID],
+      parents: parentId ? [parentId] : undefined,
     }),
   });
   if (!res.ok) throw new Error(`Drive folder error: ${res.status} ${await res.text()}`);
   const data = (await res.json()) as { id: string };
   return data.id;
+}
+
+/** Busca una carpeta por nombre dentro de `parentId`; si no existe, la crea. */
+async function findOrCreateFolder(token: string, name: string, parentId: string): Promise<string> {
+  const q = `'${parentId}' in parents and name = '${name.replace(/'/g, "\\'")}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
+  const params = new URLSearchParams({
+    q,
+    fields: "files(id,name)",
+    pageSize: "1",
+    supportsAllDrives: "true",
+    includeItemsFromAllDrives: "true",
+  });
+  const res = await fetch(`https://www.googleapis.com/drive/v3/files?${params}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (res.ok) {
+    const data = (await res.json()) as { files?: { id: string }[] };
+    if (data.files?.[0]) return data.files[0].id;
+  }
+  return createFolder(token, name, parentId);
 }
 
 /** Sube un archivo de texto a una carpeta (multipart). */
@@ -169,8 +193,10 @@ export async function ensurePropertyArchive(p: Property): Promise<string | null>
   if (!isDriveConfigured()) return null;
   try {
     const token = await getAccessToken();
-    const folderName = `${p.titulo} – ${p.ubicacion.ciudad}`;
-    const folderId = await createFolder(token, folderName);
+    const root = process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID!;
+    // Organización: raíz (db inmuebles) → Ciudad → Inmueble.
+    const cityId = await findOrCreateFolder(token, p.ubicacion.ciudad || "Sin ciudad", root);
+    const folderId = await createFolder(token, p.titulo, cityId);
     await uploadTextFile(token, folderId, "especificaciones.md", generateSpecDoc(p));
     return folderId;
   } catch (err) {
@@ -186,13 +212,13 @@ export interface DriveFolder {
   name: string;
 }
 
-/** Lista las subcarpetas de la carpeta raíz (cada una = un inmueble candidato). */
-export async function listRootFolders(): Promise<DriveFolder[]> {
-  if (!isDriveConfigured()) return [];
+/** Lista las subcarpetas de una carpeta dada. */
+export async function listSubfolders(parentId: string): Promise<DriveFolder[]> {
+  if (!isDriveConfigured() || !parentId) return [];
   try {
     const token = await getAccessToken();
     const params = new URLSearchParams({
-      q: `'${process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
+      q: `'${parentId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
       fields: "files(id,name)",
       orderBy: "name",
       pageSize: "200",
@@ -202,13 +228,18 @@ export async function listRootFolders(): Promise<DriveFolder[]> {
     const res = await fetch(`https://www.googleapis.com/drive/v3/files?${params}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
-    if (!res.ok) throw new Error(`Drive root list error: ${res.status} ${await res.text()}`);
+    if (!res.ok) throw new Error(`Drive subfolders error: ${res.status} ${await res.text()}`);
     const data = (await res.json()) as { files?: DriveFolder[] };
     return data.files ?? [];
   } catch (err) {
-    console.error("[drive] No se pudieron listar las carpetas raíz:", err);
+    console.error("[drive] No se pudieron listar subcarpetas:", err);
     return [];
   }
+}
+
+/** Subcarpetas de la carpeta raíz (ciudades o inmuebles directos). */
+export async function listRootFolders(): Promise<DriveFolder[]> {
+  return listSubfolders(process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID ?? "");
 }
 
 /** Descarga el contenido de texto de un archivo (p. ej. la ficha .md). */
