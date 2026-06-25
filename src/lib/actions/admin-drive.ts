@@ -9,6 +9,7 @@ import {
   isDriveImage,
   listFolderFiles,
   listRootFolders,
+  listSubfolders,
   makeFilePublic,
   parseSpecDoc,
 } from "@/lib/integrations/drive";
@@ -88,22 +89,23 @@ export async function importPropertiesFromDriveAction(
       existing.map((p) => p.driveFolderId).filter(Boolean) as string[],
     );
 
-    const folders = await listRootFolders();
-    if (folders.length === 0) {
+    const top = await listRootFolders();
+    if (top.length === 0) {
       return {
         ran: true,
         ok: true,
         message:
-          "No se encontraron carpetas en la carpeta raíz de Drive. Crea una carpeta por inmueble (con fotos y, opcional, una ficha .md) y vuelve a intentar.",
+          "No se encontraron carpetas en la carpeta raíz de Drive. Crea carpetas de ciudad (Bogotá, Cali…) y dentro una carpeta por inmueble.",
         created: [],
         skipped: 0,
       };
     }
 
-    for (const folder of folders) {
+    /** Importa una carpeta de inmueble. `cityHint` viene de la carpeta de ciudad. */
+    const importFolder = async (folder: { id: string; name: string }, cityHint?: string) => {
       if (importedFolderIds.has(folder.id)) {
         skipped++;
-        continue;
+        return;
       }
       try {
         const files = await listFolderFiles(folder.id);
@@ -118,6 +120,10 @@ export async function importPropertiesFromDriveAction(
 
         // Fotos -> públicas + URL embebible
         const images = files.filter(isDriveImage).slice(0, MAX_IMAGES);
+
+        // Carpeta sin nada útil (p. ej. una ciudad vacía): ignorar.
+        if (!spec && images.length === 0) return;
+
         await Promise.all(images.map((f) => makeFilePublic(f.id)));
         const medios: PropertyMedia[] = images.map((f, i) => ({
           id: `drive-${f.id}`,
@@ -129,7 +135,7 @@ export async function importPropertiesFromDriveAction(
           isCover: i === 0,
         }));
 
-        // Título / ciudad a partir del nombre de carpeta "Título – Ciudad"
+        // Título / ciudad: el nombre de carpeta puede ser "Título" o "Título – Ciudad".
         const parts = folder.name.split(/\s[–-]\s/);
         const folderTitulo = (parts[0] ?? folder.name).trim();
         const folderCiudad = parts.length > 1 ? parts[parts.length - 1].trim() : undefined;
@@ -143,7 +149,8 @@ export async function importPropertiesFromDriveAction(
           moneda: "COP",
           ubicacion: {
             departamento: fields.departamento || "Por definir",
-            ciudad: fields.ciudad || folderCiudad || "Por definir",
+            // Prioridad: ficha > carpeta de ciudad > nombre de carpeta > "Por definir".
+            ciudad: fields.ciudad || cityHint || folderCiudad || "Por definir",
             barrio: fields.barrio || undefined,
             direccion: fields.direccion || undefined,
             lat: parseNum(fields.lat),
@@ -183,6 +190,17 @@ export async function importPropertiesFromDriveAction(
       } catch (err) {
         console.error(`[drive-import] Error en carpeta "${folder.name}":`, err);
         errors.push(`No se pudo importar "${folder.name}".`);
+      }
+    };
+
+    // Recorre la raíz. Si una carpeta contiene subcarpetas, es una CIUDAD y cada
+    // hijo es un inmueble; si no, es un inmueble directo bajo la raíz.
+    for (const node of top) {
+      const children = await listSubfolders(node.id);
+      if (children.length > 0) {
+        for (const propFolder of children) await importFolder(propFolder, node.name);
+      } else {
+        await importFolder(node, undefined);
       }
     }
   } catch (err) {
