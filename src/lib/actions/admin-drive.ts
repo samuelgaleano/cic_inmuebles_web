@@ -60,6 +60,44 @@ function parseNum(v?: string): number | undefined {
 const MAX_IMAGES = 24;
 
 /**
+ * Carpetas de primer nivel que NO son ciudades y deben ignorarse en la
+ * importación (seguimiento, plantillas, respaldos, etc.).
+ */
+const IGNORE_TOP_RE = /seguimiento|plantilla|template|^\s*info\b|no.?importar|papelera|respaldo|backup|archivo/i;
+
+/** Normaliza nombres de ciudad (acentos/mayúsculas) para mostrarlos bien. */
+const CITY_FIX: Record<string, string> = {
+  bogota: "Bogotá",
+  "bogota dc": "Bogotá",
+  "bogota d.c.": "Bogotá",
+  medellin: "Medellín",
+  cali: "Cali",
+  barranquilla: "Barranquilla",
+  cartagena: "Cartagena",
+  bucaramanga: "Bucaramanga",
+  cucuta: "Cúcuta",
+  pereira: "Pereira",
+  manizales: "Manizales",
+  ibague: "Ibagué",
+  "santa marta": "Santa Marta",
+  villavicencio: "Villavicencio",
+  armenia: "Armenia",
+  pasto: "Pasto",
+  neiva: "Neiva",
+  monteria: "Montería",
+  popayan: "Popayán",
+  "la calera": "La Calera",
+  chia: "Chía",
+  soacha: "Soacha",
+};
+
+function normalizeCity(name: string): string {
+  const key = name.trim().toLowerCase();
+  if (CITY_FIX[key]) return CITY_FIX[key];
+  return name.trim().replace(/\b\p{L}/gu, (c) => c.toUpperCase());
+}
+
+/**
  * Importa inmuebles desde Google Drive: cada subcarpeta de la carpeta raíz se
  * convierte en un inmueble (borrador), tomando las fotos y, si existe, la ficha
  * de especificaciones. Los inmuebles ya importados (mismo driveFolderId) se
@@ -139,6 +177,7 @@ export async function importPropertiesFromDriveAction(
         const parts = folder.name.split(/\s[–-]\s/);
         const folderTitulo = (parts[0] ?? folder.name).trim();
         const folderCiudad = parts.length > 1 ? parts[parts.length - 1].trim() : undefined;
+        const ciudadRaw = (fields.ciudad || cityHint || folderCiudad || "").trim();
 
         const input: PropertyInput = {
           titulo: fields.titulo || folderTitulo,
@@ -149,8 +188,8 @@ export async function importPropertiesFromDriveAction(
           moneda: "COP",
           ubicacion: {
             departamento: fields.departamento || "Por definir",
-            // Prioridad: ficha > carpeta de ciudad > nombre de carpeta > "Por definir".
-            ciudad: fields.ciudad || cityHint || folderCiudad || "Por definir",
+            // Prioridad: ficha > carpeta de ciudad > nombre de carpeta. Se normaliza.
+            ciudad: ciudadRaw ? normalizeCity(ciudadRaw) : "Por definir",
             barrio: fields.barrio || undefined,
             direccion: fields.direccion || undefined,
             lat: parseNum(fields.lat),
@@ -196,10 +235,14 @@ export async function importPropertiesFromDriveAction(
     // Recorre la raíz. Si una carpeta contiene subcarpetas, es una CIUDAD y cada
     // hijo es un inmueble; si no, es un inmueble directo bajo la raíz.
     for (const node of top) {
+      // Carpetas que no son inmuebles ni ciudades (seguimiento, plantillas…).
+      if (IGNORE_TOP_RE.test(node.name)) continue;
       const children = await listSubfolders(node.id);
       if (children.length > 0) {
-        for (const propFolder of children) await importFolder(propFolder, node.name);
+        // Es una CIUDAD: cada subcarpeta es un inmueble.
+        for (const propFolder of children) await importFolder(propFolder, normalizeCity(node.name));
       } else {
+        // Inmueble directo bajo la raíz.
         await importFolder(node, undefined);
       }
     }
