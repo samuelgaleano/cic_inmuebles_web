@@ -1,87 +1,62 @@
 # Estructura del Drive de inmuebles — CIC
 
-Así debes organizar el Google Drive de la empresa. El sistema ya está
-preparado para leer **esta estructura de 2 niveles**: la **ciudad** se toma
-automáticamente de la carpeta padre, y cada carpeta de inmueble se importa
-como un borrador con sus fotos.
+El sistema ya está adaptado a **tu organización actual**. Recorre el Drive en
+profundidad y reconoce automáticamente **ciudad → estado → inmueble**.
 
-## 🗂️ Estructura general
+## 🗂️ Estructura (como la tienes)
 
 ```
-db inmuebles/                         ← CARPETA GENERAL (la raíz)
-│                                       Este es el GOOGLE_DRIVE_ROOT_FOLDER_ID.
-│                                       Compártela con la cuenta de servicio (Editor).
+BD inmuebles/                              ← RAÍZ (GOOGLE_DRIVE_ROOT_FOLDER_ID)
+│                                            Compártela (Editor) con la cuenta de servicio.
 │
-├── Bogotá/                           ← CARPETA DE CIUDAD
-│   ├── CIC-BOG-001 — Apartamento Chapinero/     ← CARPETA DE INMUEBLE
-│   │   ├── especificaciones.md       ← la ficha (usa la plantilla)
-│   │   ├── 01-fachada.jpg            ← fotos (la 01 será la portada)
-│   │   ├── 02-sala.jpg
-│   │   ├── 03-cocina.jpg
-│   │   └── 04-habitacion.jpg
-│   │
-│   ├── CIC-BOG-002 — Casa Usaquén/
-│   │   ├── especificaciones.md
-│   │   ├── 01-fachada.jpg
-│   │   └── ...
-│   │
-│   └── CIC-BOG-003 — Apartaestudio Cedritos/
-│       └── ...
+├── bogota/                                ← CIUDAD  (se muestra como "Bogotá")
+│   └── inmuebles disponibles/             ← ESTADO  (→ estado = Disponible)
+│       ├── 1006-palmeira-mazuren/         ← INMUEBLE (código 1006)
+│       │   ├── 1006-palmeira-info.docx    ← info (Word)  ⚠️ ver nota
+│       │   └── contenido visual/          ← FOTOS (se importan de aquí)
+│       │       ├── WhatsApp Image ....jpeg
+│       │       └── ...
+│       ├── 1007-Tierra Colina-Gilmar/
+│       │   ├── 1007-Tierra colina-info.docx
+│       │   └── contenido audiovisual/ ...
+│       └── 1011-Area19-Calleja XX/
+│           ├── info inmueble/             ← (también vale la info en subcarpeta)
+│           │   └── 1011-area19-info.docx
+│           └── contenido visual/ ...
 │
-└── Cali/                            ← OTRA CIUDAD
-    ├── CIC-CAL-001 — Casa Granada/
-    │   ├── especificaciones.md
-    │   └── ...
-    └── CIC-CAL-002 — Apartamento Ciudad Jardín/
-        └── ...
+└── seguimiento e info inmuebles/          ← se IGNORA (no es ciudad ni inmueble)
 ```
 
-## 📛 Nombres y convención (regla simple)
+> Más adelante puedes agregar `inmuebles vendidos/` o `inmuebles en proceso/`
+> al mismo nivel que `inmuebles disponibles/` y el estado se asignará solo.
 
-| Nivel | Cómo se nombra | Ejemplo |
-|---|---|---|
-| **General (raíz)** | `db inmuebles` | `db inmuebles` |
-| **Ciudad** | Solo el nombre de la ciudad, con tilde | `Bogotá`, `Cali` |
-| **Inmueble** | `CÓDIGO — Tipo Sector` | `CIC-BOG-001 — Apartamento Chapinero` |
-| **Fotos** | `##-descripcion.jpg` (numeradas) | `01-fachada.jpg`, `02-sala.jpg` |
-| **Ficha** | siempre `especificaciones.md` | `especificaciones.md` |
+## 🔌 Qué reconoce el sistema automáticamente
+- **Ciudad** → de la carpeta de ciudad (`bogota` → se normaliza a **Bogotá**).
+- **Estado** → de la carpeta `inmuebles disponibles / vendidos / en proceso`.
+- **Inmueble** → cualquier carpeta que tenga una subcarpeta de **contenido**
+  (`contenido visual`, `contenido audiovisual`, …) o imágenes.
+- **Fotos** → se toman de la subcarpeta de contenido (la primera = portada) y se
+  comparten como públicas para mostrarse en el sitio.
+- **Código y título** → del nombre de la carpeta: `1006-palmeira-mazuren`
+  → código `1006`, título "Palmeira Mazuren".
+- Se crea como **borrador**. No duplica si reimportas. La carpeta queda enlazada
+  en el panel (sección "Archivo en Google Drive") para abrir el `.docx` y las fotos.
 
-### Cómo se clasifica un inmueble dentro de una ciudad (el CÓDIGO)
-Usa un código corto y único por inmueble, así:
+## ⚠️ Importante sobre la INFO de cada inmueble (.docx)
+Los archivos **`.docx` de Word NO se pueden leer automáticamente**, así que el
+**precio, área, habitaciones, etc. no se importan** desde ahí. Cada inmueble se
+crea con **código + título + ciudad + estado + fotos**, y tú completas el resto
+en el panel (puedes abrir el `.docx` desde la ficha del inmueble para copiar los
+datos).
 
-```
-CIC - <CIUDAD(3 letras)> - <consecutivo de 3 dígitos>
-        BOG = Bogotá
-        CAL = Cali
-        MED = Medellín (cuando la agregues)
-```
-Ejemplos: `CIC-BOG-001`, `CIC-BOG-002`, `CIC-CAL-001`.
-- El consecutivo va subiendo (001, 002, 003…) **por ciudad**.
-- Después del código, agrega un texto humano para reconocerlo a simple vista:
-  `CIC-BOG-014 — Casa campestre La Calera`.
+### Para que TODO se importe automático (recomendado)
+Agrega en cada carpeta de inmueble un archivo **`especificaciones.md`** (usa la
+plantilla que te pasé). Si está presente, el sistema toma de ahí precio, área,
+habitaciones, descripción, etc. Alternativa: tener esa ficha como **Google Doc**
+con formato `clave: valor` (también se lee). El `.docx` de Word, no.
 
-> El código es solo para **organizarte tú** en Drive. El **título real** que se
-> publica en la web lo defines dentro de `especificaciones.md` (campo `titulo:`).
-
-## 🔌 Cómo lo lee el sistema (importante)
-
-- **Ciudad:** se toma del **nombre de la carpeta de ciudad** (`Bogotá`, `Cali`).
-  No tienes que repetirla, aunque puedes ponerla también en la ficha.
-- **Título, precio, características, descripción:** salen de `especificaciones.md`.
-- **Fotos:** todas las imágenes de la carpeta; la **primera en orden** (por eso
-  van numeradas `01`, `02`, …) será la **portada**.
-- **Estado inicial:** se importa como **borrador** (no se publica solo); tú lo
-  revisas en el panel y lo marcas como **Publicado**.
-- **No duplica:** si vuelves a importar, los inmuebles ya traídos se omiten.
-
-## ✅ Pasos para montarlo
-1. Crea la carpeta **`db inmuebles`** y compártela como **Editor** con la
-   cuenta de servicio (el correo `...iam.gserviceaccount.com`).
-2. Crea dentro las carpetas **`Bogotá`** y **`Cali`**.
-3. Por cada inmueble: crea su carpeta (`CIC-BOG-001 — …`), súbele las **fotos**
-   numeradas y la **`especificaciones.md`** (plantilla) rellena.
-4. En el panel: **Inmuebles → "Importar de Drive" → "Escanear e importar"**.
-5. Revisa los borradores y publícalos.
-
-> Consejo: deja una copia de `especificaciones.md` (vacía/plantilla) en la raíz
-> `db inmuebles` para que tus agentes la copien rápido en cada carpeta nueva.
+## ✅ Pasos
+1. Comparte **`BD inmuebles`** (Editor) con la cuenta de servicio.
+2. (Opcional pero ideal) agrega `especificaciones.md` en cada carpeta de inmueble.
+3. Panel → **Inmuebles → "Importar de Drive" → "Escanear e importar"**.
+4. Revisa los borradores, completa lo que falte y **publícalos**.

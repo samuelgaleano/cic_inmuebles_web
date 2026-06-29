@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getRepository } from "@/lib/data";
 import {
   drivePublicImageUrl,
-  getFileText,
+  getDocText,
   isDriveConfigured,
   isDriveImage,
   listFolderFiles,
@@ -12,6 +12,8 @@ import {
   listSubfolders,
   makeFilePublic,
   parseSpecDoc,
+  type DriveFile,
+  type DriveFolder,
 } from "@/lib/integrations/drive";
 import { isSheetsConfigured, syncAllPropertiesToSheet } from "@/lib/integrations/sheets";
 import {
@@ -37,7 +39,8 @@ export interface DriveImportState {
   errors?: string[];
 }
 
-/** Encuentra la clave de un enum a partir de su clave o su etiqueta legible. */
+/* ── Utilidades de mapeo ── */
+
 function matchEnum<T extends string>(
   value: string | undefined,
   keys: readonly T[],
@@ -57,15 +60,6 @@ function parseNum(v?: string): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
-const MAX_IMAGES = 24;
-
-/**
- * Carpetas de primer nivel que NO son ciudades y deben ignorarse en la
- * importación (seguimiento, plantillas, respaldos, etc.).
- */
-const IGNORE_TOP_RE = /seguimiento|plantilla|template|^\s*info\b|no.?importar|papelera|respaldo|backup|archivo/i;
-
-/** Normaliza nombres de ciudad (acentos/mayúsculas) para mostrarlos bien. */
 const CITY_FIX: Record<string, string> = {
   bogota: "Bogotá",
   "bogota dc": "Bogotá",
@@ -97,11 +91,49 @@ function normalizeCity(name: string): string {
   return name.trim().replace(/\b\p{L}/gu, (c) => c.toUpperCase());
 }
 
+/** Estado a partir del nombre de la carpeta de estado ("inmuebles disponibles"). */
+function estadoFromFolderName(name: string): PropertyStatus | undefined {
+  if (/vendid/i.test(name)) return "vendido";
+  if (/proceso|reserv|negociaci/i.test(name)) return "en_proceso";
+  if (/disponible/i.test(name)) return "disponible";
+  return undefined;
+}
+
+/** Limpia el nombre de carpeta para un título legible. */
+function cleanTitle(raw: string): string {
+  const t = raw
+    .replace(/[_]+/g, " ")
+    .replace(/\s*-\s*/g, " ")
+    .replace(/\?+/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return t.replace(/\b\p{L}/gu, (c) => c.toUpperCase());
+}
+
+// Carpetas de primer nivel que NO son ciudades ni inmuebles.
+const IGNORE_RE = /seguimiento|plantilla|template|^\s*info\b|no.?importar|papelera|respaldo|backup/i;
+// Subcarpeta con las fotos/videos del inmueble.
+const MEDIA_RE = /contenido|audiovisual|fotos|im[aá]gen|galer[ií]a|visual/i;
+// Subcarpeta con la ficha/documento de información.
+const INFO_RE = /info|especific|ficha|descrip/i;
+
+const MAX_IMAGES = 30;
+const MAX_DEPTH = 5;
+
+interface Ctx {
+  city?: string;
+  estado?: PropertyStatus;
+}
+
 /**
- * Importa inmuebles desde Google Drive: cada subcarpeta de la carpeta raíz se
- * convierte en un inmueble (borrador), tomando las fotos y, si existe, la ficha
- * de especificaciones. Los inmuebles ya importados (mismo driveFolderId) se
- * omiten. Las fotos se comparten como públicas para poder mostrarse en el sitio.
+ * Importa inmuebles desde Google Drive recorriendo la estructura
+ * raíz → Ciudad → (Estado) → Inmueble. Cada carpeta de inmueble se reconoce
+ * porque tiene una subcarpeta de "contenido" (fotos) o imágenes sueltas.
+ * - Ciudad: de la carpeta de ciudad. Estado: de la carpeta "inmuebles X".
+ * - Fotos: de la subcarpeta de contenido (se comparten como públicas).
+ * - Datos: del `especificaciones.md` o un Google Doc si existe (el .docx de
+ *   Word no se puede leer; queda accesible desde el panel para completarlo).
+ * Se importa como borrador. No duplica (omite los ya traídos por carpeta).
  */
 export async function importPropertiesFromDriveAction(
   _prev: DriveImportState,
@@ -120,10 +152,137 @@ export async function importPropertiesFromDriveAction(
   const created: NonNullable<DriveImportState["created"]> = [];
   const errors: string[] = [];
   let skipped = 0;
+  let importedFolderIds = new Set<string>();
+
+  /** Crea el inmueble (borrador) a partir de su carpeta. */
+  const importProperty = async (folder: DriveFolder, files: DriveFile[], subs: DriveFolder[], ctx: Ctx) => {
+    if (importedFolderIds.has(folder.id)) {
+      skipped++;
+      return;
+    }
+    try {
+      // Fotos: imágenes sueltas + las de las subcarpetas de "contenido".
+      let imageFiles = files.filter(isDriveImage);
+      for (const sub of subs.filter((s) => MEDIA_RE.test(s.name))) {
+        const mf = await listFolderFiles(sub.id);
+        imageFiles = imageFiles.concat(mf.filter(isDriveImage));
+      }
+      const images = imageFiles.slice(0, MAX_IMAGES);
+      await Promise.all(images.map((f) => makeFilePublic(f.id)));
+      const medios: PropertyMedia[] = images.map((f, i) => ({
+        id: `drive-${f.id}`,
+        type: "image",
+        provider: "drive",
+        url: drivePublicImageUrl(f.id),
+        alt: f.name,
+        order: i,
+        isCover: i === 0,
+      }));
+
+      // Ficha legible (.md/.txt o Google Doc): en la carpeta o en subcarpeta "info".
+      let specPool = files.slice();
+      const infoSub = subs.find((s) => INFO_RE.test(s.name) && !MEDIA_RE.test(s.name));
+      if (infoSub) specPool = specPool.concat(await listFolderFiles(infoSub.id));
+      const specFile =
+        specPool.find((f) => /\.(md|txt)$/i.test(f.name)) ??
+        specPool.find((f) => f.mimeType === "application/vnd.google-apps.document");
+      const specText = specFile ? await getDocText(specFile) : null;
+      const spec = specText ? parseSpecDoc(specText) : null;
+      const fields = spec?.fields ?? {};
+
+      // Código y título desde el nombre de carpeta "1006-palmeira-mazuren".
+      const m = folder.name.trim().match(/^(\d{2,})\s*[-–]\s*(.+)$/);
+      const codigo = m?.[1];
+      const folderTitulo = cleanTitle(m ? m[2] : folder.name);
+
+      const ciudadRaw = (fields.ciudad || ctx.city || "").trim();
+
+      const input: PropertyInput = {
+        codigo,
+        titulo: fields.titulo || folderTitulo,
+        tipo: matchEnum<PropertyType>(fields.tipo, PROPERTY_TYPES, PROPERTY_TYPE_LABELS) ?? "apartamento",
+        operacion: matchEnum<Operation>(fields.operacion, OPERATIONS, OPERATION_LABELS) ?? "venta",
+        estado:
+          matchEnum<PropertyStatus>(fields.estado, PROPERTY_STATUSES, PROPERTY_STATUS_LABELS) ??
+          ctx.estado ??
+          "disponible",
+        precio: parseNum(fields.precio) ?? 0,
+        moneda: "COP",
+        ubicacion: {
+          departamento: fields.departamento || "Por definir",
+          ciudad: ciudadRaw ? normalizeCity(ciudadRaw) : "Por definir",
+          barrio: fields.barrio || undefined,
+          direccion: fields.direccion || undefined,
+          lat: parseNum(fields.lat),
+          lng: parseNum(fields.lng),
+        },
+        caracteristicas: {
+          habitaciones: parseNum(fields.habitaciones),
+          banos: parseNum(fields.banos),
+          areaConstruida: parseNum(fields.area_construida),
+          areaTotal: parseNum(fields.area_total),
+          parqueaderos: parseNum(fields.parqueaderos),
+          estrato: parseNum(fields.estrato),
+          administracion: parseNum(fields.administracion),
+        },
+        amenidades: (fields.amenidades || "")
+          .split(/[\n,]+/)
+          .map((a) => a.trim())
+          .filter(Boolean),
+        descripcion: spec?.descripcion || "",
+        descripcionCorta: spec?.descripcionCorta || folderTitulo,
+        medios,
+        propietario: fields.propietario_nombre
+          ? {
+              nombre: fields.propietario_nombre,
+              telefono: fields.propietario_telefono || "",
+              email: fields.propietario_email || undefined,
+            }
+          : undefined,
+        driveFolderId: folder.id,
+        destacado: false,
+        publicado: false, // borrador para revisión
+      };
+
+      const prop = await repo.properties.create(input);
+      created.push({ id: prop.id, titulo: prop.titulo, slug: prop.slug, fotos: medios.length });
+    } catch (err) {
+      console.error(`[drive-import] Error en "${folder.name}":`, err);
+      errors.push(`No se pudo importar "${folder.name.trim()}".`);
+    }
+  };
+
+  /** Recorre la jerarquía detectando ciudades, estados e inmuebles. */
+  const walk = async (folder: DriveFolder, ctx: Ctx, depth: number) => {
+    if (depth > MAX_DEPTH || IGNORE_RE.test(folder.name)) return;
+
+    const ctx2: Ctx = { ...ctx };
+    const est = estadoFromFolderName(folder.name);
+    const isStatusLevel = Boolean(est);
+    if (est) ctx2.estado = est;
+
+    const [files, subs] = await Promise.all([
+      listFolderFiles(folder.id),
+      listSubfolders(folder.id),
+    ]);
+
+    const hasMedia = subs.some((s) => MEDIA_RE.test(s.name));
+    const hasImages = files.some(isDriveImage);
+
+    if (hasMedia || hasImages) {
+      // Es una carpeta de INMUEBLE.
+      await importProperty(folder, files, subs, ctx2);
+      return;
+    }
+
+    // Es una agrupación. El primer nivel sin estado define la CIUDAD.
+    if (!isStatusLevel && !ctx2.city) ctx2.city = normalizeCity(folder.name);
+    for (const sub of subs) await walk(sub, ctx2, depth + 1);
+  };
 
   try {
     const existing = await repo.properties.list();
-    const importedFolderIds = new Set(
+    importedFolderIds = new Set(
       existing.map((p) => p.driveFolderId).filter(Boolean) as string[],
     );
 
@@ -133,125 +292,22 @@ export async function importPropertiesFromDriveAction(
         ran: true,
         ok: true,
         message:
-          "No se encontraron carpetas en la carpeta raíz de Drive. Crea carpetas de ciudad (Bogotá, Cali…) y dentro una carpeta por inmueble.",
+          "No se encontraron carpetas en la raíz de Drive. Crea las carpetas de ciudad (Bogotá, Cali…) con sus inmuebles dentro.",
         created: [],
         skipped: 0,
       };
     }
 
-    /** Importa una carpeta de inmueble. `cityHint` viene de la carpeta de ciudad. */
-    const importFolder = async (folder: { id: string; name: string }, cityHint?: string) => {
-      if (importedFolderIds.has(folder.id)) {
-        skipped++;
-        return;
-      }
-      try {
-        const files = await listFolderFiles(folder.id);
-
-        // Ficha de especificaciones (opcional)
-        const specFile = files.find(
-          (f) => /espec/i.test(f.name) || /\.(md|txt)$/i.test(f.name),
-        );
-        const specText = specFile ? await getFileText(specFile.id) : null;
-        const spec = specText ? parseSpecDoc(specText) : null;
-        const fields = spec?.fields ?? {};
-
-        // Fotos -> públicas + URL embebible
-        const images = files.filter(isDriveImage).slice(0, MAX_IMAGES);
-
-        // Carpeta sin nada útil (p. ej. una ciudad vacía): ignorar.
-        if (!spec && images.length === 0) return;
-
-        await Promise.all(images.map((f) => makeFilePublic(f.id)));
-        const medios: PropertyMedia[] = images.map((f, i) => ({
-          id: `drive-${f.id}`,
-          type: "image",
-          provider: "drive",
-          url: drivePublicImageUrl(f.id),
-          alt: f.name,
-          order: i,
-          isCover: i === 0,
-        }));
-
-        // Título / ciudad: el nombre de carpeta puede ser "Título" o "Título – Ciudad".
-        const parts = folder.name.split(/\s[–-]\s/);
-        const folderTitulo = (parts[0] ?? folder.name).trim();
-        const folderCiudad = parts.length > 1 ? parts[parts.length - 1].trim() : undefined;
-        const ciudadRaw = (fields.ciudad || cityHint || folderCiudad || "").trim();
-
-        const input: PropertyInput = {
-          titulo: fields.titulo || folderTitulo,
-          tipo: matchEnum<PropertyType>(fields.tipo, PROPERTY_TYPES, PROPERTY_TYPE_LABELS) ?? "apartamento",
-          operacion: matchEnum<Operation>(fields.operacion, OPERATIONS, OPERATION_LABELS) ?? "venta",
-          estado: matchEnum<PropertyStatus>(fields.estado, PROPERTY_STATUSES, PROPERTY_STATUS_LABELS) ?? "disponible",
-          precio: parseNum(fields.precio) ?? 0,
-          moneda: "COP",
-          ubicacion: {
-            departamento: fields.departamento || "Por definir",
-            // Prioridad: ficha > carpeta de ciudad > nombre de carpeta. Se normaliza.
-            ciudad: ciudadRaw ? normalizeCity(ciudadRaw) : "Por definir",
-            barrio: fields.barrio || undefined,
-            direccion: fields.direccion || undefined,
-            lat: parseNum(fields.lat),
-            lng: parseNum(fields.lng),
-          },
-          caracteristicas: {
-            habitaciones: parseNum(fields.habitaciones),
-            banos: parseNum(fields.banos),
-            areaConstruida: parseNum(fields.area_construida),
-            areaTotal: parseNum(fields.area_total),
-            parqueaderos: parseNum(fields.parqueaderos),
-            estrato: parseNum(fields.estrato),
-            administracion: parseNum(fields.administracion),
-          },
-          amenidades: (fields.amenidades || "")
-            .split(/[\n,]+/)
-            .map((a) => a.trim())
-            .filter(Boolean),
-          descripcion: spec?.descripcion || "",
-          descripcionCorta: spec?.descripcionCorta || folderTitulo,
-          medios,
-          propietario: fields.propietario_nombre
-            ? {
-                nombre: fields.propietario_nombre,
-                telefono: fields.propietario_telefono || "",
-                email: fields.propietario_email || undefined,
-              }
-            : undefined,
-          driveFolderId: folder.id,
-          // Se importa como borrador para revisión antes de publicar.
-          destacado: false,
-          publicado: false,
-        };
-
-        const prop = await repo.properties.create(input);
-        created.push({ id: prop.id, titulo: prop.titulo, slug: prop.slug, fotos: medios.length });
-      } catch (err) {
-        console.error(`[drive-import] Error en carpeta "${folder.name}":`, err);
-        errors.push(`No se pudo importar "${folder.name}".`);
-      }
-    };
-
-    // Recorre la raíz. Si una carpeta contiene subcarpetas, es una CIUDAD y cada
-    // hijo es un inmueble; si no, es un inmueble directo bajo la raíz.
-    for (const node of top) {
-      // Carpetas que no son inmuebles ni ciudades (seguimiento, plantillas…).
-      if (IGNORE_TOP_RE.test(node.name)) continue;
-      const children = await listSubfolders(node.id);
-      if (children.length > 0) {
-        // Es una CIUDAD: cada subcarpeta es un inmueble.
-        for (const propFolder of children) await importFolder(propFolder, normalizeCity(node.name));
-      } else {
-        // Inmueble directo bajo la raíz.
-        await importFolder(node, undefined);
-      }
-    }
+    for (const node of top) await walk(node, {}, 1);
   } catch (err) {
     console.error("[drive-import] Error general:", err);
-    return { ran: true, ok: false, message: "No se pudo conectar con Google Drive. Revisa las credenciales y el acceso a la carpeta." };
+    return {
+      ran: true,
+      ok: false,
+      message: "No se pudo conectar con Google Drive. Revisa las credenciales y que la carpeta esté compartida con la cuenta de servicio.",
+    };
   }
 
-  // Refleja los nuevos inmuebles en el catálogo de Google Sheets (best-effort).
   if (created.length && isSheetsConfigured()) {
     await syncAllPropertiesToSheet(await repo.properties.list());
   }
@@ -268,7 +324,7 @@ export async function importPropertiesFromDriveAction(
   return {
     ran: true,
     ok: true,
-    message: parts.length ? parts.join(" · ") : "No había carpetas nuevas para importar.",
+    message: parts.length ? parts.join(" · ") : "No había inmuebles nuevos para importar.",
     created,
     skipped,
     errors,
