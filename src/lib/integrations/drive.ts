@@ -258,6 +258,30 @@ export async function getFileText(fileId: string): Promise<string | null> {
   }
 }
 
+/**
+ * Devuelve el texto de un archivo legible: Google Doc (export) o texto plano
+ * (.md/.txt). Para .docx/.pdf (binarios) devuelve null — no se pueden leer.
+ */
+export async function getDocText(file: DriveFile): Promise<string | null> {
+  if (!isDriveConfigured()) return null;
+  try {
+    if (file.mimeType === "application/vnd.google-apps.document") {
+      const token = await getAccessToken();
+      const res = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${file.id}/export?mimeType=text/plain`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      return res.ok ? await res.text() : null;
+    }
+    if (/^text\//.test(file.mimeType) || /\.(md|txt)$/i.test(file.name)) {
+      return getFileText(file.id);
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 /** Comparte un archivo como "cualquiera con el enlace puede ver" (best-effort). */
 export async function makeFilePublic(fileId: string): Promise<void> {
   try {
