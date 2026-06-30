@@ -60,14 +60,17 @@ concretarse en el menor número de pasos:
 Decisión: **la base de datos es la fuente de verdad; Google Drive es el archivo
 operativo, no un CDN.**
 
-- **Imágenes** → **Cloudinary es el motor visual único** (entrega optimizada vía
-  CDN). *Todas* las fotos del catálogo público se sirven desde Cloudinary, sin
-  importar su origen:
-  - subidas desde el panel → van directo a Cloudinary (subida sin firmar);
-  - importadas desde Drive → se **re-alojan** automáticamente en Cloudinary
-    (`uploadRemoteImage`) cuando está configurado. Si no lo está, caen con
-    elegancia a la URL pública de Drive (`lh3.googleusercontent.com`) como
-    respaldo, sin romper el flujo.
+- **Imágenes** → **por defecto se sirven directo desde Google Drive**
+  (`lh3.googleusercontent.com`), optimizadas vía `mediaLoader` (parámetro de
+  tamaño nativo). Decisión deliberada de **mínimas dependencias**: Drive ya es la
+  bandeja de entrada, así que no se añade ningún servicio extra para mostrar las
+  fotos. Suficiente para tráfico bajo/medio.
+  - **Cloudinary es OPCIONAL** (mejora, no requisito). Si se configura, las fotos
+    se re-alojan ahí (`uploadRemoteImage`) para entrega vía CDN dedicado; si no,
+    se usan las de Drive sin romper nada.
+  - **Plan B de crecimiento sin añadir servicios**: **Supabase Storage** (la
+    misma base que ya es fuente de verdad) si en el futuro se quiere dejar de
+    depender del hotlinking informal de Drive.
 - **Optimización sin dependencias medidas** → un *loader* propio
   (`mediaLoader`) hace que `next/image` **no use el optimizador de Vercel**
   (recurso con tope en el plan gratuito) y delegue en el origen, que optimiza
