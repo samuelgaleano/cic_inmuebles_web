@@ -68,6 +68,14 @@ operativo, no un CDN.**
     (`uploadRemoteImage`) cuando está configurado. Si no lo está, caen con
     elegancia a la URL pública de Drive (`lh3.googleusercontent.com`) como
     respaldo, sin romper el flujo.
+- **Optimización sin dependencias medidas** → un *loader* propio
+  (`mediaLoader`) hace que `next/image` **no use el optimizador de Vercel**
+  (recurso con tope en el plan gratuito) y delegue en el origen, que optimiza
+  gratis: Cloudinary (`f_auto,q_auto,c_limit,w_…`) o el tamaño nativo de Drive
+  (`=w…`). Una dependencia (y un tope) menos.
+- **Tolerancia a fallos** → `SafeImage` degrada con elegancia a un marcador
+  "imagen no disponible" si una URL cae (archivo borrado, CDN limitado), en vez
+  de mostrar una imagen rota.
 - **Videos** → YouTube no listado, embebido en la ficha.
 - **Google Drive** → al registrar un inmueble en el panel, la app:
   1. crea automáticamente la carpeta `Nombre – Localidad`,

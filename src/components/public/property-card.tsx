@@ -1,5 +1,5 @@
-import Image from "next/image";
 import Link from "next/link";
+import { SafeImage } from "@/components/ui/safe-image";
 import { ArrowUpRight, Bath, BedDouble, Car, MapPin, Maximize } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import {
@@ -29,7 +29,7 @@ export function PropertyCard({ property }: { property: PublicProperty }) {
     >
       <div className="relative m-1.5 aspect-[4/3] overflow-hidden rounded-[1.05rem] bg-surface">
         {cover ? (
-          <Image
+          <SafeImage
             src={cover.url}
             alt={cover.alt ?? property.titulo}
             fill
