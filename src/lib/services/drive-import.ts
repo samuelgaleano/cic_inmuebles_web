@@ -55,7 +55,11 @@ function matchEnum<T extends string>(
 
 function parseNum(v?: string): number | undefined {
   if (!v) return undefined;
-  const n = Number(v.replace(/[^0-9.-]/g, ""));
+  // Formato Colombia: punto = separador de miles, coma = decimal.
+  // Ej. "720.000.000" -> 720000000 ; "74,5 m²" -> 74.5 ; "$ 950.000" -> 950000.
+  const s = v.replace(/[^0-9,]/g, "").replace(",", ".");
+  if (s === "") return undefined;
+  const n = Number(s);
   return Number.isFinite(n) ? n : undefined;
 }
 
@@ -146,12 +150,20 @@ export async function runDriveImport(): Promise<DriveImportState> {
       return;
     }
     try {
-      // Fotos: imágenes sueltas + las de las subcarpetas de "contenido".
-      let imageFiles = files.filter(isDriveImage);
-      for (const sub of subs.filter((s) => MEDIA_RE.test(s.name))) {
-        const mf = await listFolderFiles(sub.id);
-        imageFiles = imageFiles.concat(mf.filter(isDriveImage));
-      }
+      // Fotos: recoge imágenes de la carpeta y de TODO su subárbol (carpetas de
+      // "contenido", incluso anidadas a varios niveles), hasta el tope. Robusto
+      // sin importar cómo de profundo guarde el equipo las fotos.
+      const imageFiles: DriveFile[] = [];
+      const collectImages = async (fls: DriveFile[], sbs: DriveFolder[], depth: number) => {
+        for (const f of fls) if (isDriveImage(f)) imageFiles.push(f);
+        if (depth >= 3 || imageFiles.length >= MAX_IMAGES) return;
+        for (const s of sbs) {
+          if (imageFiles.length >= MAX_IMAGES) break;
+          const [f2, s2] = await Promise.all([listFolderFiles(s.id), listSubfolders(s.id)]);
+          await collectImages(f2, s2, depth + 1);
+        }
+      };
+      await collectImages(files, subs, 0);
       const images = imageFiles.slice(0, MAX_IMAGES);
       await Promise.all(images.map((f) => makeFilePublic(f.id)));
       // Motor visual único: si Cloudinary está configurado, re-alojamos cada foto
