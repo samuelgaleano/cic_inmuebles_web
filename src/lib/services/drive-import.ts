@@ -13,6 +13,7 @@ import {
   type DriveFolder,
 } from "@/lib/integrations/drive";
 import { isSheetsConfigured, syncAllPropertiesToSheet } from "@/lib/integrations/sheets";
+import { isCloudinaryConfigured, uploadRemoteImage } from "@/lib/integrations/cloudinary";
 import {
   OPERATIONS,
   OPERATION_LABELS,
@@ -20,6 +21,7 @@ import {
   PROPERTY_STATUS_LABELS,
   PROPERTY_TYPES,
   PROPERTY_TYPE_LABELS,
+  type MediaProvider,
   type Operation,
   type PropertyInput,
   type PropertyMedia,
@@ -152,15 +154,33 @@ export async function runDriveImport(): Promise<DriveImportState> {
       }
       const images = imageFiles.slice(0, MAX_IMAGES);
       await Promise.all(images.map((f) => makeFilePublic(f.id)));
-      const medios: PropertyMedia[] = images.map((f, i) => ({
-        id: `drive-${f.id}`,
-        type: "image",
-        provider: "drive",
-        url: drivePublicImageUrl(f.id),
-        alt: f.name,
-        order: i,
-        isCover: i === 0,
-      }));
+      // Motor visual único: si Cloudinary está configurado, re-alojamos cada foto
+      // ahí (CDN + optimización); si no, usamos la URL pública de Drive como
+      // respaldo. Así el catálogo público es óptimo venga de donde venga.
+      const useCloudinary = isCloudinaryConfigured();
+      const medios: PropertyMedia[] = await Promise.all(
+        images.map(async (f, i) => {
+          const driveUrl = drivePublicImageUrl(f.id);
+          let url = driveUrl;
+          let provider: MediaProvider = "drive";
+          if (useCloudinary) {
+            const up = await uploadRemoteImage(driveUrl);
+            if (up) {
+              url = up.url;
+              provider = "cloudinary";
+            }
+          }
+          return {
+            id: `drive-${f.id}`,
+            type: "image" as const,
+            provider,
+            url,
+            alt: f.name,
+            order: i,
+            isCover: i === 0,
+          };
+        }),
+      );
 
       // Ficha legible (.md/.txt o Google Doc): en la carpeta o en subcarpeta "info".
       let specPool = files.slice();

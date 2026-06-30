@@ -60,15 +60,25 @@ concretarse en el menor número de pasos:
 Decisión: **la base de datos es la fuente de verdad; Google Drive es el archivo
 operativo, no un CDN.**
 
-- **Imágenes** → Cloudinary (entrega optimizada vía CDN).
+- **Imágenes** → **Cloudinary es el motor visual único** (entrega optimizada vía
+  CDN). *Todas* las fotos del catálogo público se sirven desde Cloudinary, sin
+  importar su origen:
+  - subidas desde el panel → van directo a Cloudinary (subida sin firmar);
+  - importadas desde Drive → se **re-alojan** automáticamente en Cloudinary
+    (`uploadRemoteImage`) cuando está configurado. Si no lo está, caen con
+    elegancia a la URL pública de Drive (`lh3.googleusercontent.com`) como
+    respaldo, sin romper el flujo.
 - **Videos** → YouTube no listado, embebido en la ficha.
 - **Google Drive** → al registrar un inmueble en el panel, la app:
   1. crea automáticamente la carpeta `Nombre – Localidad`,
   2. genera el **documento de especificaciones** estandarizado,
   3. guarda copia del material audiovisual (respaldo humano-legible).
+  Drive es el **archivo operativo / bandeja de entrada**, nunca el CDN del sitio.
 - **Importar desde Drive**: si se sube una carpeta a mano, un botón en el panel
-  la lee, parsea el documento de specs y crea el inmueble. Esto da el flujo
-  "subo a Drive y se refleja" sin un sincronizador frágil permanente.
+  la lee, parsea el documento de specs, re-aloja las fotos en Cloudinary y crea el
+  inmueble como **borrador**. Esto da el flujo "subo a Drive y se refleja" sin un
+  sincronizador frágil permanente y conservando la revisión humana antes de
+  publicar.
 
 ### Formato del documento de especificaciones
 Markdown con cabecera `clave: valor` (legible por humanos y parseable):

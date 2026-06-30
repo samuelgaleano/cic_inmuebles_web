@@ -10,9 +10,17 @@ import {
   OPERATIONS,
   PROPERTY_STATUSES,
   PROPERTY_TYPES,
+  type MediaProvider,
   type PropertyInput,
   type PropertyMedia,
 } from "@/lib/domain";
+
+/** Deduce el proveedor del medio a partir del host de la URL. */
+function mediaProviderFor(url: string): MediaProvider {
+  if (/res\.cloudinary\.com/i.test(url)) return "cloudinary";
+  if (/drive\.google\.com|googleusercontent\.com/i.test(url)) return "drive";
+  return "external";
+}
 
 /** Revalida las rutas públicas afectadas para mantener el catálogo sincronizado. */
 function revalidatePublic(slug?: string) {
@@ -78,7 +86,7 @@ function buildInput(formData: FormData): { input?: PropertyInput; state?: Proper
   const medios: PropertyMedia[] = imagenes.map((url, i) => ({
     id: `img-${i}`,
     type: "image",
-    provider: "external",
+    provider: mediaProviderFor(url),
     url,
     order: i,
     isCover: i === 0,
