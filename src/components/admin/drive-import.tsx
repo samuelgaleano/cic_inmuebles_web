@@ -10,7 +10,8 @@ import {
   Loader2,
   Pencil,
 } from "lucide-react";
-import { importPropertiesFromDriveAction, type DriveImportState } from "@/lib/actions/admin-drive";
+import { importPropertiesFromDriveAction } from "@/lib/actions/admin-drive";
+import type { DriveImportState } from "@/lib/services/drive-import";
 
 const initial: DriveImportState = {};
 
