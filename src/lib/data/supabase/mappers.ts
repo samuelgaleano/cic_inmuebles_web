@@ -75,6 +75,7 @@ export function propertyRowToDomain(row: any): Property {
           email: row.propietario_email ?? undefined,
         }
       : undefined,
+    notasInternas: row.notas_internas ?? undefined,
     driveFolderId: row.drive_folder_id ?? undefined,
     destacado: Boolean(row.destacado),
     publicado: Boolean(row.publicado),
@@ -113,6 +114,7 @@ export function propertyInputToRow(input: PropertyInput): Record<string, unknown
     propietario_nombre: input.propietario?.nombre ?? null,
     propietario_telefono: input.propietario?.telefono ?? null,
     propietario_email: input.propietario?.email ?? null,
+    notas_internas: input.notasInternas ?? null,
     drive_folder_id: input.driveFolderId ?? null,
     destacado: input.destacado,
     publicado: input.publicado,

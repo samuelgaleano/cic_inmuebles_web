@@ -200,6 +200,18 @@ export function PropertyForm({
           <Field name="propietarioEmail" label="Email" defaultValue={property?.propietario?.email} />
         </div>
         <div className="mt-4">
+          <label htmlFor="notasInternas" className="mb-1.5 block text-sm font-medium text-ink-soft">
+            Notas internas (privadas: negociación, llaves, observaciones)
+          </label>
+          <textarea
+            id="notasInternas"
+            name="notasInternas"
+            rows={3}
+            defaultValue={property?.notasInternas}
+            className={textareaClass}
+          />
+        </div>
+        <div className="mt-4">
           <Field name="driveFolderId" label="ID carpeta de Google Drive (opcional)" defaultValue={property?.driveFolderId} />
         </div>
         <div className="mt-4 flex flex-wrap gap-6">

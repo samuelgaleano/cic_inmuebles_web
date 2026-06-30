@@ -107,6 +107,9 @@ create table if not exists properties (
   propietario_telefono text,
   propietario_email    text,
 
+  -- Notas internas del equipo (privado)
+  notas_internas  text,
+
   -- Integración híbrida con Google Drive
   drive_folder_id text,
 

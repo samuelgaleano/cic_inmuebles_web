@@ -146,6 +146,7 @@ function buildInput(formData: FormData): { input?: PropertyInput; state?: Proper
           email: str(formData.get("propietarioEmail")) || undefined,
         }
       : undefined,
+    notasInternas: str(formData.get("notasInternas")) || undefined,
     driveFolderId: str(formData.get("driveFolderId")) || undefined,
     destacado: formData.get("destacado") === "on",
     publicado: formData.get("publicado") === "on",

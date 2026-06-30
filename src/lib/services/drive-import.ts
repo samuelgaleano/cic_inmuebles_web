@@ -254,6 +254,7 @@ export async function runDriveImport(): Promise<DriveImportState> {
               email: fields.propietario_email || undefined,
             }
           : undefined,
+        notasInternas: fields.notas_internas || undefined,
         driveFolderId: folder.id,
         destacado: false,
         publicado: false, // borrador para revisión

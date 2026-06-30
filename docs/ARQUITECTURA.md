@@ -114,7 +114,21 @@ descripcion:
 Texto largo que se muestra en la ficha del inmueble...
 ```
 
----
+### Límite real de la cuenta de servicio (verificado)
+Una cuenta de servicio sobre un Drive de **Gmail normal** (sin Unidad compartida
+de Workspace) **puede leer, listar, crear carpetas y dar permisos, pero NO puede
+subir archivos** (devuelve *"Service Accounts do not have storage quota"*).
+Implicaciones de diseño (todo a $0):
+
+- **Drive → Web (importar):** funciona completo (lee carpetas, Google Docs/.md,
+  fotos y las hace públicas). ✅
+- **Web → Drive (al registrar):** se crea la **carpeta** del inmueble (organizada
+  por ciudad) como archivo para fotos, pero **no** se sube `especificaciones.md`.
+  No pasa nada: la **fuente de verdad son la base de datos + Google Sheets**
+  (que la cuenta de servicio SÍ puede escribir e incluye propietario y notas
+  internas). El doc en Drive es opcional y humano.
+- Conclusión: **la base de datos + Sheets son el registro**; Drive es la
+  **bandeja de entrada de material** (fotos/fichas que sube el equipo).
 
 ## 5. Sincronización del catálogo
 

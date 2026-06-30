@@ -175,6 +175,7 @@ export function generateSpecDoc(p: Property | PropertyInput): string {
     `propietario_nombre: ${p.propietario?.nombre ?? ""}`,
     `propietario_telefono: ${p.propietario?.telefono ?? ""}`,
     `propietario_email: ${p.propietario?.email ?? ""}`,
+    `notas_internas: ${p.notasInternas ?? ""}`,
     "---",
     `descripcion_corta: ${p.descripcionCorta}`,
     "",
@@ -197,7 +198,19 @@ export async function ensurePropertyArchive(p: Property): Promise<string | null>
     // Organización: raíz (db inmuebles) → Ciudad → Inmueble.
     const cityId = await findOrCreateFolder(token, p.ubicacion.ciudad || "Sin ciudad", root);
     const folderId = await createFolder(token, p.titulo, cityId);
-    await uploadTextFile(token, folderId, "especificaciones.md", generateSpecDoc(p));
+    // El doc de especificaciones es best-effort APARTE: una cuenta de servicio
+    // sobre un Drive de Gmail (sin Unidad compartida) NO puede subir archivos
+    // ("Service Accounts do not have storage quota"). La carpeta sí se crea y
+    // queda como archivo del inmueble (para fotos). Los datos estructurados
+    // viven en la base de datos + Google Sheets, que sí son la fuente de verdad.
+    try {
+      await uploadTextFile(token, folderId, "especificaciones.md", generateSpecDoc(p));
+    } catch {
+      console.warn(
+        "[drive] Carpeta creada, pero no se pudo subir especificaciones.md " +
+          "(cuenta de servicio sin cuota de almacenamiento). Los datos quedan en la BD y en Sheets.",
+      );
+    }
     return folderId;
   } catch (err) {
     console.error("[drive] No se pudo crear el archivo del inmueble:", err);

@@ -129,6 +129,8 @@ export interface Property {
 
   /** Privado: solo panel admin. */
   propietario?: PropertyOwner;
+  /** Notas internas del equipo (negociación, llaves, observaciones). Privado. */
+  notasInternas?: string;
   /** ID de la carpeta de Google Drive del inmueble (integración híbrida). */
   driveFolderId?: string;
 
@@ -139,8 +141,8 @@ export interface Property {
   actualizadoEn: string;
 }
 
-/** Versión pública: omite datos sensibles del propietario. */
-export type PublicProperty = Omit<Property, "propietario"> & {
+/** Versión pública: omite datos sensibles (propietario, notas internas). */
+export type PublicProperty = Omit<Property, "propietario" | "notasInternas"> & {
   ubicacion: Omit<PropertyLocation, "direccion">;
 };
 
@@ -174,7 +176,7 @@ export function getCoverMedia(p: Pick<Property, "medios">): PropertyMedia | unde
 
 /** Convierte un inmueble en su versión pública (sin datos privados). */
 export function toPublicProperty(p: Property): PublicProperty {
-  const { propietario: _propietario, ubicacion, ...rest } = p;
+  const { propietario: _propietario, notasInternas: _notasInternas, ubicacion, ...rest } = p;
   const { direccion: _direccion, ...ubicacionPublica } = ubicacion;
   return { ...rest, ubicacion: ubicacionPublica };
 }

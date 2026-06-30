@@ -19,8 +19,10 @@
 #                 Oficina | Local comercial | Bodega | Lote | Finca
 #      operacion: En venta | En arriendo
 #      estado:    Disponible | En proceso | Vendido
-#  - precio y áreas: solo números (sin puntos ni símbolos). Ej. 450000000
-#  - La "direccion" es PRIVADA: no se muestra en el sitio público.
+#  - precio y áreas: números. Se admite formato colombiano: 450.000.000 o
+#    450000000 (los puntos de miles se entienden). Ej. 450000000
+#  - La "direccion" y las "notas_internas" son PRIVADAS: nunca se muestran en
+#    el sitio público (solo en el panel y en el registro interno de Sheets).
 # ─────────────────────────────────────────────────────────────────────────────
 
 titulo: Apartamento El Poblado
@@ -43,6 +45,7 @@ amenidades: Piscina, Gimnasio, Portería 24h, Ascensor, Zona BBQ
 propietario_nombre: 
 propietario_telefono: 
 propietario_email: 
+notas_internas: 
 ---
 descripcion_corta: Apartamento de 3 habitaciones en El Poblado, listo para estrenar.
 
