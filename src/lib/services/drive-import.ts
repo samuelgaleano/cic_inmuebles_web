@@ -15,14 +15,11 @@ import {
 import { isSheetsConfigured, syncAllPropertiesToSheet } from "@/lib/integrations/sheets";
 import { isCloudinaryConfigured, uploadRemoteImage } from "@/lib/integrations/cloudinary";
 import {
-  OPERATIONS,
-  OPERATION_LABELS,
   PROPERTY_STATUSES,
   PROPERTY_STATUS_LABELS,
   PROPERTY_TYPES,
   PROPERTY_TYPE_LABELS,
   type MediaProvider,
-  type Operation,
   type PropertyInput,
   type PropertyMedia,
   type PropertyStatus,
@@ -216,36 +213,24 @@ export async function runDriveImport(): Promise<DriveImportState> {
         codigo,
         titulo: fields.titulo || folderTitulo,
         tipo: matchEnum<PropertyType>(fields.tipo, PROPERTY_TYPES, PROPERTY_TYPE_LABELS) ?? "apartamento",
-        operacion: matchEnum<Operation>(fields.operacion, OPERATIONS, OPERATION_LABELS) ?? "venta",
         estado:
           matchEnum<PropertyStatus>(fields.estado, PROPERTY_STATUSES, PROPERTY_STATUS_LABELS) ??
           ctx.estado ??
           "disponible",
         precio: parseNum(fields.precio) ?? 0,
-        moneda: "COP",
+        administracion: parseNum(fields.administracion),
         ubicacion: {
-          departamento: fields.departamento || "Por definir",
           ciudad: ciudadRaw ? normalizeCity(ciudadRaw) : "Por definir",
-          barrio: fields.barrio || undefined,
+          sector: fields.sector || fields.barrio || undefined,
+          conjunto: fields.conjunto || undefined,
           direccion: fields.direccion || undefined,
-          lat: parseNum(fields.lat),
-          lng: parseNum(fields.lng),
         },
         caracteristicas: {
           habitaciones: parseNum(fields.habitaciones),
           banos: parseNum(fields.banos),
-          areaConstruida: parseNum(fields.area_construida),
-          areaTotal: parseNum(fields.area_total),
-          parqueaderos: parseNum(fields.parqueaderos),
-          estrato: parseNum(fields.estrato),
-          administracion: parseNum(fields.administracion),
+          area: parseNum(fields.area) ?? parseNum(fields.area_construida),
         },
-        amenidades: (fields.amenidades || "")
-          .split(/[\n,]+/)
-          .map((a) => a.trim())
-          .filter(Boolean),
-        descripcion: spec?.descripcion || "",
-        descripcionCorta: spec?.descripcionCorta || folderTitulo,
+        descripcion: spec?.descripcion || spec?.descripcionCorta || "",
         medios,
         propietario: fields.propietario_nombre
           ? {

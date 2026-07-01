@@ -1,9 +1,10 @@
 /**
- * Modelo de dominio del Inmueble.
+ * Modelo de dominio del Inmueble (CIC Inmuebles).
  *
- * Es la entidad central del catálogo. La fuente de verdad es la base de datos
- * (ver docs/ARQUITECTURA.md); estos tipos describen la forma de los datos que
- * consume tanto el sitio público como el panel de administración.
+ * Catálogo enfocado en VENTA: todos los inmuebles están en venta, por eso no
+ * existe el concepto de operación (venta/arriendo). El modelo es deliberadamente
+ * mínimo: solo los datos que se usan. La fuente de verdad es la base de datos
+ * (ver docs/ARQUITECTURA.md).
  */
 
 /** Tipo de inmueble. */
@@ -32,27 +33,18 @@ export const PROPERTY_TYPE_LABELS: Record<PropertyType, string> = {
   finca: "Finca",
 };
 
-/** Operación comercial. */
-export const OPERATIONS = ["venta", "arriendo"] as const;
-export type Operation = (typeof OPERATIONS)[number];
-
-export const OPERATION_LABELS: Record<Operation, string> = {
-  venta: "En venta",
-  arriendo: "En arriendo",
-};
-
-/**
- * Estado del inmueble dentro del proceso comercial.
- * Sincronizado con el catálogo público en tiempo (casi) real.
- */
+/** Estado del inmueble dentro del proceso de venta. */
 export const PROPERTY_STATUSES = ["disponible", "en_proceso", "vendido"] as const;
 export type PropertyStatus = (typeof PROPERTY_STATUSES)[number];
 
 export const PROPERTY_STATUS_LABELS: Record<PropertyStatus, string> = {
-  disponible: "Disponible",
-  en_proceso: "En proceso",
+  disponible: "Listo para vender",
+  en_proceso: "En proceso de venta",
   vendido: "Vendido",
 };
+
+/** Moneda única del catálogo (Colombia). */
+export const CURRENCY = "COP";
 
 /** Medio audiovisual asociado al inmueble. */
 export type MediaProvider = "cloudinary" | "youtube" | "drive" | "external";
@@ -71,29 +63,21 @@ export interface PropertyMedia {
 
 /** Ubicación. La dirección exacta es privada (solo panel admin). */
 export interface PropertyLocation {
-  departamento: string;
   ciudad: string;
-  barrio?: string;
+  /** Sector / zona / barrio. */
+  sector?: string;
+  /** Nombre del conjunto o edificio. */
+  conjunto?: string;
   /** Dirección exacta — NO se expone en el sitio público. */
   direccion?: string;
-  lat?: number;
-  lng?: number;
 }
 
-/** Características numéricas/estructurales. */
+/** Especificaciones generales. */
 export interface PropertyFeatures {
   habitaciones?: number;
   banos?: number;
-  /** Área construida en m². */
-  areaConstruida?: number;
-  /** Área total/lote en m². */
-  areaTotal?: number;
-  parqueaderos?: number;
-  estrato?: number;
-  piso?: number;
-  antiguedadAnios?: number;
-  /** Valor de administración mensual (si aplica). */
-  administracion?: number;
+  /** Área en m². */
+  area?: number;
 }
 
 /** Datos del propietario — privados, solo visibles en el panel admin. */
@@ -105,25 +89,23 @@ export interface PropertyOwner {
 
 export interface Property {
   id: string;
-  /** Código interno legible, p. ej. "CIC-0001". */
+  /** Código interno legible, p. ej. "1006". */
   codigo: string;
   slug: string;
   titulo: string;
   tipo: PropertyType;
-  operacion: Operation;
   estado: PropertyStatus;
 
+  /** Precio de venta (COP). */
   precio: number;
-  moneda: string;
+  /** Valor de administración mensual, si aplica (COP). */
+  administracion?: number;
 
   ubicacion: PropertyLocation;
   caracteristicas: PropertyFeatures;
-  amenidades: string[];
 
-  /** Descripción larga (se muestra en la ficha). */
+  /** Descripción general breve (intro que se muestra en la ficha). */
   descripcion: string;
-  /** Descripción breve para compartir (WhatsApp/redes). */
-  descripcionCorta: string;
 
   medios: PropertyMedia[];
 
@@ -159,7 +141,6 @@ export type PropertyInput = Omit<
 export interface PropertyFilters {
   q?: string;
   tipo?: PropertyType;
-  operacion?: Operation;
   estado?: PropertyStatus;
   ciudad?: string;
   habitacionesMin?: number;

@@ -4,8 +4,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useTransition } from "react";
 import { Search, X } from "lucide-react";
 import {
-  OPERATIONS,
-  OPERATION_LABELS,
   PROPERTY_STATUSES,
   PROPERTY_STATUS_LABELS,
   PROPERTY_TYPES,
@@ -52,7 +50,7 @@ export function PropertyFilters({ cities }: { cities: string[] }) {
             type="search"
             name="q"
             defaultValue={params.get("q") ?? ""}
-            placeholder="Buscar por ciudad, barrio, código..."
+            placeholder="Buscar por ciudad, sector, conjunto, código..."
             className="h-11 w-full rounded-xl border border-line bg-surface pl-10 pr-3 text-sm text-ink transition-colors focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-200"
           />
         </div>
@@ -64,19 +62,7 @@ export function PropertyFilters({ cities }: { cities: string[] }) {
         </button>
       </form>
 
-      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-        <select
-          aria-label="Operación"
-          className={selectClass}
-          value={params.get("operacion") ?? ""}
-          onChange={(e) => update("operacion", e.target.value)}
-        >
-          <option value="">Operación</option>
-          {OPERATIONS.map((o) => (
-            <option key={o} value={o}>{OPERATION_LABELS[o]}</option>
-          ))}
-        </select>
-
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
         <select
           aria-label="Tipo"
           className={selectClass}
