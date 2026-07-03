@@ -18,8 +18,6 @@ import { PropertyGrid } from "@/components/public/property-grid";
 import { WhatsAppButton } from "@/components/public/whatsapp-button";
 import { getRepository } from "@/lib/data";
 import {
-  OPERATIONS,
-  OPERATION_LABELS,
   PROPERTY_TYPES,
   PROPERTY_TYPE_LABELS,
 } from "@/lib/domain";
@@ -104,22 +102,11 @@ export default async function HomePage() {
                 <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
                 <input
                   name="q"
-                  placeholder="Ciudad, barrio o código…"
+                  placeholder="Ciudad, sector, conjunto o código…"
                   aria-label="Buscar inmuebles"
                   className="h-12 w-full rounded-xl bg-transparent pl-10 pr-3 text-ink placeholder:text-muted focus:outline-none"
                 />
               </div>
-              <select
-                name="operacion"
-                aria-label="Operación"
-                className="h-12 rounded-xl border border-line bg-surface px-3 text-sm text-ink-soft focus:outline-none focus:ring-2 focus:ring-brand-300 sm:w-36"
-                defaultValue=""
-              >
-                <option value="">Operación</option>
-                {OPERATIONS.map((o) => (
-                  <option key={o} value={o}>{OPERATION_LABELS[o]}</option>
-                ))}
-              </select>
               <select
                 name="tipo"
                 aria-label="Tipo de inmueble"
@@ -143,8 +130,8 @@ export default async function HomePage() {
             {[
               { label: "Apartamentos", href: "/inmuebles?tipo=apartamento" },
               { label: "Casas", href: "/inmuebles?tipo=casa" },
-              { label: "En arriendo", href: "/inmuebles?operacion=arriendo" },
-              { label: "En venta", href: "/inmuebles?operacion=venta" },
+              { label: "Apartaestudios", href: "/inmuebles?tipo=apartaestudio" },
+              { label: "Listo para vender", href: "/inmuebles?estado=disponible" },
             ].map((chip) => (
               <Link
                 key={chip.label}

@@ -60,15 +60,36 @@ concretarse en el menor número de pasos:
 Decisión: **la base de datos es la fuente de verdad; Google Drive es el archivo
 operativo, no un CDN.**
 
-- **Imágenes** → Cloudinary (entrega optimizada vía CDN).
+- **Imágenes** → **por defecto se sirven directo desde Google Drive**
+  (`lh3.googleusercontent.com`), optimizadas vía `mediaLoader` (parámetro de
+  tamaño nativo). Decisión deliberada de **mínimas dependencias**: Drive ya es la
+  bandeja de entrada, así que no se añade ningún servicio extra para mostrar las
+  fotos. Suficiente para tráfico bajo/medio.
+  - **Cloudinary es OPCIONAL** (mejora, no requisito). Si se configura, las fotos
+    se re-alojan ahí (`uploadRemoteImage`) para entrega vía CDN dedicado; si no,
+    se usan las de Drive sin romper nada.
+  - **Plan B de crecimiento sin añadir servicios**: **Supabase Storage** (la
+    misma base que ya es fuente de verdad) si en el futuro se quiere dejar de
+    depender del hotlinking informal de Drive.
+- **Optimización sin dependencias medidas** → un *loader* propio
+  (`mediaLoader`) hace que `next/image` **no use el optimizador de Vercel**
+  (recurso con tope en el plan gratuito) y delegue en el origen, que optimiza
+  gratis: Cloudinary (`f_auto,q_auto,c_limit,w_…`) o el tamaño nativo de Drive
+  (`=w…`). Una dependencia (y un tope) menos.
+- **Tolerancia a fallos** → `SafeImage` degrada con elegancia a un marcador
+  "imagen no disponible" si una URL cae (archivo borrado, CDN limitado), en vez
+  de mostrar una imagen rota.
 - **Videos** → YouTube no listado, embebido en la ficha.
 - **Google Drive** → al registrar un inmueble en el panel, la app:
   1. crea automáticamente la carpeta `Nombre – Localidad`,
   2. genera el **documento de especificaciones** estandarizado,
   3. guarda copia del material audiovisual (respaldo humano-legible).
+  Drive es el **archivo operativo / bandeja de entrada**, nunca el CDN del sitio.
 - **Importar desde Drive**: si se sube una carpeta a mano, un botón en el panel
-  la lee, parsea el documento de specs y crea el inmueble. Esto da el flujo
-  "subo a Drive y se refleja" sin un sincronizador frágil permanente.
+  la lee, parsea el documento de specs, re-aloja las fotos en Cloudinary y crea el
+  inmueble como **borrador**. Esto da el flujo "subo a Drive y se refleja" sin un
+  sincronizador frágil permanente y conservando la revisión humana antes de
+  publicar.
 
 ### Formato del documento de especificaciones
 Markdown con cabecera `clave: valor` (legible por humanos y parseable):
@@ -93,7 +114,21 @@ descripcion:
 Texto largo que se muestra en la ficha del inmueble...
 ```
 
----
+### Límite real de la cuenta de servicio (verificado)
+Una cuenta de servicio sobre un Drive de **Gmail normal** (sin Unidad compartida
+de Workspace) **puede leer, listar, crear carpetas y dar permisos, pero NO puede
+subir archivos** (devuelve *"Service Accounts do not have storage quota"*).
+Implicaciones de diseño (todo a $0):
+
+- **Drive → Web (importar):** funciona completo (lee carpetas, Google Docs/.md,
+  fotos y las hace públicas). ✅
+- **Web → Drive (al registrar):** se crea la **carpeta** del inmueble (organizada
+  por ciudad) como archivo para fotos, pero **no** se sube `especificaciones.md`.
+  No pasa nada: la **fuente de verdad son la base de datos + Google Sheets**
+  (que la cuenta de servicio SÍ puede escribir e incluye propietario y notas
+  internas). El doc en Drive es opcional y humano.
+- Conclusión: **la base de datos + Sheets son el registro**; Drive es la
+  **bandeja de entrada de material** (fotos/fichas que sube el equipo).
 
 ## 5. Sincronización del catálogo
 

@@ -7,12 +7,19 @@ import { getRepository } from "@/lib/data";
 import { ensurePropertyArchive, isDriveConfigured } from "@/lib/integrations/drive";
 import { isSheetsConfigured, syncAllPropertiesToSheet, syncPropertyToSheet } from "@/lib/integrations/sheets";
 import {
-  OPERATIONS,
   PROPERTY_STATUSES,
   PROPERTY_TYPES,
+  type MediaProvider,
   type PropertyInput,
   type PropertyMedia,
 } from "@/lib/domain";
+
+/** Deduce el proveedor del medio a partir del host de la URL. */
+function mediaProviderFor(url: string): MediaProvider {
+  if (/res\.cloudinary\.com/i.test(url)) return "cloudinary";
+  if (/drive\.google\.com|googleusercontent\.com/i.test(url)) return "drive";
+  return "external";
+}
 
 /** Revalida las rutas públicas afectadas para mantener el catálogo sincronizado. */
 function revalidatePublic(slug?: string) {
@@ -34,11 +41,9 @@ const str = (v: FormDataEntryValue | null): string => String(v ?? "").trim();
 const baseSchema = z.object({
   titulo: z.string().trim().min(3, "El título es obligatorio"),
   tipo: z.enum(PROPERTY_TYPES),
-  operacion: z.enum(OPERATIONS),
   estado: z.enum(PROPERTY_STATUSES),
   precio: z.number().nonnegative("El precio debe ser un número válido"),
   ciudad: z.string().trim().min(2, "La ciudad es obligatoria"),
-  departamento: z.string().trim().min(2, "El departamento es obligatorio"),
 });
 
 export interface PropertyFormState {
@@ -51,11 +56,9 @@ function buildInput(formData: FormData): { input?: PropertyInput; state?: Proper
   const parsed = baseSchema.safeParse({
     titulo: str(formData.get("titulo")),
     tipo: str(formData.get("tipo")),
-    operacion: str(formData.get("operacion")),
     estado: str(formData.get("estado")),
     precio: num(formData.get("precio")) ?? -1,
     ciudad: str(formData.get("ciudad")),
-    departamento: str(formData.get("departamento")),
   });
 
   if (!parsed.success) {
@@ -78,7 +81,7 @@ function buildInput(formData: FormData): { input?: PropertyInput; state?: Proper
   const medios: PropertyMedia[] = imagenes.map((url, i) => ({
     id: `img-${i}`,
     type: "image",
-    provider: "external",
+    provider: mediaProviderFor(url),
     url,
     order: i,
     isCover: i === 0,
@@ -96,40 +99,25 @@ function buildInput(formData: FormData): { input?: PropertyInput; state?: Proper
     });
   }
 
-  const amenidades = str(formData.get("amenidades"))
-    .split(/[\n,]+/)
-    .map((a) => a.trim())
-    .filter(Boolean);
-
   const input: PropertyInput = {
     titulo: d.titulo,
     tipo: d.tipo,
-    operacion: d.operacion,
     estado: d.estado,
     precio: d.precio,
-    moneda: str(formData.get("moneda")) || "COP",
+    administracion: num(formData.get("administracion")),
     ubicacion: {
-      departamento: d.departamento,
       ciudad: d.ciudad,
-      barrio: str(formData.get("barrio")) || undefined,
+      sector: str(formData.get("sector")) || undefined,
+      conjunto: str(formData.get("conjunto")) || undefined,
       direccion: str(formData.get("direccion")) || undefined,
-      lat: num(formData.get("lat")),
-      lng: num(formData.get("lng")),
     },
     caracteristicas: {
       habitaciones: num(formData.get("habitaciones")),
       banos: num(formData.get("banos")),
-      areaConstruida: num(formData.get("areaConstruida")),
-      areaTotal: num(formData.get("areaTotal")),
+      area: num(formData.get("area")),
       parqueaderos: num(formData.get("parqueaderos")),
-      estrato: num(formData.get("estrato")),
-      piso: num(formData.get("piso")),
-      antiguedadAnios: num(formData.get("antiguedadAnios")),
-      administracion: num(formData.get("administracion")),
     },
-    amenidades,
     descripcion: str(formData.get("descripcion")),
-    descripcionCorta: str(formData.get("descripcionCorta")),
     medios,
     propietario: str(formData.get("propietarioNombre"))
       ? {
@@ -138,6 +126,7 @@ function buildInput(formData: FormData): { input?: PropertyInput; state?: Proper
           email: str(formData.get("propietarioEmail")) || undefined,
         }
       : undefined,
+    notasInternas: str(formData.get("notasInternas")) || undefined,
     driveFolderId: str(formData.get("driveFolderId")) || undefined,
     destacado: formData.get("destacado") === "on",
     publicado: formData.get("publicado") === "on",

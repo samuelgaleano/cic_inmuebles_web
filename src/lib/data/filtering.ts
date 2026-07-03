@@ -5,7 +5,6 @@ import type { Property, PropertyFilters } from "@/lib/domain";
 export function matchesFilters(p: Property, f?: PropertyFilters): boolean {
   if (!f) return true;
   if (f.tipo && p.tipo !== f.tipo) return false;
-  if (f.operacion && p.operacion !== f.operacion) return false;
   if (f.estado && p.estado !== f.estado) return false;
   if (f.ciudad && p.ubicacion.ciudad.toLowerCase() !== f.ciudad.toLowerCase()) return false;
   if (f.destacado && !p.destacado) return false;
@@ -19,7 +18,8 @@ export function matchesFilters(p: Property, f?: PropertyFilters): boolean {
       p.titulo,
       p.descripcion,
       p.ubicacion.ciudad,
-      p.ubicacion.barrio ?? "",
+      p.ubicacion.sector ?? "",
+      p.ubicacion.conjunto ?? "",
       p.codigo,
     ]
       .join(" ")

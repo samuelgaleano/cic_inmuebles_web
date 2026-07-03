@@ -6,8 +6,6 @@ import { Loader2, Save } from "lucide-react";
 import { CloudinaryUploader } from "./cloudinary-uploader";
 import type { PropertyFormState } from "@/lib/actions/admin-properties";
 import {
-  OPERATIONS,
-  OPERATION_LABELS,
   PROPERTY_STATUSES,
   PROPERTY_STATUS_LABELS,
   PROPERTY_TYPES,
@@ -101,14 +99,6 @@ export function PropertyForm({
             </select>
           </div>
           <div>
-            <label className={label} htmlFor="operacion">Operación</label>
-            <select id="operacion" name="operacion" defaultValue={property?.operacion ?? "venta"} className={input}>
-              {OPERATIONS.map((o) => (
-                <option key={o} value={o}>{OPERATION_LABELS[o]}</option>
-              ))}
-            </select>
-          </div>
-          <div>
             <label className={label} htmlFor="estado">Estado</label>
             <select id="estado" name="estado" defaultValue={property?.estado ?? "disponible"} className={input}>
               {PROPERTY_STATUSES.map((s) => (
@@ -116,7 +106,8 @@ export function PropertyForm({
               ))}
             </select>
           </div>
-          <Field name="precio" label="Precio (COP)" type="number" defaultValue={property?.precio} required error={state.errors?.precio} />
+          <Field name="precio" label="Precio de venta (COP)" type="number" defaultValue={property?.precio} required error={state.errors?.precio} />
+          <Field name="administracion" label="Administración (COP)" type="number" defaultValue={property?.administracion} />
         </div>
       </section>
 
@@ -124,47 +115,30 @@ export function PropertyForm({
       <section className="rounded-2xl border border-line bg-white p-6">
         <h2 className="mb-4 text-lg font-bold tracking-tight text-ink">Ubicación</h2>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field name="departamento" label="Departamento" defaultValue={u?.departamento} required error={state.errors?.departamento} />
           <Field name="ciudad" label="Ciudad" defaultValue={u?.ciudad} required error={state.errors?.ciudad} />
-          <Field name="barrio" label="Barrio" defaultValue={u?.barrio} />
+          <Field name="sector" label="Sector / zona" defaultValue={u?.sector} />
+          <Field name="conjunto" label="Nombre del conjunto o edificio" defaultValue={u?.conjunto} />
           <Field name="direccion" label="Dirección (privada)" defaultValue={u?.direccion} />
-          <Field name="lat" label="Latitud" type="number" defaultValue={u?.lat} />
-          <Field name="lng" label="Longitud" type="number" defaultValue={u?.lng} />
         </div>
       </section>
 
-      {/* Características */}
+      {/* Especificaciones */}
       <section className="rounded-2xl border border-line bg-white p-6">
-        <h2 className="mb-4 text-lg font-bold tracking-tight text-ink">Características</h2>
-        <div className="grid gap-4 sm:grid-cols-3">
+        <h2 className="mb-4 text-lg font-bold tracking-tight text-ink">Especificaciones</h2>
+        <div className="grid gap-4 sm:grid-cols-4">
           <Field name="habitaciones" label="Habitaciones" type="number" defaultValue={c?.habitaciones} />
           <Field name="banos" label="Baños" type="number" defaultValue={c?.banos} />
+          <Field name="area" label="Área (m²)" type="number" defaultValue={c?.area} />
           <Field name="parqueaderos" label="Parqueaderos" type="number" defaultValue={c?.parqueaderos} />
-          <Field name="areaConstruida" label="Área construida (m²)" type="number" defaultValue={c?.areaConstruida} />
-          <Field name="areaTotal" label="Área total (m²)" type="number" defaultValue={c?.areaTotal} />
-          <Field name="estrato" label="Estrato" type="number" defaultValue={c?.estrato} />
-          <Field name="piso" label="Piso" type="number" defaultValue={c?.piso} />
-          <Field name="antiguedadAnios" label="Antigüedad (años)" type="number" defaultValue={c?.antiguedadAnios} />
-          <Field name="administracion" label="Administración (COP)" type="number" defaultValue={c?.administracion} />
-        </div>
-        <div className="mt-4">
-          <label className={label} htmlFor="amenidades">Amenidades (una por línea o separadas por coma)</label>
-          <textarea id="amenidades" name="amenidades" rows={2} defaultValue={property?.amenidades.join(", ")} className={textareaClass} />
         </div>
       </section>
 
       {/* Descripción */}
       <section className="rounded-2xl border border-line bg-white p-6">
         <h2 className="mb-4 text-lg font-bold tracking-tight text-ink">Descripción</h2>
-        <div className="space-y-4">
-          <div>
-            <label className={label} htmlFor="descripcionCorta">Descripción corta (para WhatsApp/redes)</label>
-            <textarea id="descripcionCorta" name="descripcionCorta" rows={2} defaultValue={property?.descripcionCorta} className={textareaClass} />
-          </div>
-          <div>
-            <label className={label} htmlFor="descripcion">Descripción larga (ficha)</label>
-            <textarea id="descripcion" name="descripcion" rows={5} defaultValue={property?.descripcion} className={textareaClass} />
-          </div>
+        <div>
+          <label className={label} htmlFor="descripcion">Descripción general (intro breve del inmueble)</label>
+          <textarea id="descripcion" name="descripcion" rows={5} defaultValue={property?.descripcion} className={textareaClass} />
         </div>
       </section>
 
@@ -198,6 +172,18 @@ export function PropertyForm({
           <Field name="propietarioNombre" label="Nombre" defaultValue={property?.propietario?.nombre} />
           <Field name="propietarioTelefono" label="Teléfono" defaultValue={property?.propietario?.telefono} />
           <Field name="propietarioEmail" label="Email" defaultValue={property?.propietario?.email} />
+        </div>
+        <div className="mt-4">
+          <label htmlFor="notasInternas" className="mb-1.5 block text-sm font-medium text-ink-soft">
+            Notas internas (privadas: negociación, llaves, observaciones)
+          </label>
+          <textarea
+            id="notasInternas"
+            name="notasInternas"
+            rows={3}
+            defaultValue={property?.notasInternas}
+            className={textareaClass}
+          />
         </div>
         <div className="mt-4">
           <Field name="driveFolderId" label="ID carpeta de Google Drive (opcional)" defaultValue={property?.driveFolderId} />

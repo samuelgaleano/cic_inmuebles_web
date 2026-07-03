@@ -3,8 +3,6 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { generateSpecDoc, parseSpecDoc } from "./drive";
 import {
-  OPERATION_LABELS,
-  OPERATIONS,
   PROPERTY_STATUS_LABELS,
   PROPERTY_STATUSES,
   PROPERTY_TYPE_LABELS,
@@ -22,7 +20,6 @@ describe("parseSpecDoc (round-trip con generateSpecDoc)", () => {
     expect(parsed.fields.titulo).toBe(property.titulo);
     expect(parsed.fields.ciudad).toBe(property.ubicacion.ciudad);
     expect(parsed.fields.tipo).toBe(PROPERTY_TYPE_LABELS[property.tipo]);
-    expect(parsed.descripcionCorta).toBe(property.descripcionCorta);
     expect(parsed.descripcion.trim()).toBe(property.descripcion.trim());
   });
 
@@ -49,16 +46,13 @@ describe("plantilla especificaciones.md (docs/)", () => {
     expect(parsed.fields.titulo).toBeTruthy();
     expect(parsed.fields.ciudad).toBeTruthy();
     expect(Number(parsed.fields.precio)).toBeGreaterThan(0);
-    expect(parsed.descripcionCorta).toBeTruthy();
     expect(parsed.descripcion.length).toBeGreaterThan(0);
   });
 
-  it("usa valores válidos para tipo, operación y estado", () => {
+  it("usa valores válidos para tipo y estado", () => {
     const okTipo = PROPERTY_TYPES.some((k) => PROPERTY_TYPE_LABELS[k] === parsed.fields.tipo);
-    const okOper = OPERATIONS.some((k) => OPERATION_LABELS[k] === parsed.fields.operacion);
     const okEstado = PROPERTY_STATUSES.some((k) => PROPERTY_STATUS_LABELS[k] === parsed.fields.estado);
     expect(okTipo).toBe(true);
-    expect(okOper).toBe(true);
     expect(okEstado).toBe(true);
   });
 });

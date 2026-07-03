@@ -13,10 +13,6 @@ do $$ begin
 exception when duplicate_object then null; end $$;
 
 do $$ begin
-  create type operation_type as enum ('venta','arriendo');
-exception when duplicate_object then null; end $$;
-
-do $$ begin
   create type property_status as enum ('disponible','en_proceso','vendido');
 exception when duplicate_object then null; end $$;
 
@@ -66,46 +62,39 @@ create table if not exists agents (
   created_at  timestamptz not null default now()
 );
 
--- --- Inmuebles ---------------------------------------------------------------
+-- --- Inmuebles (catálogo de VENTA) -------------------------------------------
 create table if not exists properties (
   id              uuid primary key default gen_random_uuid(),
   codigo          text not null unique,
   slug            text not null unique,
   titulo          text not null,
   tipo            property_type not null,
-  operacion       operation_type not null,
   estado          property_status not null default 'disponible',
 
-  precio          bigint not null,
-  moneda          text not null default 'COP',
+  precio          bigint not null,          -- precio de venta (COP)
+  administracion  bigint,                   -- administración mensual (COP), si aplica
 
   -- Ubicación (la dirección exacta es privada)
-  departamento    text not null,
   ciudad          text not null,
-  barrio          text,
-  direccion       text,
-  lat             double precision,
-  lng             double precision,
+  sector          text,                     -- sector / zona / barrio
+  conjunto        text,                     -- nombre del conjunto o edificio
+  direccion       text,                     -- privada
 
-  -- Características (campos opcionales según el tipo de inmueble)
+  -- Especificaciones generales (públicas)
   habitaciones    int,
   banos           int,
-  area_construida numeric,
-  area_total      numeric,
-  parqueaderos    int,
-  estrato         int,
-  piso            int,
-  antiguedad_anios int,
-  administracion  bigint,
+  area            numeric,                  -- m²
+  parqueaderos    int,                      -- 0 o null = no tiene
 
-  amenidades      text[] not null default '{}',
-  descripcion     text not null default '',
-  descripcion_corta text not null default '',
+  descripcion     text not null default '', -- intro general breve
 
   -- Propietario (privado)
   propietario_nombre   text,
   propietario_telefono text,
   propietario_email    text,
+
+  -- Notas internas del equipo (privado)
+  notas_internas  text,
 
   -- Integración híbrida con Google Drive
   drive_folder_id text,
@@ -121,7 +110,6 @@ create table if not exists properties (
 create index if not exists idx_properties_estado on properties(estado);
 create index if not exists idx_properties_ciudad on properties(ciudad);
 create index if not exists idx_properties_tipo on properties(tipo);
-create index if not exists idx_properties_operacion on properties(operacion);
 create index if not exists idx_properties_publicado on properties(publicado);
 
 drop trigger if exists trg_properties_updated_at on properties;

@@ -1,8 +1,8 @@
 "use client";
 
-import Image from "next/image";
 import { useState } from "react";
 import { cn } from "@/lib/utils/cn";
+import { SafeImage } from "@/components/ui/safe-image";
 import type { PropertyMedia } from "@/lib/domain";
 
 export function PropertyGallery({
@@ -27,7 +27,7 @@ export function PropertyGallery({
   return (
     <div>
       <div className="relative aspect-[16/10] overflow-hidden rounded-[1.4rem] border border-line bg-surface">
-        <Image
+        <SafeImage
           src={current.url}
           alt={current.alt ?? title}
           fill
@@ -49,7 +49,7 @@ export function PropertyGallery({
                 i === active ? "ring-brand-600" : "ring-transparent hover:ring-brand-300",
               )}
             >
-              <Image
+              <SafeImage
                 src={m.thumbnailUrl ?? m.url}
                 alt={m.alt ?? `${title} ${i + 1}`}
                 fill

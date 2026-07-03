@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import type { Property, PropertyInput } from "@/lib/domain";
-import { PROPERTY_STATUS_LABELS, PROPERTY_TYPE_LABELS, OPERATION_LABELS } from "@/lib/domain";
+import { PROPERTY_STATUS_LABELS, PROPERTY_TYPE_LABELS } from "@/lib/domain";
 import { getGoogleAccessToken, isGoogleServiceAccountConfigured } from "./google-auth";
 
 /**
@@ -157,27 +157,22 @@ export function generateSpecDoc(p: Property | PropertyInput): string {
     `codigo: ${"codigo" in p ? p.codigo ?? "" : ""}`,
     `titulo: ${p.titulo}`,
     `tipo: ${PROPERTY_TYPE_LABELS[p.tipo]}`,
-    `operacion: ${OPERATION_LABELS[p.operacion]}`,
     `estado: ${PROPERTY_STATUS_LABELS[p.estado]}`,
-    `precio: ${p.precio} ${p.moneda}`,
-    `departamento: ${u.departamento}`,
+    `precio: ${p.precio}`,
+    `administracion: ${p.administracion ?? ""}`,
     `ciudad: ${u.ciudad}`,
-    `barrio: ${u.barrio ?? ""}`,
+    `sector: ${u.sector ?? ""}`,
+    `conjunto: ${u.conjunto ?? ""}`,
     `direccion: ${u.direccion ?? ""}`,
     `habitaciones: ${c.habitaciones ?? ""}`,
     `banos: ${c.banos ?? ""}`,
-    `area_construida: ${c.areaConstruida ?? ""}`,
-    `area_total: ${c.areaTotal ?? ""}`,
+    `area: ${c.area ?? ""}`,
     `parqueaderos: ${c.parqueaderos ?? ""}`,
-    `estrato: ${c.estrato ?? ""}`,
-    `administracion: ${c.administracion ?? ""}`,
-    `amenidades: ${p.amenidades.join(", ")}`,
     `propietario_nombre: ${p.propietario?.nombre ?? ""}`,
     `propietario_telefono: ${p.propietario?.telefono ?? ""}`,
     `propietario_email: ${p.propietario?.email ?? ""}`,
+    `notas_internas: ${p.notasInternas ?? ""}`,
     "---",
-    `descripcion_corta: ${p.descripcionCorta}`,
-    "",
     "descripcion:",
     p.descripcion,
   ];
@@ -197,7 +192,19 @@ export async function ensurePropertyArchive(p: Property): Promise<string | null>
     // Organización: raíz (db inmuebles) → Ciudad → Inmueble.
     const cityId = await findOrCreateFolder(token, p.ubicacion.ciudad || "Sin ciudad", root);
     const folderId = await createFolder(token, p.titulo, cityId);
-    await uploadTextFile(token, folderId, "especificaciones.md", generateSpecDoc(p));
+    // El doc de especificaciones es best-effort APARTE: una cuenta de servicio
+    // sobre un Drive de Gmail (sin Unidad compartida) NO puede subir archivos
+    // ("Service Accounts do not have storage quota"). La carpeta sí se crea y
+    // queda como archivo del inmueble (para fotos). Los datos estructurados
+    // viven en la base de datos + Google Sheets, que sí son la fuente de verdad.
+    try {
+      await uploadTextFile(token, folderId, "especificaciones.md", generateSpecDoc(p));
+    } catch {
+      console.warn(
+        "[drive] Carpeta creada, pero no se pudo subir especificaciones.md " +
+          "(cuenta de servicio sin cuota de almacenamiento). Los datos quedan en la BD y en Sheets.",
+      );
+    }
     return folderId;
   } catch (err) {
     console.error("[drive] No se pudo crear el archivo del inmueble:", err);

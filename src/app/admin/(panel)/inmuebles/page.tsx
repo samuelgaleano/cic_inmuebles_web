@@ -5,7 +5,6 @@ import { getRepository } from "@/lib/data";
 import { deletePropertyAction } from "@/lib/actions/admin-properties";
 import { StatusBadge } from "@/components/ui/status-badge";
 import {
-  OPERATION_LABELS,
   PROPERTY_STATUSES,
   PROPERTY_STATUS_LABELS,
   PROPERTY_TYPE_LABELS,
@@ -82,7 +81,6 @@ export default async function AdminInmueblesPage({
               <th className="px-4 py-3 font-semibold">Código</th>
               <th className="px-4 py-3 font-semibold">Título</th>
               <th className="px-4 py-3 font-semibold">Ciudad</th>
-              <th className="px-4 py-3 font-semibold">Operación</th>
               <th className="px-4 py-3 font-semibold">Precio</th>
               <th className="px-4 py-3 font-semibold">Estado</th>
               <th className="px-4 py-3 text-right font-semibold">Acciones</th>
@@ -97,8 +95,7 @@ export default async function AdminInmueblesPage({
                   <p className="text-xs text-muted">{PROPERTY_TYPE_LABELS[p.tipo]}{p.publicado ? "" : " · borrador"}</p>
                 </td>
                 <td className="px-4 py-3 text-ink-soft">{p.ubicacion.ciudad}</td>
-                <td className="px-4 py-3 text-ink-soft">{OPERATION_LABELS[p.operacion]}</td>
-                <td className="px-4 py-3 font-semibold text-ink">{formatPrice(p.precio, p.moneda)}</td>
+                <td className="px-4 py-3 font-semibold text-ink">{formatPrice(p.precio)}</td>
                 <td className="px-4 py-3"><StatusBadge status={p.estado} /></td>
                 <td className="px-4 py-3">
                   <div className="flex items-center justify-end gap-1">

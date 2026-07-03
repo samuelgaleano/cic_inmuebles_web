@@ -5,10 +5,8 @@ import { PropertyGrid } from "@/components/public/property-grid";
 import { Pagination } from "@/components/public/pagination";
 import { getRepository } from "@/lib/data";
 import {
-  OPERATIONS,
   PROPERTY_STATUSES,
   PROPERTY_TYPES,
-  type Operation,
   type PropertyFilters as Filters,
   type PropertyStatus,
   type PropertyType,
@@ -17,7 +15,7 @@ import {
 
 export const metadata: Metadata = {
   title: "Inmuebles",
-  description: "Explora el catálogo de inmuebles en venta y arriendo de CIC Inmuebles.",
+  description: "Explora el catálogo de inmuebles en venta de CIC Inmuebles.",
 };
 
 type SearchParams = Record<string, string | string[] | undefined>;
@@ -30,7 +28,6 @@ function first(v: string | string[] | undefined): string | undefined {
 
 function parseFilters(sp: SearchParams): Filters {
   const tipo = first(sp.tipo);
-  const operacion = first(sp.operacion);
   const estado = first(sp.estado);
   const habMin = first(sp.habitacionesMin);
   const precioMin = first(sp.precioMin);
@@ -39,7 +36,6 @@ function parseFilters(sp: SearchParams): Filters {
     q: first(sp.q),
     ciudad: first(sp.ciudad),
     tipo: PROPERTY_TYPES.includes(tipo as PropertyType) ? (tipo as PropertyType) : undefined,
-    operacion: OPERATIONS.includes(operacion as Operation) ? (operacion as Operation) : undefined,
     estado: PROPERTY_STATUSES.includes(estado as PropertyStatus)
       ? (estado as PropertyStatus)
       : undefined,

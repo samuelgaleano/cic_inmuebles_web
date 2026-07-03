@@ -13,14 +13,13 @@ import {
   type DriveFolder,
 } from "@/lib/integrations/drive";
 import { isSheetsConfigured, syncAllPropertiesToSheet } from "@/lib/integrations/sheets";
+import { isCloudinaryConfigured, uploadRemoteImage } from "@/lib/integrations/cloudinary";
 import {
-  OPERATIONS,
-  OPERATION_LABELS,
   PROPERTY_STATUSES,
   PROPERTY_STATUS_LABELS,
   PROPERTY_TYPES,
   PROPERTY_TYPE_LABELS,
-  type Operation,
+  type MediaProvider,
   type PropertyInput,
   type PropertyMedia,
   type PropertyStatus,
@@ -53,7 +52,11 @@ function matchEnum<T extends string>(
 
 function parseNum(v?: string): number | undefined {
   if (!v) return undefined;
-  const n = Number(v.replace(/[^0-9.-]/g, ""));
+  // Formato Colombia: punto = separador de miles, coma = decimal.
+  // Ej. "720.000.000" -> 720000000 ; "74,5 m²" -> 74.5 ; "$ 950.000" -> 950000.
+  const s = v.replace(/[^0-9,]/g, "").replace(",", ".");
+  if (s === "") return undefined;
+  const n = Number(s);
   return Number.isFinite(n) ? n : undefined;
 }
 
@@ -144,23 +147,49 @@ export async function runDriveImport(): Promise<DriveImportState> {
       return;
     }
     try {
-      // Fotos: imágenes sueltas + las de las subcarpetas de "contenido".
-      let imageFiles = files.filter(isDriveImage);
-      for (const sub of subs.filter((s) => MEDIA_RE.test(s.name))) {
-        const mf = await listFolderFiles(sub.id);
-        imageFiles = imageFiles.concat(mf.filter(isDriveImage));
-      }
+      // Fotos: recoge imágenes de la carpeta y de TODO su subárbol (carpetas de
+      // "contenido", incluso anidadas a varios niveles), hasta el tope. Robusto
+      // sin importar cómo de profundo guarde el equipo las fotos.
+      const imageFiles: DriveFile[] = [];
+      const collectImages = async (fls: DriveFile[], sbs: DriveFolder[], depth: number) => {
+        for (const f of fls) if (isDriveImage(f)) imageFiles.push(f);
+        if (depth >= 3 || imageFiles.length >= MAX_IMAGES) return;
+        for (const s of sbs) {
+          if (imageFiles.length >= MAX_IMAGES) break;
+          const [f2, s2] = await Promise.all([listFolderFiles(s.id), listSubfolders(s.id)]);
+          await collectImages(f2, s2, depth + 1);
+        }
+      };
+      await collectImages(files, subs, 0);
       const images = imageFiles.slice(0, MAX_IMAGES);
       await Promise.all(images.map((f) => makeFilePublic(f.id)));
-      const medios: PropertyMedia[] = images.map((f, i) => ({
-        id: `drive-${f.id}`,
-        type: "image",
-        provider: "drive",
-        url: drivePublicImageUrl(f.id),
-        alt: f.name,
-        order: i,
-        isCover: i === 0,
-      }));
+      // Motor visual único: si Cloudinary está configurado, re-alojamos cada foto
+      // ahí (CDN + optimización); si no, usamos la URL pública de Drive como
+      // respaldo. Así el catálogo público es óptimo venga de donde venga.
+      const useCloudinary = isCloudinaryConfigured();
+      const medios: PropertyMedia[] = await Promise.all(
+        images.map(async (f, i) => {
+          const driveUrl = drivePublicImageUrl(f.id);
+          let url = driveUrl;
+          let provider: MediaProvider = "drive";
+          if (useCloudinary) {
+            const up = await uploadRemoteImage(driveUrl);
+            if (up) {
+              url = up.url;
+              provider = "cloudinary";
+            }
+          }
+          return {
+            id: `drive-${f.id}`,
+            type: "image" as const,
+            provider,
+            url,
+            alt: f.name,
+            order: i,
+            isCover: i === 0,
+          };
+        }),
+      );
 
       // Ficha legible (.md/.txt o Google Doc): en la carpeta o en subcarpeta "info".
       let specPool = files.slice();
@@ -184,36 +213,25 @@ export async function runDriveImport(): Promise<DriveImportState> {
         codigo,
         titulo: fields.titulo || folderTitulo,
         tipo: matchEnum<PropertyType>(fields.tipo, PROPERTY_TYPES, PROPERTY_TYPE_LABELS) ?? "apartamento",
-        operacion: matchEnum<Operation>(fields.operacion, OPERATIONS, OPERATION_LABELS) ?? "venta",
         estado:
           matchEnum<PropertyStatus>(fields.estado, PROPERTY_STATUSES, PROPERTY_STATUS_LABELS) ??
           ctx.estado ??
           "disponible",
         precio: parseNum(fields.precio) ?? 0,
-        moneda: "COP",
+        administracion: parseNum(fields.administracion),
         ubicacion: {
-          departamento: fields.departamento || "Por definir",
           ciudad: ciudadRaw ? normalizeCity(ciudadRaw) : "Por definir",
-          barrio: fields.barrio || undefined,
+          sector: fields.sector || fields.barrio || undefined,
+          conjunto: fields.conjunto || undefined,
           direccion: fields.direccion || undefined,
-          lat: parseNum(fields.lat),
-          lng: parseNum(fields.lng),
         },
         caracteristicas: {
           habitaciones: parseNum(fields.habitaciones),
           banos: parseNum(fields.banos),
-          areaConstruida: parseNum(fields.area_construida),
-          areaTotal: parseNum(fields.area_total),
+          area: parseNum(fields.area) ?? parseNum(fields.area_construida),
           parqueaderos: parseNum(fields.parqueaderos),
-          estrato: parseNum(fields.estrato),
-          administracion: parseNum(fields.administracion),
         },
-        amenidades: (fields.amenidades || "")
-          .split(/[\n,]+/)
-          .map((a) => a.trim())
-          .filter(Boolean),
-        descripcion: spec?.descripcion || "",
-        descripcionCorta: spec?.descripcionCorta || folderTitulo,
+        descripcion: spec?.descripcion || spec?.descripcionCorta || "",
         medios,
         propietario: fields.propietario_nombre
           ? {
@@ -222,6 +240,7 @@ export async function runDriveImport(): Promise<DriveImportState> {
               email: fields.propietario_email || undefined,
             }
           : undefined,
+        notasInternas: fields.notas_internas || undefined,
         driveFolderId: folder.id,
         destacado: false,
         publicado: false, // borrador para revisión
