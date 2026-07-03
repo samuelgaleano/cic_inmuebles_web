@@ -72,12 +72,14 @@ export interface PropertyLocation {
   direccion?: string;
 }
 
-/** Especificaciones generales. */
+/** Especificaciones generales (públicas). */
 export interface PropertyFeatures {
   habitaciones?: number;
   banos?: number;
   /** Área en m². */
   area?: number;
+  /** Número de parqueaderos (0 o vacío = no tiene). */
+  parqueaderos?: number;
 }
 
 /** Datos del propietario — privados, solo visibles en el panel admin. */

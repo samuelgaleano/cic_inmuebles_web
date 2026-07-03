@@ -37,6 +37,7 @@ direccion: Calle 10 # 30-20, Torre 2 Apto 1203
 habitaciones: 3
 banos: 2
 area: 90
+parqueaderos: 1
 propietario_nombre: 
 propietario_telefono: 
 propietario_email: 

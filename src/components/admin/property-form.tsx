@@ -125,10 +125,11 @@ export function PropertyForm({
       {/* Especificaciones */}
       <section className="rounded-2xl border border-line bg-white p-6">
         <h2 className="mb-4 text-lg font-bold tracking-tight text-ink">Especificaciones</h2>
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-4">
           <Field name="habitaciones" label="Habitaciones" type="number" defaultValue={c?.habitaciones} />
           <Field name="banos" label="Baños" type="number" defaultValue={c?.banos} />
           <Field name="area" label="Área (m²)" type="number" defaultValue={c?.area} />
+          <Field name="parqueaderos" label="Parqueaderos" type="number" defaultValue={c?.parqueaderos} />
         </div>
       </section>
 

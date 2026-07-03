@@ -38,7 +38,7 @@ export const seedProperties: Property[] = [
       conjunto: "Torres de Provenza",
       direccion: "Cra. 35 #7-50",
     },
-    caracteristicas: { habitaciones: 3, banos: 2, area: 92 },
+    caracteristicas: { habitaciones: 3, banos: 2, area: 92, parqueaderos: 1 },
     descripcion:
       "Espectacular apartamento en el corazón de El Poblado, con acabados premium, amplios ventanales y balcón con vista a la ciudad. Cocina integral y excelente ubicación cerca de Provenza, parques y centros comerciales.",
     medios: [
@@ -67,7 +67,7 @@ export const seedProperties: Property[] = [
       conjunto: "Parcelación El Carmelo",
       direccion: "Vereda Llanogrande km 3",
     },
-    caracteristicas: { habitaciones: 4, banos: 4, area: 280 },
+    caracteristicas: { habitaciones: 4, banos: 4, area: 280, parqueaderos: 3 },
     descripcion:
       "Hermosa casa campestre rodeada de naturaleza, ideal para descanso o vivienda permanente. Amplios espacios sociales, jardín privado, chimenea y excelente clima. A pocos minutos del aeropuerto José María Córdova.",
     medios: [
@@ -96,7 +96,7 @@ export const seedProperties: Property[] = [
       conjunto: "Edificio Sesenta",
       direccion: "Calle 60 #9-20",
     },
-    caracteristicas: { habitaciones: 1, banos: 1, area: 38 },
+    caracteristicas: { habitaciones: 1, banos: 1, area: 38, parqueaderos: 0 },
     descripcion:
       "Acogedor apartaestudio remodelado, listo para habitar, en una de las zonas más conectadas de Bogotá. Cerca de universidades, transporte y zona gastronómica.",
     medios: [
@@ -123,7 +123,7 @@ export const seedProperties: Property[] = [
       conjunto: "Conjunto Los Almendros",
       direccion: "Cra. 105 #16-40",
     },
-    caracteristicas: { habitaciones: 4, banos: 3, area: 210 },
+    caracteristicas: { habitaciones: 4, banos: 3, area: 210, parqueaderos: 2 },
     descripcion:
       "Casa espaciosa en conjunto cerrado, perfecta para familias. Cuenta con amplios espacios, patio, estudio y excelente iluminación natural. Sector tranquilo y seguro.",
     medios: [
@@ -151,7 +151,7 @@ export const seedProperties: Property[] = [
       conjunto: "Edificio Marbella",
       direccion: "Av. San Martín #6-100",
     },
-    caracteristicas: { habitaciones: 3, banos: 3, area: 110 },
+    caracteristicas: { habitaciones: 3, banos: 3, area: 110, parqueaderos: 1 },
     descripcion:
       "Exclusivo apartamento frente al mar Caribe, con acabados de lujo y vistas inigualables. Edificio con amplias zonas comunes y ubicación privilegiada en Bocagrande.",
     medios: [

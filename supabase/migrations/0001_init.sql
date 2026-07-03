@@ -80,10 +80,11 @@ create table if not exists properties (
   conjunto        text,                     -- nombre del conjunto o edificio
   direccion       text,                     -- privada
 
-  -- Especificaciones generales
+  -- Especificaciones generales (públicas)
   habitaciones    int,
   banos           int,
   area            numeric,                  -- m²
+  parqueaderos    int,                      -- 0 o null = no tiene
 
   descripcion     text not null default '', -- intro general breve
 

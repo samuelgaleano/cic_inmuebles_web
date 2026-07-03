@@ -115,6 +115,7 @@ function buildInput(formData: FormData): { input?: PropertyInput; state?: Proper
       habitaciones: num(formData.get("habitaciones")),
       banos: num(formData.get("banos")),
       area: num(formData.get("area")),
+      parqueaderos: num(formData.get("parqueaderos")),
     },
     descripcion: str(formData.get("descripcion")),
     medios,

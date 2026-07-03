@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Bath, BedDouble, Building2, MapPin, Maximize, Receipt } from "lucide-react";
+import { ArrowLeft, Bath, BedDouble, Building2, Car, MapPin, Maximize, Receipt } from "lucide-react";
 import { PropertyGallery } from "@/components/public/property-gallery";
 import { PropertyContactCard } from "@/components/public/property-contact-card";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -69,6 +69,11 @@ export default async function PropertyDetailPage({
     c.habitaciones != null && { icon: BedDouble, label: "Habitaciones", value: String(c.habitaciones) },
     c.banos != null && { icon: Bath, label: "Baños", value: String(c.banos) },
     c.area != null && { icon: Maximize, label: "Área", value: formatArea(c.area) },
+    c.parqueaderos != null && {
+      icon: Car,
+      label: "Parqueadero",
+      value: c.parqueaderos > 0 ? String(c.parqueaderos) : "No tiene",
+    },
     property.administracion != null && {
       icon: Receipt,
       label: "Administración",

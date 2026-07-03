@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { SafeImage } from "@/components/ui/safe-image";
-import { ArrowUpRight, Bath, BedDouble, MapPin, Maximize } from "lucide-react";
+import { ArrowUpRight, Bath, BedDouble, Car, MapPin, Maximize } from "lucide-react";
 import { StatusBadge } from "@/components/ui/status-badge";
 import {
   getCoverMedia,
@@ -18,6 +18,7 @@ export function PropertyCard({ property }: { property: PublicProperty }) {
     c.habitaciones != null && { icon: BedDouble, value: c.habitaciones, label: "hab." },
     c.banos != null && { icon: Bath, value: c.banos, label: "baños" },
     c.area != null && { icon: Maximize, value: `${c.area}`, label: "m²" },
+    c.parqueaderos != null && c.parqueaderos > 0 && { icon: Car, value: c.parqueaderos, label: "parq." },
   ].filter(Boolean) as { icon: typeof BedDouble; value: string | number; label: string }[];
 
   return (

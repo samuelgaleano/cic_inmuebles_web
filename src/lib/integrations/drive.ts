@@ -167,6 +167,7 @@ export function generateSpecDoc(p: Property | PropertyInput): string {
     `habitaciones: ${c.habitaciones ?? ""}`,
     `banos: ${c.banos ?? ""}`,
     `area: ${c.area ?? ""}`,
+    `parqueaderos: ${c.parqueaderos ?? ""}`,
     `propietario_nombre: ${p.propietario?.nombre ?? ""}`,
     `propietario_telefono: ${p.propietario?.telefono ?? ""}`,
     `propietario_email: ${p.propietario?.email ?? ""}`,

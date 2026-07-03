@@ -229,6 +229,7 @@ export async function runDriveImport(): Promise<DriveImportState> {
           habitaciones: parseNum(fields.habitaciones),
           banos: parseNum(fields.banos),
           area: parseNum(fields.area) ?? parseNum(fields.area_construida),
+          parqueaderos: parseNum(fields.parqueaderos),
         },
         descripcion: spec?.descripcion || spec?.descripcionCorta || "",
         medios,
