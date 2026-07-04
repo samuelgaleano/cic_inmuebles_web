@@ -202,10 +202,18 @@ export async function runDriveImport(): Promise<DriveImportState> {
       const spec = specText ? parseSpecDoc(specText) : null;
       const fields = spec?.fields ?? {};
 
-      // Código y título desde el nombre de carpeta "1006-palmeira-mazuren".
+      // El nombre de carpeta ya trae los datos: "1006-palmeira-mazuren" =
+      // código-conjunto-sector. Se extraen para NO volver a pedirlos a mano.
       const m = folder.name.trim().match(/^(\d{2,})\s*[-–]\s*(.+)$/);
       const codigo = m?.[1];
-      const folderTitulo = cleanTitle(m ? m[2] : folder.name);
+      const rest = m ? m[2] : folder.name;
+      const folderTitulo = cleanTitle(rest);
+      const segs = rest
+        .split(/\s*[-–]\s*/)
+        .map((s) => s.replace(/\?+/g, "").trim())
+        .filter(Boolean);
+      const folderConjunto = segs.length >= 2 ? cleanTitle(segs.slice(0, -1).join(" ")) : undefined;
+      const folderSector = segs.length >= 2 ? cleanTitle(segs[segs.length - 1]) : undefined;
 
       const ciudadRaw = (fields.ciudad || ctx.city || "").trim();
 
@@ -221,8 +229,8 @@ export async function runDriveImport(): Promise<DriveImportState> {
         administracion: parseNum(fields.administracion),
         ubicacion: {
           ciudad: ciudadRaw ? normalizeCity(ciudadRaw) : "Por definir",
-          sector: fields.sector || fields.barrio || undefined,
-          conjunto: fields.conjunto || undefined,
+          sector: fields.sector || fields.barrio || folderSector,
+          conjunto: fields.conjunto || folderConjunto,
           direccion: fields.direccion || undefined,
         },
         caracteristicas: {

@@ -88,7 +88,13 @@ export function PropertyForm({
         <h2 className="mb-4 text-lg font-bold tracking-tight text-ink">Datos principales</h2>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">
-            <Field name="titulo" label="Título" defaultValue={property?.titulo} required error={state.errors?.titulo} />
+            <Field
+              name="titulo"
+              label="Título (opcional: si lo dejas vacío se genera con tipo + conjunto/sector)"
+              defaultValue={property?.titulo}
+              placeholder="Ej. Apartamento en Torres de Provenza"
+              error={state.errors?.titulo}
+            />
           </div>
           <div>
             <label className={label} htmlFor="tipo">Tipo</label>

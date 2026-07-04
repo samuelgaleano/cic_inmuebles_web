@@ -9,6 +9,7 @@ import { isSheetsConfigured, syncAllPropertiesToSheet, syncPropertyToSheet } fro
 import {
   PROPERTY_STATUSES,
   PROPERTY_TYPES,
+  PROPERTY_TYPE_LABELS,
   type MediaProvider,
   type PropertyInput,
   type PropertyMedia,
@@ -39,7 +40,8 @@ const num = (v: FormDataEntryValue | null): number | undefined => {
 const str = (v: FormDataEntryValue | null): string => String(v ?? "").trim();
 
 const baseSchema = z.object({
-  titulo: z.string().trim().min(3, "El título es obligatorio"),
+  // El título es opcional: si se deja vacío se genera de tipo + conjunto/sector.
+  titulo: z.string().trim(),
   tipo: z.enum(PROPERTY_TYPES),
   estado: z.enum(PROPERTY_STATUSES),
   precio: z.number().nonnegative("El precio debe ser un número válido"),
@@ -99,16 +101,21 @@ function buildInput(formData: FormData): { input?: PropertyInput; state?: Proper
     });
   }
 
+  const sector = str(formData.get("sector")) || undefined;
+  const conjunto = str(formData.get("conjunto")) || undefined;
+  // Sin título: se compone de lo ya capturado (no se pide dos veces el dato).
+  const tituloAuto = `${PROPERTY_TYPE_LABELS[d.tipo]} en ${conjunto ?? sector ?? d.ciudad}`;
+
   const input: PropertyInput = {
-    titulo: d.titulo,
+    titulo: d.titulo || tituloAuto,
     tipo: d.tipo,
     estado: d.estado,
     precio: d.precio,
     administracion: num(formData.get("administracion")),
     ubicacion: {
       ciudad: d.ciudad,
-      sector: str(formData.get("sector")) || undefined,
-      conjunto: str(formData.get("conjunto")) || undefined,
+      sector,
+      conjunto,
       direccion: str(formData.get("direccion")) || undefined,
     },
     caracteristicas: {
