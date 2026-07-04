@@ -31,7 +31,6 @@ export const metadata: Metadata = {
     "apartamentos",
     "casas",
     "venta de inmuebles",
-    "arriendo",
     siteConfig.name,
   ],
   openGraph: {
