@@ -7,7 +7,7 @@ export const siteConfig = {
   name: "CIC Inmuebles",
   tagline: "Tu próximo hogar, sin complicaciones",
   description:
-    "Catálogo de apartamentos y casas en venta y arriendo. Encuentra tu inmueble ideal y agenda una visita en segundos con CIC Inmuebles.",
+    "Catálogo de apartamentos y casas en venta. Encuentra tu inmueble ideal y agenda una visita en segundos con CIC Inmuebles.",
   url: process.env.NEXT_PUBLIC_SITE_URL ?? "https://cicinmuebles.com",
 
   // Contacto público

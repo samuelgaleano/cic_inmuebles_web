@@ -87,7 +87,7 @@ export default async function HomePage() {
             style={{ animationDelay: "160ms" }}
           >
             Explora inmuebles seleccionados, agenda una visita en segundos y recibe
-            acompañamiento real en cada paso de la compra, venta o arriendo.
+            acompañamiento real en cada paso de la compra y la venta.
           </p>
 
           {/* Buscador (GET → catálogo) */}
