@@ -22,19 +22,35 @@ export function PropertyGallery({
     );
   }
 
-  const current = images[active] ?? images[0];
+  // Se montan la foto activa y sus vecinas (anterior/siguiente): las vecinas
+  // se descargan por adelantado con opacidad 0, así el cambio es instantáneo
+  // al navegar la galería (sin esperar la descarga en el clic).
+  const visibles = [active - 1, active, active + 1].filter(
+    (i) => i >= 0 && i < images.length,
+  );
 
   return (
     <div>
       <div className="relative aspect-[16/10] overflow-hidden rounded-[1.4rem] border border-line bg-surface">
-        <SafeImage
-          src={current.url}
-          alt={current.alt ?? title}
-          fill
-          priority
-          sizes="(max-width: 1024px) 100vw, 66vw"
-          className="object-cover"
-        />
+        {visibles.map((i) => (
+          <div
+            key={images[i].id}
+            aria-hidden={i !== active}
+            className={cn(
+              "absolute inset-0 transition-opacity duration-300",
+              i === active ? "opacity-100" : "opacity-0",
+            )}
+          >
+            <SafeImage
+              src={images[i].url}
+              alt={images[i].alt ?? title}
+              fill
+              priority={i === 0}
+              sizes="(max-width: 1024px) 100vw, 66vw"
+              className="object-cover"
+            />
+          </div>
+        ))}
       </div>
       {images.length > 1 && (
         <div className="mt-3 grid grid-cols-5 gap-2 sm:grid-cols-6">
