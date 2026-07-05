@@ -43,10 +43,10 @@ export default async function HomePage() {
   }
 
   const stats = [
-    { value: total > 0 ? `${total}+` : "—", label: "Inmuebles en catálogo" },
+    { value: total > 0 ? `${total}` : "—", label: "Inmuebles seleccionados" },
     { value: ciudades > 0 ? `${ciudades}` : "—", label: ciudades === 1 ? "Ciudad" : "Ciudades" },
-    { value: "24h", label: "Respuesta promedio" },
-    { value: "100%", label: "Acompañamiento" },
+    { value: "100%", label: "Enfocados en venta" },
+    { value: "WhatsApp", label: "Respuesta directa" },
   ];
 
   return (
@@ -256,7 +256,7 @@ export default async function HomePage() {
                 <HomeIcon className="h-3.5 w-3.5" /> Para propietarios
               </span>
               <h2 className="mt-5 max-w-xl text-3xl font-bold tracking-tight sm:text-4xl">
-                ¿Tienes un inmueble para vender o arrendar?
+                ¿Tienes un inmueble para vender?
               </h2>
               <p className="mt-4 max-w-lg leading-relaxed text-white/65">
                 Nos encargamos de todo: fotos profesionales, publicación, visitas y negociación.

@@ -56,14 +56,14 @@ export function SiteHeader() {
 
         <div className="flex items-center gap-2">
           <Link
-            href="/inmuebles"
+            href="/vender"
             className={buttonVariants({
               variant: "primary",
               size: "sm",
               className: "hidden rounded-full sm:inline-flex",
             })}
           >
-            Ver catálogo
+            Vende tu inmueble
             <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5">
               <ArrowUpRight className="h-3 w-3" />
             </span>

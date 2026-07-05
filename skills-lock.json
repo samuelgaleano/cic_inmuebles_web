@@ -49,6 +49,13 @@
       "skillPath": "ux-strategy/skills/business-design/SKILL.md",
       "computedHash": "2a4787321a0c788fb0e42f1b2ad3af66b8695137e29fd92131fe97358ae2fbae"
     },
+    "canvas-design": {
+      "source": "anthropics/skills",
+      "ref": "main",
+      "sourceType": "github",
+      "skillPath": "skills/canvas-design/SKILL.md",
+      "computedHash": "3fa7ea60170023ad8268bf9fd734ea75dd404279a2ef8ddf5abaa1102ad8e5f4"
+    },
     "card-sort-analysis": {
       "source": "Owl-Listener/designer-skills",
       "sourceType": "github",
@@ -258,6 +265,12 @@
       "sourceType": "github",
       "skillPath": "interaction-design/skills/doherty-threshold/SKILL.md",
       "computedHash": "3d9d9a3ec839603a8416fff16c6c1cb715e07f1f9258468858f72a5697040cbf"
+    },
+    "emil-design-eng": {
+      "source": "emilkowalski/skills",
+      "sourceType": "github",
+      "skillPath": "skills/emil-design-eng/SKILL.md",
+      "computedHash": "8bdf9e4e6de7a4969147bf4828a4ad2c5aacd9fba4b690b250a85e0467ca387d"
     },
     "empathy-map": {
       "source": "Owl-Listener/designer-skills",
