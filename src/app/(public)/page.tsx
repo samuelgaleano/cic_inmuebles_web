@@ -6,7 +6,6 @@ import {
   Home as HomeIcon,
   KeyRound,
   MapPinned,
-  Search,
   ShieldCheck,
   Sparkles,
   TrendingUp,
@@ -14,29 +13,23 @@ import {
 import { buttonVariants } from "@/components/ui/button";
 import { BrandMark } from "@/components/brand/brand-mark";
 import { Reveal } from "@/components/ui/reveal";
-import { PropertyGrid } from "@/components/public/property-grid";
 import { WhatsAppButton } from "@/components/public/whatsapp-button";
 import { SafeImage } from "@/components/ui/safe-image";
 import { getRepository } from "@/lib/data";
-import {
-  PROPERTY_TYPES,
-  PROPERTY_TYPE_LABELS,
-} from "@/lib/domain";
+import { getCoverMedia, PROPERTY_TYPE_LABELS } from "@/lib/domain";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { formatPrice } from "@/lib/utils/format";
 import { siteConfig } from "@/lib/config/site";
 
 export default async function HomePage() {
   const repo = getRepository();
-  let destacados: Awaited<ReturnType<typeof repo.properties.listPublic>> = [];
-  let recientes: typeof destacados = [];
+  let vitrina: Awaited<ReturnType<typeof repo.properties.listPublic>> = [];
   let total = 0;
   let ciudades = 0;
   try {
-    const [dest, todos] = await Promise.all([
-      repo.properties.listPublic({ destacado: true }),
-      repo.properties.listPublic(),
-    ]);
-    destacados = dest.slice(0, 3);
-    recientes = todos.slice(0, 6);
+    // Disponibles primero, luego en proceso y vendidos (orden del repositorio).
+    const todos = await repo.properties.listPublic();
+    vitrina = todos.slice(0, 12);
     total = todos.length;
     ciudades = new Set(todos.map((p) => p.ubicacion.ciudad)).size;
   } catch (err) {
@@ -52,143 +45,118 @@ export default async function HomePage() {
 
   return (
     <>
-      {/* ───────────────────────── Hero ───────────────────────── */}
+      {/* ─────────── Hero + Vitrina: el catálogo es el protagonista ─────────── */}
       <section className="relative -mt-[4.5rem] overflow-hidden bg-ink pt-[4.5rem] text-white">
         <div className="absolute inset-0 bg-gradient-to-br from-ink via-ink/95 to-brand-950/80" />
         <div className="absolute inset-0 bg-aurora" />
         <div className="pointer-events-none absolute inset-0 bg-grain opacity-[0.04]" />
+        <BrandMark className="animate-float pointer-events-none absolute right-[4%] top-20 hidden h-36 w-36 text-brand-500/20 lg:block" />
 
-        <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-4 py-16 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:gap-10 lg:px-8 lg:py-24">
-          {/* Columna de contenido */}
-          <div>
-            <span className="animate-rise inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-brand-300 backdrop-blur">
-              <Sparkles className="h-3.5 w-3.5" /> Finca raíz en {siteConfig.city}
-            </span>
+        <div className="relative mx-auto max-w-6xl px-4 pt-14 sm:px-6 lg:px-8 lg:pt-20">
+          <span className="animate-rise inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-brand-300 backdrop-blur">
+            <Sparkles className="h-3.5 w-3.5" /> Finca raíz en {siteConfig.city}
+          </span>
 
+          <div className="mt-6 flex flex-wrap items-end justify-between gap-6">
             <h1
-              className="animate-rise text-balance mt-6 font-display text-4xl font-extrabold leading-[1.06] tracking-tight sm:text-6xl lg:text-[4.15rem] lg:leading-[1.04]"
+              className="animate-rise text-balance max-w-2xl font-display text-4xl font-extrabold leading-[1.06] tracking-tight sm:text-6xl"
               style={{ animationDelay: "80ms" }}
             >
-              Tu próximo <span className="text-brand-400">hogar</span>, sin complicaciones.
+              Pocos inmuebles.
+              <br />
+              <span className="text-brand-400">Los correctos.</span>
             </h1>
-
             <p
-              className="animate-rise mt-5 max-w-xl text-lg leading-relaxed text-white/70"
+              className="animate-rise max-w-sm text-base leading-relaxed text-white/65 sm:pb-2"
               style={{ animationDelay: "160ms" }}
             >
-              Un catálogo corto y seleccionado: cada inmueble verificado, con fotos
-              reales y acompañamiento directo hasta las llaves.
+              Un catálogo corto y verificado, en venta directa. Míralo completo aquí abajo:
+              sin buscar, sin perderse.
             </p>
-
-            {/* Buscador (GET → catálogo) */}
-            <form
-              action="/inmuebles"
-              method="get"
-              className="animate-rise mt-8 rounded-[1.4rem] border border-white/10 bg-white/10 p-1.5 backdrop-blur-md"
-              style={{ animationDelay: "240ms" }}
-            >
-              <div className="flex flex-col gap-2 rounded-[1.05rem] bg-white p-2 sm:flex-row sm:items-center">
-                <div className="relative flex-1">
-                  <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
-                  <input
-                    name="q"
-                    placeholder="Ciudad, sector, conjunto o código…"
-                    aria-label="Buscar inmuebles"
-                    className="h-12 w-full rounded-xl bg-transparent pl-10 pr-3 text-ink placeholder:text-muted focus:outline-none"
-                  />
-                </div>
-                <select
-                  name="tipo"
-                  aria-label="Tipo de inmueble"
-                  className="h-12 rounded-xl border border-line bg-surface px-3 text-sm text-ink-soft focus:outline-none focus:ring-2 focus:ring-brand-300 sm:w-36"
-                  defaultValue=""
-                >
-                  <option value="">Tipo</option>
-                  {PROPERTY_TYPES.map((t) => (
-                    <option key={t} value={t}>{PROPERTY_TYPE_LABELS[t]}</option>
-                  ))}
-                </select>
-                <button type="submit" className={buttonVariants({ variant: "primary", size: "lg", className: "shrink-0" })}>
-                  Buscar
-                </button>
-              </div>
-            </form>
-
-            {/* Accesos rápidos */}
-            <div className="animate-rise mt-5 flex flex-wrap items-center gap-2" style={{ animationDelay: "320ms" }}>
-              <span className="text-sm text-white/50">Populares:</span>
-              {[
-                { label: "Apartamentos", href: "/inmuebles?tipo=apartamento" },
-                { label: "Casas", href: "/inmuebles?tipo=casa" },
-                { label: "Apartaestudios", href: "/inmuebles?tipo=apartaestudio" },
-              ].map((chip) => (
-                <Link
-                  key={chip.label}
-                  href={chip.href}
-                  className="rounded-full border border-white/15 bg-white/5 px-3.5 py-1.5 text-sm font-medium text-white/80 transition-colors hover:border-brand-400/50 hover:bg-brand-500/10 hover:text-white"
-                >
-                  {chip.label}
-                </Link>
-              ))}
-            </div>
-
-            {/* Stats */}
-            <dl className="animate-rise mt-10 grid grid-cols-2 gap-x-6 gap-y-6 border-t border-white/10 pt-7 sm:grid-cols-4" style={{ animationDelay: "400ms" }}>
-              {stats.map((s) => (
-                <div key={s.label}>
-                  <dt className="font-display text-2xl font-extrabold tracking-tight text-white sm:text-3xl">{s.value}</dt>
-                  <dd className="mt-1 text-sm text-white/55">{s.label}</dd>
-                </div>
-              ))}
-            </dl>
-          </div>
-
-          {/* Columna visual: la puerta al hogar (arco fotográfico) */}
-          <div className="animate-rise relative mx-auto w-full max-w-[300px] sm:max-w-[350px] lg:max-w-[400px]" style={{ animationDelay: "200ms" }}>
-            <div className="relative aspect-[4/5] overflow-hidden rounded-b-[2rem] rounded-t-[12rem] border border-white/15 shadow-[0_50px_90px_-45px_rgba(0,0,0,0.85)]">
-              <SafeImage
-                src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=75"
-                alt="Interior luminoso de un hogar"
-                fill
-                priority
-                sizes="(max-width: 1024px) 85vw, 400px"
-                className="object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-ink/55 via-transparent to-transparent" />
-              <div className="absolute bottom-4 left-4 right-4 flex items-center gap-3 rounded-2xl border border-white/15 bg-ink/55 px-4 py-3 backdrop-blur-md">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-500 text-white">
-                  <KeyRound className="h-4 w-4" />
-                </span>
-                <div className="min-w-0 leading-tight">
-                  <p className="truncate text-sm font-semibold text-white">Catálogo seleccionado</p>
-                  <p className="truncate text-xs text-white/60">Fotos reales · precios claros · solo venta</p>
-                </div>
-              </div>
-            </div>
-            <BrandMark className="animate-float pointer-events-none absolute -right-8 -top-8 hidden h-24 w-24 text-brand-500/30 sm:block" />
           </div>
         </div>
-      </section>
 
-      {/* ───────────────────────── Destacados ───────────────────────── */}
-      {destacados.length > 0 && (
-        <section className="mx-auto max-w-6xl px-4 pb-6 sm:px-6 lg:px-8">
-          <Reveal>
-            <div className="flex items-end justify-between gap-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-600">Selección CIC</p>
-                <h2 className="mt-2 text-3xl font-bold tracking-tight text-ink">Inmuebles destacados</h2>
-              </div>
-              <Link href="/inmuebles" className="hidden shrink-0 items-center gap-1 text-sm font-semibold text-brand-700 hover:gap-2 transition-all sm:flex">
-                Ver todos <ArrowRight className="h-4 w-4" />
-              </Link>
-            </div>
-          </Reveal>
-          <div className="mt-8">
-            <PropertyGrid properties={destacados} />
+        {/* La vitrina: todos los inmuebles, ordenados y numerados */}
+        {vitrina.length > 0 ? (
+          <div
+            className="animate-rise relative mt-10 flex snap-x snap-mandatory gap-5 overflow-x-auto pb-5 pl-4 pr-4 [scrollbar-width:none] sm:pl-6 sm:pr-6 lg:pl-[max(2rem,calc((100vw-72rem)/2+2rem))] [&::-webkit-scrollbar]:hidden"
+            style={{ animationDelay: "240ms" }}
+          >
+            {vitrina.map((p, i) => {
+              const cover = getCoverMedia(p);
+              return (
+                <Link
+                  key={p.id}
+                  href={`/inmuebles/${p.slug}`}
+                  className="group relative aspect-[3/4] w-[75vw] max-w-[330px] shrink-0 snap-start overflow-hidden rounded-[1.6rem] border border-white/10 bg-white/[0.04] transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-1.5 sm:w-[330px]"
+                >
+                  {cover ? (
+                    <SafeImage
+                      src={cover.url}
+                      alt={cover.alt ?? p.titulo}
+                      fill
+                      sizes="(max-width: 640px) 75vw, 330px"
+                      className="object-cover transition-transform duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.05]"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-sm text-white/40">
+                      Fotos próximamente
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-ink/85 via-ink/10 to-transparent" />
+                  <span className="absolute left-4 top-4 font-mono text-sm font-semibold tracking-widest text-white/70">
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                  {p.estado !== "disponible" && (
+                    <span className="absolute right-4 top-4">
+                      <StatusBadge status={p.estado} />
+                    </span>
+                  )}
+                  <div className="absolute inset-x-0 bottom-0 p-5">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-300">
+                      {PROPERTY_TYPE_LABELS[p.tipo]}
+                      {p.ubicacion.sector ? ` · ${p.ubicacion.sector}` : ""}
+                    </p>
+                    <h3 className="mt-1.5 line-clamp-2 font-display text-xl font-bold leading-snug text-white">
+                      {p.titulo}
+                    </h3>
+                    <p className="mt-2 font-display text-2xl font-extrabold tracking-tight text-white">
+                      {formatPrice(p.precio)}
+                    </p>
+                  </div>
+                </Link>
+              );
+            })}
+            {/* Cierre de la vitrina: invitación directa */}
+            <Link
+              href="/inmuebles"
+              className="group flex aspect-[3/4] w-[60vw] max-w-[240px] shrink-0 snap-start flex-col items-center justify-center gap-3 rounded-[1.6rem] border border-dashed border-white/20 text-white/70 transition-colors hover:border-brand-400/60 hover:text-white"
+            >
+              <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white/10 transition-transform duration-300 group-hover:scale-110">
+                <ArrowRight className="h-5 w-5" />
+              </span>
+              <span className="px-6 text-center text-sm font-semibold">Ver el catálogo con filtros</span>
+            </Link>
           </div>
-        </section>
-      )}
+        ) : (
+          <div className="relative mx-auto mt-10 max-w-6xl px-4 sm:px-6 lg:px-8">
+            <p className="rounded-2xl border border-dashed border-white/15 px-6 py-10 text-center text-white/55">
+              Estamos preparando la vitrina. Escríbenos por WhatsApp y te mostramos lo disponible.
+            </p>
+          </div>
+        )}
+
+        <div className="relative mx-auto max-w-6xl px-4 pb-14 sm:px-6 lg:px-8">
+          <dl className="animate-rise grid grid-cols-2 gap-x-6 gap-y-5 border-t border-white/10 pt-7 sm:grid-cols-4" style={{ animationDelay: "320ms" }}>
+            {stats.map((s) => (
+              <div key={s.label}>
+                <dt className="font-display text-2xl font-extrabold tracking-tight text-white sm:text-3xl">{s.value}</dt>
+                <dd className="mt-1 text-sm text-white/55">{s.label}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      </section>
 
       {/* ─────────────────── Propuesta de valor ─────────────────── */}
       <section className="mx-auto max-w-6xl px-4 py-20 sm:px-6 lg:px-8">
@@ -242,21 +210,6 @@ export default async function HomePage() {
               </div>
             </Reveal>
           ))}
-        </div>
-      </section>
-
-      {/* ───────────────────────── Recientes ───────────────────────── */}
-      <section className="mx-auto max-w-6xl px-4 pb-20 sm:px-6 lg:px-8">
-        <Reveal>
-          <div className="flex items-end justify-between gap-4">
-            <h2 className="text-3xl font-bold tracking-tight text-ink">Inmuebles disponibles</h2>
-            <Link href="/inmuebles" className="flex shrink-0 items-center gap-1 text-sm font-semibold text-brand-700 hover:gap-2 transition-all">
-              Catálogo <ArrowRight className="h-4 w-4" />
-            </Link>
-          </div>
-        </Reveal>
-        <div className="mt-8">
-          <PropertyGrid properties={recientes} />
         </div>
       </section>
 
