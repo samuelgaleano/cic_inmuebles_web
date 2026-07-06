@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils/cn";
 import { SafeImage } from "@/components/ui/safe-image";
+import { FramedPhoto } from "@/components/ui/framed-photo";
 import type { PropertyMedia } from "@/lib/domain";
 
 export function PropertyGallery({
@@ -41,13 +42,11 @@ export function PropertyGallery({
               i === active ? "opacity-100" : "opacity-0",
             )}
           >
-            <SafeImage
+            <FramedPhoto
               src={images[i].url}
               alt={images[i].alt ?? title}
-              fill
               priority={i === 0}
               sizes="(max-width: 1024px) 100vw, 66vw"
-              className="object-cover"
             />
           </div>
         ))}
