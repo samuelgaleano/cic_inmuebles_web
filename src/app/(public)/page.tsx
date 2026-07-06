@@ -37,9 +37,12 @@ export default async function HomePage() {
     console.error("[home] no se pudo cargar el catálogo:", err);
   }
 
-  const heroBg =
-    (vitrina[0] ? getCoverMedia(vitrina[0])?.url : undefined) ??
-    "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=2000&q=70";
+  // Recorrido del hero: varias fotos del primer inmueble (fachada → interiores).
+  const firstShots = vitrina[0]?.medios.filter((m) => m.type === "image").map((m) => m.url) ?? [];
+  const heroImages =
+    firstShots.length > 0
+      ? firstShots.slice(0, 5)
+      : ["https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=2000&q=70"];
 
   const items = vitrina.map((p) => ({
     id: p.id,
@@ -68,7 +71,7 @@ export default async function HomePage() {
     <>
       {/* ─────────── Hero POV: entras al inmueble al deslizar ─────────── */}
       <section className="-mt-[4.5rem] text-white">
-        <HeroPov bg={heroBg}>
+        <HeroPov images={heroImages}>
           <div className="mx-auto flex max-w-4xl flex-col items-center px-4 text-center sm:px-6">
             <span className="animate-rise inline-flex items-center gap-2 rounded-full border border-white/20 bg-ink/40 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-brand-300 backdrop-blur">
               <Sparkles className="h-3.5 w-3.5" /> Inmobiliaria boutique · {siteConfig.city}
