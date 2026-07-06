@@ -36,6 +36,10 @@ export default async function HomePage() {
     console.error("[home] no se pudo cargar el catálogo:", err);
   }
 
+  const heroBg =
+    (vitrina[0] ? getCoverMedia(vitrina[0])?.url : undefined) ??
+    "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=2000&q=70";
+
   const stats = [
     { value: total > 0 ? `${total}` : "—", label: "Inmuebles seleccionados" },
     { value: ciudades > 0 ? `${ciudades}` : "—", label: ciudades === 1 ? "Ciudad" : "Ciudades" },
@@ -45,117 +49,136 @@ export default async function HomePage() {
 
   return (
     <>
-      {/* ─────────── Hero + Vitrina: el catálogo es el protagonista ─────────── */}
+      {/* ─────────── Hero boutique: fondo de inmueble real ─────────── */}
       <section className="relative -mt-[4.5rem] overflow-hidden bg-ink pt-[4.5rem] text-white">
-        <div className="absolute inset-0 bg-gradient-to-br from-ink via-ink/95 to-brand-950/80" />
-        <div className="absolute inset-0 bg-aurora" />
-        <div className="pointer-events-none absolute inset-0 bg-grain opacity-[0.04]" />
-        <BrandMark className="animate-float pointer-events-none absolute right-[4%] top-20 hidden h-36 w-36 text-brand-500/20 lg:block" />
+        <SafeImage src={heroBg} alt="" fill priority sizes="100vw" className="object-cover opacity-40" />
+        <div className="absolute inset-0 bg-gradient-to-b from-ink/75 via-ink/50 to-ink" />
+        <div className="pointer-events-none absolute inset-0 bg-grain opacity-[0.05]" />
 
-        <div className="relative mx-auto max-w-6xl px-4 pt-14 sm:px-6 lg:px-8 lg:pt-20">
-          <span className="animate-rise inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-brand-300 backdrop-blur">
-            <Sparkles className="h-3.5 w-3.5" /> Finca raíz en {siteConfig.city}
+        <div className="relative mx-auto flex min-h-[66vh] max-w-6xl flex-col items-center justify-center px-4 py-24 text-center sm:px-6 lg:px-8">
+          <span className="animate-rise inline-flex items-center gap-2 rounded-full border border-white/20 bg-ink/40 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-brand-300 backdrop-blur">
+            <Sparkles className="h-3.5 w-3.5" /> Inmobiliaria boutique · {siteConfig.city}
           </span>
 
-          <div className="mt-6 flex flex-wrap items-end justify-between gap-6">
-            <h1
-              className="animate-rise text-balance max-w-2xl font-display text-4xl font-extrabold leading-[1.06] tracking-tight sm:text-6xl"
-              style={{ animationDelay: "80ms" }}
-            >
-              Pocos inmuebles.
-              <br />
-              <span className="text-brand-400">Los correctos.</span>
-            </h1>
-            <p
-              className="animate-rise max-w-sm text-base leading-relaxed text-white/65 sm:pb-2"
-              style={{ animationDelay: "160ms" }}
-            >
-              Un catálogo corto y verificado, en venta directa. Míralo completo aquí abajo:
-              sin buscar, sin perderse.
-            </p>
+          <h1
+            className="animate-rise text-balance mt-6 max-w-3xl font-display text-4xl font-extrabold leading-[1.06] tracking-tight sm:text-6xl lg:text-7xl"
+            style={{ animationDelay: "80ms" }}
+          >
+            Pocos inmuebles. <span className="text-brand-400">Los correctos.</span>
+          </h1>
+
+          <p
+            className="animate-rise mt-5 max-w-xl text-lg leading-relaxed text-white/75"
+            style={{ animationDelay: "160ms" }}
+          >
+            Un portafolio corto, visitado y verificado por nosotros. Sin ruido:
+            solo propiedades que valen tu tiempo.
+          </p>
+
+          <div className="animate-rise mt-8 flex flex-wrap items-center justify-center gap-3" style={{ animationDelay: "240ms" }}>
+            <a href="#portafolio" className={buttonVariants({ variant: "primary", size: "lg" })}>
+              Ver el portafolio
+            </a>
+            <WhatsAppButton size="lg" label="Hablar por WhatsApp" message={`Hola ${siteConfig.name}, quiero conocer sus inmuebles disponibles.`} />
+          </div>
+
+          <div className="animate-rise mt-12 flex flex-wrap items-center justify-center gap-x-10 gap-y-3 text-sm text-white/60" style={{ animationDelay: "320ms" }}>
+            {stats.map((s) => (
+              <span key={s.label}>
+                <strong className="font-display font-extrabold text-white">{s.value}</strong> {s.label.toLowerCase()}
+              </span>
+            ))}
           </div>
         </div>
+      </section>
 
-        {/* La vitrina: todos los inmuebles, ordenados y numerados */}
+      {/* ─────────────────── Cómo funciona (secuencia real) ─────────────────── */}
+      <section className="mx-auto max-w-6xl px-4 py-20 sm:px-6 lg:px-8">
+        <Reveal className="max-w-2xl">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-600">Cómo funciona</p>
+          <h2 className="mt-3 text-3xl font-bold tracking-tight text-ink sm:text-4xl">De la búsqueda a las llaves, en tres pasos.</h2>
+        </Reveal>
+        <div className="mt-12 grid gap-5 md:grid-cols-3">
+          {[
+            { n: "01", icon: MapPinned, title: "Explora", desc: "Filtra por ciudad, precio y características hasta encontrar el inmueble que encaja contigo." },
+            { n: "02", icon: CalendarCheck, title: "Agenda", desc: "Reserva tu visita en segundos. Coordinamos el horario que mejor te funcione." },
+            { n: "03", icon: KeyRound, title: "Cierra", desc: "Te acompañamos en la negociación y el papeleo hasta recibir las llaves." },
+          ].map((step, i) => (
+            <Reveal key={step.n} delay={i * 90}>
+              <div className="relative h-full rounded-[1.4rem] border border-line bg-white p-7">
+                <span className="font-display text-5xl font-extrabold tracking-tight text-brand-100">{step.n}</span>
+                <span className="absolute right-6 top-7 flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-50 text-brand-700">
+                  <step.icon className="h-5 w-5" />
+                </span>
+                <h3 className="mt-4 text-lg font-bold text-ink">{step.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-muted">{step.desc}</p>
+              </div>
+            </Reveal>
+          ))}
+        </div>
+      </section>
+
+      {/* ─────────── El portafolio: galería limpia, sin saturación ─────────── */}
+      <section id="portafolio" className="scroll-mt-24 bg-surface py-20">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+          <Reveal>
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-600">El portafolio</p>
+                <h2 className="mt-2 text-3xl font-bold tracking-tight text-ink sm:text-4xl">Disponibles ahora.</h2>
+              </div>
+              <Link href="/inmuebles" className="hidden shrink-0 items-center gap-1 text-sm font-semibold text-brand-700 transition-all hover:gap-2 sm:flex">
+                Ver con filtros <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+          </Reveal>
+        </div>
+
         {vitrina.length > 0 ? (
-          <div
-            className="animate-rise relative mt-10 flex snap-x snap-mandatory gap-5 overflow-x-auto pb-5 pl-4 pr-4 [scrollbar-width:none] sm:pl-6 sm:pr-6 lg:pl-[max(2rem,calc((100vw-72rem)/2+2rem))] [&::-webkit-scrollbar]:hidden"
-            style={{ animationDelay: "240ms" }}
-          >
+          <div className="mt-10 flex snap-x snap-mandatory gap-6 overflow-x-auto pb-4 pl-4 pr-4 [scrollbar-width:none] sm:pl-6 sm:pr-6 lg:pl-[max(2rem,calc((100vw-72rem)/2+2rem))] [&::-webkit-scrollbar]:hidden">
             {vitrina.map((p, i) => {
               const cover = getCoverMedia(p);
               return (
-                <Link
-                  key={p.id}
-                  href={`/inmuebles/${p.slug}`}
-                  className="group relative aspect-[3/4] w-[75vw] max-w-[330px] shrink-0 snap-start overflow-hidden rounded-[1.6rem] border border-white/10 bg-white/[0.04] transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-1.5 sm:w-[330px]"
-                >
-                  {cover ? (
-                    <SafeImage
-                      src={cover.url}
-                      alt={cover.alt ?? p.titulo}
-                      fill
-                      sizes="(max-width: 640px) 75vw, 330px"
-                      className="object-cover transition-transform duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.05]"
-                    />
-                  ) : (
-                    <div className="flex h-full items-center justify-center text-sm text-white/40">
-                      Fotos próximamente
-                    </div>
-                  )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-ink/85 via-ink/10 to-transparent" />
-                  <span className="absolute left-4 top-4 font-mono text-sm font-semibold tracking-widest text-white/70">
-                    {String(i + 1).padStart(2, "0")}
-                  </span>
-                  {p.estado !== "disponible" && (
-                    <span className="absolute right-4 top-4">
-                      <StatusBadge status={p.estado} />
-                    </span>
-                  )}
-                  <div className="absolute inset-x-0 bottom-0 p-5">
-                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-300">
+                <Link key={p.id} href={`/inmuebles/${p.slug}`} className="group w-[78vw] max-w-[340px] shrink-0 snap-start sm:w-[340px]">
+                  <div className="relative aspect-[4/3] overflow-hidden rounded-[1.4rem] border border-line bg-white">
+                    {cover ? (
+                      <SafeImage
+                        src={cover.url}
+                        alt={cover.alt ?? p.titulo}
+                        fill
+                        sizes="(max-width: 640px) 78vw, 340px"
+                        className="object-cover transition-transform duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.04]"
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center text-sm text-muted">Fotos próximamente</div>
+                    )}
+                    {p.estado !== "disponible" && (
+                      <span className="absolute right-3 top-3"><StatusBadge status={p.estado} /></span>
+                    )}
+                  </div>
+                  <div className="mt-4 flex items-center gap-3">
+                    <p className="font-mono text-xs font-semibold text-muted">{String(i + 1).padStart(2, "0")}</p>
+                    <span className="h-px flex-1 bg-line" />
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand-700">
                       {PROPERTY_TYPE_LABELS[p.tipo]}
                       {p.ubicacion.sector ? ` · ${p.ubicacion.sector}` : ""}
                     </p>
-                    <h3 className="mt-1.5 line-clamp-2 font-display text-xl font-bold leading-snug text-white">
-                      {p.titulo}
-                    </h3>
-                    <p className="mt-2 font-display text-2xl font-extrabold tracking-tight text-white">
-                      {formatPrice(p.precio)}
-                    </p>
                   </div>
+                  <h3 className="mt-2 line-clamp-1 font-display text-lg font-bold tracking-tight text-ink transition-colors group-hover:text-brand-700">
+                    {p.titulo}
+                  </h3>
+                  <p className="mt-1 font-display text-xl font-extrabold tracking-tight text-ink">{formatPrice(p.precio)}</p>
                 </Link>
               );
             })}
-            {/* Cierre de la vitrina: invitación directa */}
-            <Link
-              href="/inmuebles"
-              className="group flex aspect-[3/4] w-[60vw] max-w-[240px] shrink-0 snap-start flex-col items-center justify-center gap-3 rounded-[1.6rem] border border-dashed border-white/20 text-white/70 transition-colors hover:border-brand-400/60 hover:text-white"
-            >
-              <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white/10 transition-transform duration-300 group-hover:scale-110">
-                <ArrowRight className="h-5 w-5" />
-              </span>
-              <span className="px-6 text-center text-sm font-semibold">Ver el catálogo con filtros</span>
-            </Link>
           </div>
         ) : (
-          <div className="relative mx-auto mt-10 max-w-6xl px-4 sm:px-6 lg:px-8">
-            <p className="rounded-2xl border border-dashed border-white/15 px-6 py-10 text-center text-white/55">
-              Estamos preparando la vitrina. Escríbenos por WhatsApp y te mostramos lo disponible.
+          <div className="mx-auto mt-10 max-w-6xl px-4 sm:px-6 lg:px-8">
+            <p className="rounded-2xl border border-dashed border-line bg-white px-6 py-10 text-center text-muted">
+              Estamos preparando el portafolio. Escríbenos por WhatsApp y te mostramos lo disponible.
             </p>
           </div>
         )}
-
-        <div className="relative mx-auto max-w-6xl px-4 pb-14 sm:px-6 lg:px-8">
-          <dl className="animate-rise grid grid-cols-2 gap-x-6 gap-y-5 border-t border-white/10 pt-7 sm:grid-cols-4" style={{ animationDelay: "320ms" }}>
-            {stats.map((s) => (
-              <div key={s.label}>
-                <dt className="font-display text-2xl font-extrabold tracking-tight text-white sm:text-3xl">{s.value}</dt>
-                <dd className="mt-1 text-sm text-white/55">{s.label}</dd>
-              </div>
-            ))}
-          </dl>
-        </div>
       </section>
 
       {/* ─────────────────── Propuesta de valor ─────────────────── */}
@@ -181,32 +204,6 @@ export default async function HomePage() {
                   <h3 className="mt-5 text-lg font-bold text-ink">{f.title}</h3>
                   <p className="mt-2 text-sm leading-relaxed text-muted">{f.desc}</p>
                 </div>
-              </div>
-            </Reveal>
-          ))}
-        </div>
-      </section>
-
-      {/* ─────────────────── Cómo funciona (secuencia real) ─────────────────── */}
-      <section className="mx-auto max-w-6xl px-4 py-20 sm:px-6 lg:px-8">
-        <Reveal className="max-w-2xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-600">Cómo funciona</p>
-          <h2 className="mt-3 text-3xl font-bold tracking-tight text-ink sm:text-4xl">De la búsqueda a las llaves, en tres pasos.</h2>
-        </Reveal>
-        <div className="mt-12 grid gap-5 md:grid-cols-3">
-          {[
-            { n: "01", icon: MapPinned, title: "Explora", desc: "Filtra por ciudad, precio y características hasta encontrar el inmueble que encaja contigo." },
-            { n: "02", icon: CalendarCheck, title: "Agenda", desc: "Reserva tu visita en segundos. Coordinamos el horario que mejor te funcione." },
-            { n: "03", icon: KeyRound, title: "Cierra", desc: "Te acompañamos en la negociación y el papeleo hasta recibir las llaves." },
-          ].map((step, i) => (
-            <Reveal key={step.n} delay={i * 90}>
-              <div className="relative h-full rounded-[1.4rem] border border-line bg-white p-7">
-                <span className="font-display text-5xl font-extrabold tracking-tight text-brand-100">{step.n}</span>
-                <span className="absolute right-6 top-7 flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-50 text-brand-700">
-                  <step.icon className="h-5 w-5" />
-                </span>
-                <h3 className="mt-4 text-lg font-bold text-ink">{step.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-muted">{step.desc}</p>
               </div>
             </Reveal>
           ))}
