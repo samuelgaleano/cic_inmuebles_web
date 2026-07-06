@@ -2,6 +2,7 @@ import Link from "next/link";
 import {
   ArrowRight,
   ArrowUpRight,
+  ChevronDown,
   CalendarCheck,
   Home as HomeIcon,
   KeyRound,
@@ -14,10 +15,10 @@ import { buttonVariants } from "@/components/ui/button";
 import { BrandMark } from "@/components/brand/brand-mark";
 import { Reveal } from "@/components/ui/reveal";
 import { WhatsAppButton } from "@/components/public/whatsapp-button";
-import { SafeImage } from "@/components/ui/safe-image";
+import { HeroPov } from "@/components/public/hero-pov";
+import { PortfolioExpand } from "@/components/public/portfolio-expand";
 import { getRepository } from "@/lib/data";
 import { getCoverMedia, PROPERTY_TYPE_LABELS } from "@/lib/domain";
-import { StatusBadge } from "@/components/ui/status-badge";
 import { formatPrice } from "@/lib/utils/format";
 import { siteConfig } from "@/lib/config/site";
 
@@ -40,6 +41,22 @@ export default async function HomePage() {
     (vitrina[0] ? getCoverMedia(vitrina[0])?.url : undefined) ??
     "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=2000&q=70";
 
+  const items = vitrina.map((p) => ({
+    id: p.id,
+    slug: p.slug,
+    titulo: p.titulo,
+    precio: formatPrice(p.precio),
+    tipo: PROPERTY_TYPE_LABELS[p.tipo],
+    sector: p.ubicacion.sector,
+    estado: p.estado,
+    cover: getCoverMedia(p)?.url,
+    descripcion: p.descripcion,
+    habitaciones: p.caracteristicas.habitaciones,
+    banos: p.caracteristicas.banos,
+    area: p.caracteristicas.area,
+    parqueaderos: p.caracteristicas.parqueaderos,
+  }));
+
   const stats = [
     { value: total > 0 ? `${total}` : "—", label: "Inmuebles seleccionados" },
     { value: ciudades > 0 ? `${ciudades}` : "—", label: ciudades === 1 ? "Ciudad" : "Ciudades" },
@@ -49,47 +66,50 @@ export default async function HomePage() {
 
   return (
     <>
-      {/* ─────────── Hero boutique: fondo de inmueble real ─────────── */}
-      <section className="relative -mt-[4.5rem] overflow-hidden bg-ink pt-[4.5rem] text-white">
-        <SafeImage src={heroBg} alt="" fill priority sizes="100vw" className="object-cover opacity-40" />
-        <div className="absolute inset-0 bg-gradient-to-b from-ink/75 via-ink/50 to-ink" />
-        <div className="pointer-events-none absolute inset-0 bg-grain opacity-[0.05]" />
+      {/* ─────────── Hero POV: entras al inmueble al deslizar ─────────── */}
+      <section className="-mt-[4.5rem] text-white">
+        <HeroPov bg={heroBg}>
+          <div className="mx-auto flex max-w-4xl flex-col items-center px-4 text-center sm:px-6">
+            <span className="animate-rise inline-flex items-center gap-2 rounded-full border border-white/20 bg-ink/40 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-brand-300 backdrop-blur">
+              <Sparkles className="h-3.5 w-3.5" /> Inmobiliaria boutique · {siteConfig.city}
+            </span>
 
-        <div className="relative mx-auto flex min-h-[66vh] max-w-6xl flex-col items-center justify-center px-4 py-24 text-center sm:px-6 lg:px-8">
-          <span className="animate-rise inline-flex items-center gap-2 rounded-full border border-white/20 bg-ink/40 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-brand-300 backdrop-blur">
-            <Sparkles className="h-3.5 w-3.5" /> Inmobiliaria boutique · {siteConfig.city}
-          </span>
+            <h1
+              className="animate-rise text-balance mt-6 max-w-3xl font-display text-4xl font-extrabold leading-[1.06] tracking-tight sm:text-6xl lg:text-7xl"
+              style={{ animationDelay: "80ms" }}
+            >
+              Pocos inmuebles. <span className="text-brand-400">Los correctos.</span>
+            </h1>
 
-          <h1
-            className="animate-rise text-balance mt-6 max-w-3xl font-display text-4xl font-extrabold leading-[1.06] tracking-tight sm:text-6xl lg:text-7xl"
-            style={{ animationDelay: "80ms" }}
-          >
-            Pocos inmuebles. <span className="text-brand-400">Los correctos.</span>
-          </h1>
+            <p
+              className="animate-rise mt-5 max-w-xl text-lg leading-relaxed text-white/75"
+              style={{ animationDelay: "160ms" }}
+            >
+              Un portafolio corto, visitado y verificado por nosotros. Sin ruido:
+              solo propiedades que valen tu tiempo.
+            </p>
 
-          <p
-            className="animate-rise mt-5 max-w-xl text-lg leading-relaxed text-white/75"
-            style={{ animationDelay: "160ms" }}
-          >
-            Un portafolio corto, visitado y verificado por nosotros. Sin ruido:
-            solo propiedades que valen tu tiempo.
-          </p>
+            <div className="animate-rise mt-8 flex flex-wrap items-center justify-center gap-3" style={{ animationDelay: "240ms" }}>
+              <a href="#portafolio" className={buttonVariants({ variant: "primary", size: "lg" })}>
+                Ver el portafolio
+              </a>
+              <WhatsAppButton size="lg" label="Hablar por WhatsApp" message={`Hola ${siteConfig.name}, quiero conocer sus inmuebles disponibles.`} />
+            </div>
 
-          <div className="animate-rise mt-8 flex flex-wrap items-center justify-center gap-3" style={{ animationDelay: "240ms" }}>
-            <a href="#portafolio" className={buttonVariants({ variant: "primary", size: "lg" })}>
-              Ver el portafolio
-            </a>
-            <WhatsAppButton size="lg" label="Hablar por WhatsApp" message={`Hola ${siteConfig.name}, quiero conocer sus inmuebles disponibles.`} />
+            <div className="animate-rise mt-10 flex flex-wrap items-center justify-center gap-x-10 gap-y-3 text-sm text-white/60" style={{ animationDelay: "320ms" }}>
+              {stats.map((s) => (
+                <span key={s.label}>
+                  <strong className="font-display font-extrabold text-white">{s.value}</strong> {s.label.toLowerCase()}
+                </span>
+              ))}
+            </div>
+
+            <span className="animate-rise mt-12 inline-flex flex-col items-center gap-1 text-xs font-semibold uppercase tracking-[0.2em] text-white/50" style={{ animationDelay: "400ms" }}>
+              Desliza para entrar
+              <ChevronDown className="h-5 w-5 animate-bounce text-brand-300" />
+            </span>
           </div>
-
-          <div className="animate-rise mt-12 flex flex-wrap items-center justify-center gap-x-10 gap-y-3 text-sm text-white/60" style={{ animationDelay: "320ms" }}>
-            {stats.map((s) => (
-              <span key={s.label}>
-                <strong className="font-display font-extrabold text-white">{s.value}</strong> {s.label.toLowerCase()}
-              </span>
-            ))}
-          </div>
-        </div>
+        </HeroPov>
       </section>
 
       {/* ─────────────────── Cómo funciona (secuencia real) ─────────────────── */}
@@ -118,7 +138,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* ─────────── El portafolio: galería limpia, sin saturación ─────────── */}
+      {/* ─────────── El portafolio: vertical y desplegable ─────────── */}
       <section id="portafolio" className="scroll-mt-24 bg-surface py-20">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
           <Reveal>
@@ -126,59 +146,24 @@ export default async function HomePage() {
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-600">El portafolio</p>
                 <h2 className="mt-2 text-3xl font-bold tracking-tight text-ink sm:text-4xl">Disponibles ahora.</h2>
+                <p className="mt-2 hidden text-sm text-muted lg:block">Pasa el cursor sobre cada inmueble para verlo en grande.</p>
               </div>
               <Link href="/inmuebles" className="hidden shrink-0 items-center gap-1 text-sm font-semibold text-brand-700 transition-all hover:gap-2 sm:flex">
                 Ver con filtros <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
           </Reveal>
-        </div>
 
-        {vitrina.length > 0 ? (
-          <div className="mt-10 flex snap-x snap-mandatory gap-6 overflow-x-auto pb-4 pl-4 pr-4 [scrollbar-width:none] sm:pl-6 sm:pr-6 lg:pl-[max(2rem,calc((100vw-72rem)/2+2rem))] [&::-webkit-scrollbar]:hidden">
-            {vitrina.map((p, i) => {
-              const cover = getCoverMedia(p);
-              return (
-                <Link key={p.id} href={`/inmuebles/${p.slug}`} className="group w-[78vw] max-w-[340px] shrink-0 snap-start sm:w-[340px]">
-                  <div className="relative aspect-[4/3] overflow-hidden rounded-[1.4rem] border border-line bg-white">
-                    {cover ? (
-                      <SafeImage
-                        src={cover.url}
-                        alt={cover.alt ?? p.titulo}
-                        fill
-                        sizes="(max-width: 640px) 78vw, 340px"
-                        className="object-cover transition-transform duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:scale-[1.04]"
-                      />
-                    ) : (
-                      <div className="flex h-full items-center justify-center text-sm text-muted">Fotos próximamente</div>
-                    )}
-                    {p.estado !== "disponible" && (
-                      <span className="absolute right-3 top-3"><StatusBadge status={p.estado} /></span>
-                    )}
-                  </div>
-                  <div className="mt-4 flex items-center gap-3">
-                    <p className="font-mono text-xs font-semibold text-muted">{String(i + 1).padStart(2, "0")}</p>
-                    <span className="h-px flex-1 bg-line" />
-                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand-700">
-                      {PROPERTY_TYPE_LABELS[p.tipo]}
-                      {p.ubicacion.sector ? ` · ${p.ubicacion.sector}` : ""}
-                    </p>
-                  </div>
-                  <h3 className="mt-2 line-clamp-1 font-display text-lg font-bold tracking-tight text-ink transition-colors group-hover:text-brand-700">
-                    {p.titulo}
-                  </h3>
-                  <p className="mt-1 font-display text-xl font-extrabold tracking-tight text-ink">{formatPrice(p.precio)}</p>
-                </Link>
-              );
-            })}
+          <div className="mt-10">
+            {vitrina.length > 0 ? (
+              <PortfolioExpand items={items} />
+            ) : (
+              <p className="rounded-2xl border border-dashed border-line bg-white px-6 py-10 text-center text-muted">
+                Estamos preparando el portafolio. Escríbenos por WhatsApp y te mostramos lo disponible.
+              </p>
+            )}
           </div>
-        ) : (
-          <div className="mx-auto mt-10 max-w-6xl px-4 sm:px-6 lg:px-8">
-            <p className="rounded-2xl border border-dashed border-line bg-white px-6 py-10 text-center text-muted">
-              Estamos preparando el portafolio. Escríbenos por WhatsApp y te mostramos lo disponible.
-            </p>
-          </div>
-        )}
+        </div>
       </section>
 
       {/* ─────────────────── Propuesta de valor ─────────────────── */}
