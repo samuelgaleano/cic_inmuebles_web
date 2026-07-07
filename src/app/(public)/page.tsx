@@ -88,11 +88,11 @@ export default async function HomePage() {
               solo propiedades que valen tu tiempo.
             </p>
 
-            <div className="animate-rise mt-8 flex flex-wrap items-center justify-center gap-3" style={{ animationDelay: "240ms" }}>
+            <div className="animate-rise mt-8 flex justify-center" style={{ animationDelay: "240ms" }}>
               <a href="#portafolio" className={buttonVariants({ variant: "primary", size: "lg" })}>
                 Ver el portafolio
+                <ChevronDown className="h-4 w-4 transition-transform duration-300 group-hover:translate-y-0.5" />
               </a>
-              <WhatsAppButton size="lg" label="Hablar por WhatsApp" message={`Hola ${siteConfig.name}, quiero conocer sus inmuebles disponibles.`} />
             </div>
 
             <div className="animate-rise mt-10 flex flex-wrap items-center justify-center gap-x-10 gap-y-3 text-sm text-white/60" style={{ animationDelay: "320ms" }}>
@@ -124,9 +124,9 @@ export default async function HomePage() {
             { n: "03", icon: KeyRound, title: "Cierra", desc: "Te acompañamos en la negociación y el papeleo hasta recibir las llaves." },
           ].map((step, i) => (
             <Reveal key={step.n} delay={i * 90}>
-              <div className="relative h-full rounded-[1.4rem] border border-line bg-white p-7">
-                <span className="font-display text-5xl font-extrabold tracking-tight text-brand-100">{step.n}</span>
-                <span className="absolute right-6 top-7 flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-50 text-brand-700">
+              <div className="group relative h-full rounded-[1.4rem] border border-line bg-white p-7 transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-1 hover:border-brand-200 hover:shadow-[0_28px_50px_-28px_rgba(11,26,21,0.3)]">
+                <span className="font-display text-5xl font-extrabold tracking-tight text-brand-100 transition-colors duration-500 group-hover:text-brand-200">{step.n}</span>
+                <span className="absolute right-6 top-7 flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-50 text-brand-700 transition-transform duration-500 group-hover:scale-110">
                   <step.icon className="h-5 w-5" />
                 </span>
                 <h3 className="mt-4 text-lg font-bold text-ink">{step.title}</h3>
@@ -224,7 +224,7 @@ export default async function HomePage() {
               </Link>
               <WhatsAppButton
                 size="lg"
-                message={`Hola ${siteConfig.name}, tengo un inmueble que quiero vender/arrendar y me gustaría más información.`}
+                message={`Hola ${siteConfig.name}, tengo un inmueble que quiero vender y me gustaría más información.`}
                 label="Hablar por WhatsApp"
               />
             </div>
