@@ -37,10 +37,8 @@ export default async function HomePage() {
     console.error("[home] no se pudo cargar el catálogo:", err);
   }
 
-  // Fondo del hero: la portada del primer inmueble (o una foto de respaldo).
-  const heroBg =
-    (vitrina[0] ? getCoverMedia(vitrina[0])?.url : undefined) ??
-    "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=2000&q=70";
+  // Fondo fijo del hero: imagen de marca optimizada (local, sin dependencias).
+  const heroBg = "/hero.jpg";
 
   const items = vitrina.map((p) => ({
     id: p.id,
@@ -76,14 +74,14 @@ export default async function HomePage() {
             </span>
 
             <h1
-              className="animate-rise text-balance mt-6 max-w-3xl font-display text-4xl font-extrabold leading-[1.06] tracking-tight sm:text-6xl lg:text-7xl"
+              className="animate-rise text-balance mt-6 max-w-3xl font-display text-4xl font-extrabold leading-[1.06] tracking-tight [text-shadow:0_2px_28px_rgba(6,20,16,0.55)] sm:text-6xl lg:text-7xl"
               style={{ animationDelay: "80ms" }}
             >
               Pocos inmuebles. <span className="text-brand-400">Los correctos.</span>
             </h1>
 
             <p
-              className="animate-rise mt-5 max-w-xl text-lg leading-relaxed text-white/75"
+              className="animate-rise mt-5 max-w-xl text-lg leading-relaxed text-white/80 [text-shadow:0_1px_16px_rgba(6,20,16,0.55)]"
               style={{ animationDelay: "160ms" }}
             >
               Un portafolio corto, visitado y verificado por nosotros. Sin ruido:
