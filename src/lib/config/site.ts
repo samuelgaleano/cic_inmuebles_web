@@ -10,11 +10,14 @@ export const siteConfig = {
     "Catálogo de apartamentos y casas en venta. Encuentra tu inmueble ideal y agenda una visita en segundos con CIC Inmuebles.",
   url: process.env.NEXT_PUBLIC_SITE_URL ?? "https://cicinmuebles.com",
 
-  // Contacto público
+  // Contacto público (número fijo del negocio, igual en toda la página)
   email: process.env.NEXT_PUBLIC_CONTACT_EMAIL ?? "cc.inmuebles@gmail.com",
-  // Número en formato internacional sin "+", solo dígitos (para enlaces wa.me)
-  whatsapp: process.env.NEXT_PUBLIC_WHATSAPP ?? "573000000000",
-  phoneDisplay: process.env.NEXT_PUBLIC_PHONE_DISPLAY ?? "+57 300 000 0000",
+  // WhatsApp: formato internacional sin "+", solo dígitos (para enlaces wa.me)
+  whatsapp: "573249071717",
+  // Enlace de llamada (tel:) en formato internacional con "+"
+  phone: "+573249071717",
+  // Número tal como se muestra en pantalla
+  phoneDisplay: "+57 324 907 1717",
   city: "Colombia",
 
   social: {
