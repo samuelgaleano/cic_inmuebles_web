@@ -11,7 +11,6 @@ import { cn } from "@/lib/utils/cn";
 const navItems = [
   { href: "/", label: "Inicio" },
   { href: "/inmuebles", label: "Inmuebles" },
-  { href: "/vender", label: "Vender" },
   { href: "/contacto", label: "Contacto" },
 ];
 
@@ -108,7 +107,7 @@ export function SiteHeader() {
           open ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0",
         )}
       >
-        <nav className="flex h-full flex-col justify-center gap-2 px-8">
+        <nav className="flex h-full flex-col items-center justify-center gap-2 px-8 text-center">
           {navItems.map((item, i) => (
             <Link
               key={item.href}
@@ -125,19 +124,20 @@ export function SiteHeader() {
             </Link>
           ))}
           <Link
-            href="/inmuebles"
+            href="/vender"
             onClick={() => setOpen(false)}
             className={buttonVariants({
               variant: "primary",
               size: "lg",
               className: cn(
-                "mt-6 w-full transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]",
+                "mt-6 rounded-full transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]",
                 open ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0",
               ),
             })}
             style={{ transitionDelay: open ? `${120 + navItems.length * 70}ms` : "0ms" }}
           >
-            Ver catálogo
+            Vende tu inmueble
+            <ArrowUpRight className="h-4 w-4" />
           </Link>
         </nav>
       </div>
