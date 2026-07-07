@@ -135,6 +135,21 @@ h3 {
   animation: float-blocks 7s ease-in-out infinite;
 }
 
+/* Brillo diagonal continuo del CTA de venta del héroe */
+@keyframes cta-shine {
+  0%,
+  15% {
+    transform: translateX(-140%) skewX(-12deg);
+  }
+  55%,
+  100% {
+    transform: translateX(340%) skewX(-12deg);
+  }
+}
+.animate-cta-shine {
+  animation: cta-shine 3.2s ease-in-out infinite;
+}
+
 /* Resplandor radial reutilizable para fondos oscuros */
 .bg-aurora {
   background-image:
@@ -153,7 +168,8 @@ h3 {
   }
   .reveal,
   .animate-rise,
-  .animate-float {
+  .animate-float,
+  .animate-cta-shine {
     animation: none !important;
     transition: none !important;
     opacity: 1 !important;
