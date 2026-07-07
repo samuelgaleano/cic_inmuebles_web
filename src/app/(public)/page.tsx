@@ -16,6 +16,7 @@ import { BrandMark } from "@/components/brand/brand-mark";
 import { Reveal } from "@/components/ui/reveal";
 import { WhatsAppButton } from "@/components/public/whatsapp-button";
 import { HeroPov } from "@/components/public/hero-pov";
+import { HeroSellCta } from "@/components/public/hero-sell-cta";
 import { PortfolioExpand } from "@/components/public/portfolio-expand";
 import { getRepository } from "@/lib/data";
 import { getCoverMedia, PROPERTY_TYPE_LABELS } from "@/lib/domain";
@@ -88,11 +89,12 @@ export default async function HomePage() {
               solo propiedades que valen tu tiempo.
             </p>
 
-            <div className="animate-rise mt-8 flex justify-center" style={{ animationDelay: "240ms" }}>
+            <div className="animate-rise mt-8 flex flex-wrap items-center justify-center gap-3" style={{ animationDelay: "240ms" }}>
               <a href="#portafolio" className={buttonVariants({ variant: "primary", size: "lg" })}>
                 Ver el portafolio
                 <ChevronDown className="h-4 w-4 transition-transform duration-300 group-hover:translate-y-0.5" />
               </a>
+              <HeroSellCta />
             </div>
 
             <div className="animate-rise mt-10 flex flex-wrap items-center justify-center gap-x-10 gap-y-3 text-sm text-white/60" style={{ animationDelay: "320ms" }}>
