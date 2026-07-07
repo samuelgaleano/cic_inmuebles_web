@@ -44,7 +44,9 @@ export function SiteFooter() {
               </li>
               <li className="flex items-center gap-2.5">
                 <Phone className="h-4 w-4 text-brand-400" />
-                <span>{siteConfig.phoneDisplay}</span>
+                <a href={`tel:${siteConfig.phone}`} className="transition-colors hover:text-white">
+                  {siteConfig.phoneDisplay}
+                </a>
               </li>
               <li className="flex items-center gap-2.5">
                 <MapPin className="h-4 w-4 text-brand-400" />
