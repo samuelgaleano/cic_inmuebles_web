@@ -51,15 +51,13 @@ export function SiteHeader() {
               {item.label}
             </Link>
           ))}
-        </nav>
-
-        <div className="flex items-center gap-2">
+          {/* CTA de venta, junto a los demás enlaces, con animación */}
           <Link
             href="/vender"
             className={buttonVariants({
               variant: "primary",
               size: "sm",
-              className: "hidden rounded-full sm:inline-flex",
+              className: "ml-2 rounded-full transition-transform hover:-translate-y-0.5",
             })}
           >
             Vende tu inmueble
@@ -67,7 +65,9 @@ export function SiteHeader() {
               <ArrowUpRight className="h-3 w-3" />
             </span>
           </Link>
+        </nav>
 
+        <div className="flex items-center gap-2">
           {/* Hamburguesa móvil que se transforma en X */}
           <button
             type="button"
