@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Sora, Plus_Jakarta_Sans, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { JsonLd } from "@/components/seo/json-ld";
 import { siteConfig } from "@/lib/config/site";
 
 const sora = Sora({
@@ -33,14 +34,13 @@ export const metadata: Metadata = {
   keywords: [
     "apartamentos en venta",
     "casas en venta",
-    "apartamentos en arriendo",
-    "casas en arriendo",
-    "inmuebles en venta Colombia",
-    "inmuebles en arriendo Colombia",
-    "vender apartamento",
-    "vender casa",
-    "arrendar apartamento",
-    "arrendar casa",
+    "apartamentos en venta en Colombia",
+    "casas en venta en Colombia",
+    "comprar apartamento",
+    "comprar casa",
+    "vender mi apartamento",
+    "vender mi casa",
+    "inmuebles en venta",
     "finca raíz Colombia",
     "inmobiliaria en Colombia",
     siteConfig.name,
@@ -62,6 +62,15 @@ export const metadata: Metadata = {
   },
 };
 
+// Identidad del sitio para buscadores, presente en todas las páginas.
+const websiteJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  name: siteConfig.name,
+  url: siteConfig.url,
+  inLanguage: "es",
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -73,6 +82,7 @@ export default function RootLayout({
       className={`${sora.variable} ${jakarta.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col bg-white text-ink">
+        <JsonLd data={websiteJsonLd} />
         {children}
       </body>
     </html>

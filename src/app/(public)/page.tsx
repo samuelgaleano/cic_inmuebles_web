@@ -82,7 +82,7 @@ export default async function HomePage() {
   const stats = [
     { value: total > 0 ? `${total}` : "—", label: "inmuebles seleccionados" },
     { value: ciudades > 0 ? `${ciudades}` : "—", label: ciudades === 1 ? "ciudad" : "ciudades" },
-    { value: "Venta y arriendo", label: "en toda Colombia" },
+    { value: "100%", label: "enfocados en venta" },
     { value: "WhatsApp", label: "respuesta directa" },
   ];
 
@@ -102,16 +102,16 @@ export default async function HomePage() {
               className="animate-rise text-balance mt-6 max-w-3xl font-display text-4xl font-extrabold leading-[1.08] tracking-tight [text-shadow:0_2px_28px_rgba(6,20,16,0.55)] sm:text-5xl lg:text-6xl"
               style={{ animationDelay: "80ms" }}
             >
-              Apartamentos y casas en <span className="text-brand-400">venta y arriendo</span>
+              Apartamentos y casas <span className="text-brand-400">en venta</span> en Colombia
             </h1>
 
             <p
               className="animate-rise mt-5 max-w-xl text-lg leading-relaxed text-white/80 [text-shadow:0_1px_16px_rgba(6,20,16,0.55)]"
               style={{ animationDelay: "160ms" }}
             >
-              Te ayudamos a vender o arrendar tu inmueble en toda Colombia, de forma
-              rápida y segura. Encuentra el tuyo en un portafolio corto, visitado y
-              verificado por nosotros.
+              Te ayudamos a vender tu inmueble en toda Colombia, de forma rápida y
+              segura. Encuentra el tuyo en un portafolio corto, visitado y verificado
+              por nosotros.
             </p>
 
             <div className="animate-rise mt-8 flex flex-wrap items-center justify-center gap-3" style={{ animationDelay: "240ms" }}>
@@ -204,7 +204,7 @@ export default async function HomePage() {
           {[
             { icon: ShieldCheck, title: "Inmuebles verificados", desc: "Cada propiedad con información detallada, fotos reales y estado actualizado al día." },
             { icon: CalendarCheck, title: "Agenda en segundos", desc: "Solicita una visita cuando quieras, sin trámites ni llamadas eternas." },
-            { icon: TrendingUp, title: "Vende o arrienda sin estrés", desc: "Publicamos, promocionamos y gestionamos la venta o el arriendo de tu inmueble, de principio a fin." },
+            { icon: TrendingUp, title: "Vende sin estrés", desc: "Publicamos, promocionamos y gestionamos la venta de tu inmueble, de principio a fin." },
           ].map((f, i) => (
             <Reveal key={f.title} delay={i * 90}>
               <div className="group h-full rounded-[1.4rem] border border-line bg-white p-1.5 transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-1 hover:shadow-[0_28px_50px_-28px_rgba(11,26,21,0.3)]">
@@ -232,7 +232,7 @@ export default async function HomePage() {
                 <HomeIcon className="h-3.5 w-3.5" /> Para propietarios
               </span>
               <h2 className="mt-5 max-w-xl text-3xl font-bold tracking-tight sm:text-4xl">
-                ¿Tienes un inmueble para vender o arrendar?
+                ¿Tienes un inmueble para vender?
               </h2>
               <p className="mt-4 max-w-lg leading-relaxed text-white/65">
                 Nos encargamos de todo: fotos profesionales, publicación, visitas y negociación.
@@ -251,7 +251,7 @@ export default async function HomePage() {
               </Link>
               <WhatsAppButton
                 size="lg"
-                message={`Hola ${siteConfig.name}, tengo un inmueble que quiero vender o arrendar y me gustaría más información.`}
+                message={`Hola ${siteConfig.name}, tengo un inmueble que quiero vender y me gustaría más información.`}
                 label="Hablar por WhatsApp"
               />
             </div>
