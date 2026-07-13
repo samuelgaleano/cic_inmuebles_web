@@ -15,7 +15,7 @@ const benefits = [
   { icon: Megaphone, title: "Mayor exposición", desc: "Publicamos tu inmueble en nuestro catálogo y canales digitales." },
   { icon: Camera, title: "Presentación profesional", desc: "Fotos, descripción y ficha optimizada para vender más rápido." },
   { icon: Handshake, title: "Gestión completa", desc: "Atendemos interesados, coordinamos visitas y acompañamos la negociación." },
-  { icon: BadgeCheck, title: "Acompañamiento legal", desc: "Te guiamos en la promesa de compraventa y el cierre." },
+  { icon: BadgeCheck, title: "Acompañamiento legal", desc: "Te guiamos en la promesa de compraventa o el contrato de arriendo, hasta el cierre." },
 ];
 
 export default function VenderPage() {

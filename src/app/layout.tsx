@@ -19,10 +19,14 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const fullTitle = `${siteConfig.name} — ${siteConfig.tagline}`;
+
+// Nota: no definimos `twitter` porque Next lo deriva automáticamente del
+// `openGraph` resuelto de cada página (así las fichas usan su propia foto).
 export const metadata: Metadata = {
   metadataBase: new URL(siteConfig.url),
   title: {
-    default: `${siteConfig.name} — ${siteConfig.tagline}`,
+    default: fullTitle,
     template: `%s | ${siteConfig.name}`,
   },
   description: siteConfig.description,
@@ -44,28 +48,17 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "es_CO",
-    url: "/",
     siteName: siteConfig.name,
-    title: `${siteConfig.name} — ${siteConfig.tagline}`,
+    title: fullTitle,
     description: siteConfig.description,
     images: [
       {
         url: "/hero.jpg",
         width: 1920,
         height: 1280,
-        alt: `${siteConfig.name} — ${siteConfig.tagline}`,
+        alt: fullTitle,
       },
     ],
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: `${siteConfig.name} — ${siteConfig.tagline}`,
-    description: siteConfig.description,
-    images: ["/hero.jpg"],
-  },
-  robots: {
-    index: true,
-    follow: true,
   },
 };
 

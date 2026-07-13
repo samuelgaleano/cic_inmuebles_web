@@ -5,10 +5,36 @@ import { ArrowLeft, Bath, BedDouble, Building2, Car, MapPin, Maximize, Receipt }
 import { PropertyGallery } from "@/components/public/property-gallery";
 import { PropertyContactCard } from "@/components/public/property-contact-card";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { JsonLd } from "@/components/seo/json-ld";
 import { getRepository } from "@/lib/data";
-import { PROPERTY_TYPE_LABELS, type PropertyMedia } from "@/lib/domain";
+import {
+  PROPERTY_TYPE_LABELS,
+  type PropertyMedia,
+  type PropertyStatus,
+  type PropertyType,
+} from "@/lib/domain";
 import { formatArea, formatPrice } from "@/lib/utils/format";
-import { siteConfig } from "@/lib/config/site";
+import { propertyUrl, siteConfig } from "@/lib/config/site";
+
+// Estado del inmueble → disponibilidad schema.org ("en_proceso" NO es InStock).
+const SCHEMA_AVAILABILITY: Record<PropertyStatus, string> = {
+  disponible: "https://schema.org/InStock",
+  en_proceso: "https://schema.org/LimitedAvailability",
+  vendido: "https://schema.org/SoldOut",
+};
+
+// Tipo de inmueble → tipo schema.org de lo ofrecido.
+const SCHEMA_ITEM_TYPE: Record<PropertyType, string> = {
+  apartamento: "Apartment",
+  apartaestudio: "Apartment",
+  casa: "House",
+  casa_campestre: "House",
+  finca: "House",
+  oficina: "Place",
+  local: "Place",
+  bodega: "Place",
+  lote: "Place",
+};
 
 export async function generateStaticParams() {
   try {
@@ -38,7 +64,9 @@ export async function generateMetadata({
     openGraph: {
       title: property.titulo,
       description: property.descripcion,
-      images: images.slice(0, 1),
+      // Si el inmueble no tiene fotos, usamos la imagen de marca del sitio
+      // (este openGraph reemplaza por completo al del layout raíz).
+      images: images.length > 0 ? images.slice(0, 1) : ["/hero.jpg"],
     },
   };
 }
@@ -84,29 +112,39 @@ export default async function PropertyDetailPage({
   ].filter(Boolean) as { icon: typeof BedDouble; label: string; value: string }[];
 
   const ubicacionTexto = [ubicacion.sector, ubicacion.ciudad].filter(Boolean).join(", ");
-  const whatsappMessage = `Hola ${siteConfig.name}, me interesa el inmueble "${property.titulo}" (${property.codigo}). ${siteConfig.url}/inmuebles/${property.slug}`;
-  const propertyUrl = `${siteConfig.url}/inmuebles/${property.slug}`;
+  const fichaUrl = propertyUrl(property.slug);
+  const whatsappMessage = `Hola ${siteConfig.name}, me interesa el inmueble "${property.titulo}" (${property.codigo}). ${fichaUrl}`;
 
-  // Datos estructurados (schema.org): ficha con precio para buscadores + migas de pan.
+  // Datos estructurados (schema.org): la ficha como oferta inmobiliaria
+  // (Offer + itemOffered, no Product: Google no admite Product para finca raíz)
+  // + migas de pan.
   const jsonLd = [
     {
       "@context": "https://schema.org",
-      "@type": "Product",
+      "@type": "Offer",
       name: property.titulo,
       description: property.descripcion,
       sku: property.codigo,
       category: PROPERTY_TYPE_LABELS[property.tipo],
-      url: propertyUrl,
+      url: fichaUrl,
+      price: property.precio,
+      priceCurrency: "COP",
+      availability: SCHEMA_AVAILABILITY[property.estado],
       ...(images.length > 0 && { image: images.slice(0, 3).map((m) => m.url) }),
-      offers: {
-        "@type": "Offer",
-        price: property.precio,
-        priceCurrency: "COP",
-        url: propertyUrl,
-        availability:
-          property.estado === "vendido"
-            ? "https://schema.org/SoldOut"
-            : "https://schema.org/InStock",
+      itemOffered: {
+        "@type": SCHEMA_ITEM_TYPE[property.tipo],
+        name: property.titulo,
+        ...(c.habitaciones != null && { numberOfRooms: c.habitaciones }),
+        ...(c.area != null && {
+          floorSize: { "@type": "QuantitativeValue", value: c.area, unitCode: "MTK" },
+        }),
+        ...(ubicacion.ciudad && {
+          address: {
+            "@type": "PostalAddress",
+            addressLocality: ubicacion.ciudad,
+            addressCountry: "CO",
+          },
+        }),
       },
     },
     {
@@ -115,17 +153,14 @@ export default async function PropertyDetailPage({
       itemListElement: [
         { "@type": "ListItem", position: 1, name: "Inicio", item: siteConfig.url },
         { "@type": "ListItem", position: 2, name: "Inmuebles", item: `${siteConfig.url}/inmuebles` },
-        { "@type": "ListItem", position: 3, name: property.titulo, item: propertyUrl },
+        { "@type": "ListItem", position: 3, name: property.titulo, item: fichaUrl },
       ],
     },
   ];
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
-      />
+      <JsonLd data={jsonLd} />
       <Link
         href="/inmuebles"
         className="inline-flex items-center gap-1.5 text-sm font-medium text-muted transition-colors hover:gap-2 hover:text-brand-700"

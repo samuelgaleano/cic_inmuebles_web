@@ -38,7 +38,7 @@ export function HeroSellCta() {
       <span className="absolute -inset-2 -z-10 rounded-2xl bg-accent-400/50 opacity-0 blur-xl transition-opacity duration-500 group-hover:opacity-100" aria-hidden />
       <Link
         href="/vender"
-        className="relative inline-flex h-12 items-center justify-center gap-2 overflow-hidden rounded-xl bg-accent-500 px-6 text-[15px] font-semibold tracking-tight text-ink shadow-[0_10px_26px_-12px_rgba(226,173,78,0.9)] transition-shadow duration-300 hover:shadow-[0_18px_40px_-12px_rgba(226,173,78,1)]"
+        className="relative inline-flex min-h-12 items-center justify-center gap-2 overflow-hidden rounded-xl bg-accent-500 px-6 py-2.5 text-center text-[15px] font-semibold tracking-tight text-ink shadow-[0_10px_26px_-12px_rgba(226,173,78,0.9)] transition-shadow duration-300 hover:shadow-[0_18px_40px_-12px_rgba(226,173,78,1)]"
       >
         {/* Brillo diagonal continuo: llama la atención sin requerir el cursor */}
         <span

@@ -18,6 +18,7 @@ import { Reveal } from "@/components/ui/reveal";
 import { WhatsAppButton } from "@/components/public/whatsapp-button";
 import { HeroPov } from "@/components/public/hero-pov";
 import { HeroSellCta } from "@/components/public/hero-sell-cta";
+import { JsonLd } from "@/components/seo/json-ld";
 import { PortfolioExpand } from "@/components/public/portfolio-expand";
 import { getRepository } from "@/lib/data";
 import { getCoverMedia, PROPERTY_TYPE_LABELS } from "@/lib/domain";
@@ -26,6 +27,22 @@ import { siteConfig } from "@/lib/config/site";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/" },
+};
+
+// Datos estructurados (schema.org) para buscadores: quiénes somos y qué hacemos.
+// Solo depende de la configuración del sitio, así que se construye una vez.
+const homeJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "RealEstateAgent",
+  name: siteConfig.name,
+  description: siteConfig.description,
+  url: siteConfig.url,
+  telephone: siteConfig.phone,
+  email: siteConfig.email,
+  image: `${siteConfig.url}/hero.jpg`,
+  address: { "@type": "PostalAddress", addressCountry: "CO" },
+  areaServed: { "@type": "Country", name: "Colombia" },
+  knowsLanguage: "es",
 };
 
 export default async function HomePage() {
@@ -69,26 +86,9 @@ export default async function HomePage() {
     { value: "WhatsApp", label: "respuesta directa" },
   ];
 
-  // Datos estructurados (schema.org) para buscadores: quiénes somos y qué hacemos.
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "RealEstateAgent",
-    name: siteConfig.name,
-    description: siteConfig.description,
-    url: siteConfig.url,
-    telephone: siteConfig.phone,
-    email: siteConfig.email,
-    image: `${siteConfig.url}/hero.jpg`,
-    areaServed: { "@type": "Country", name: "Colombia" },
-    knowsLanguage: "es",
-  };
-
   return (
     <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
-      />
+      <JsonLd data={homeJsonLd} />
 
       {/* ─────────── Hero POV: entras al inmueble al deslizar ─────────── */}
       <section className="-mt-[4.5rem] text-white">
