@@ -55,8 +55,8 @@ async function buildLeadWhatsappUrl(lead: Lead): Promise<string> {
     const detalle = [lead.tipoInmueble, lead.ciudad].filter(Boolean).join(" en ");
     partes.push(
       detalle
-        ? `Quiero vender/arrendar mi inmueble (${detalle}).`
-        : "Quiero vender/arrendar mi inmueble.",
+        ? `Quiero vender mi inmueble (${detalle}).`
+        : "Quiero vender mi inmueble.",
     );
   } else {
     let titulo = lead.propertySlug;

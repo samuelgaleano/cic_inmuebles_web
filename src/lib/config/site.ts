@@ -15,9 +15,9 @@ const siteUrl = (
 
 export const siteConfig = {
   name: "CIC Inmuebles",
-  tagline: "Apartamentos y casas en venta y arriendo en Colombia",
+  tagline: "Apartamentos y casas en venta en Colombia",
   description:
-    "Encuentra apartamentos y casas en venta y arriendo en Colombia. Te ayudamos a vender o arrendar tu inmueble de forma rápida y segura: fotos profesionales, visitas y negociación, con respuesta directa por WhatsApp.",
+    "Encuentra apartamentos y casas en venta en Colombia. Te ayudamos a vender tu inmueble de forma rápida y segura: fotos profesionales, visitas y negociación, con respuesta directa por WhatsApp.",
   url: siteUrl,
 
   // Contacto público (número fijo del negocio, igual en toda la página)

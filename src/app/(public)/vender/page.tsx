@@ -5,9 +5,9 @@ import { WhatsAppButton } from "@/components/public/whatsapp-button";
 import { siteConfig } from "@/lib/config/site";
 
 export const metadata: Metadata = {
-  title: "Vende o arrienda tu inmueble",
+  title: "Vende tu inmueble",
   description:
-    "Publica tu apartamento o casa con CIC Inmuebles y véndelo o arriéndalo de forma rápida y segura en toda Colombia. Nos encargamos de fotos, visitas y negociación.",
+    "Publica tu apartamento o casa con CIC Inmuebles y véndelo de forma rápida y segura en toda Colombia. Nos encargamos de fotos, visitas y negociación.",
   alternates: { canonical: "/vender" },
 };
 
@@ -15,7 +15,7 @@ const benefits = [
   { icon: Megaphone, title: "Mayor exposición", desc: "Publicamos tu inmueble en nuestro catálogo y canales digitales." },
   { icon: Camera, title: "Presentación profesional", desc: "Fotos, descripción y ficha optimizada para vender más rápido." },
   { icon: Handshake, title: "Gestión completa", desc: "Atendemos interesados, coordinamos visitas y acompañamos la negociación." },
-  { icon: BadgeCheck, title: "Acompañamiento legal", desc: "Te guiamos en la promesa de compraventa o el contrato de arriendo, hasta el cierre." },
+  { icon: BadgeCheck, title: "Acompañamiento legal", desc: "Te guiamos en la promesa de compraventa y el cierre." },
 ];
 
 export default function VenderPage() {
@@ -27,11 +27,11 @@ export default function VenderPage() {
             Para propietarios
           </span>
           <h1 className="mt-5 text-4xl font-bold tracking-tight text-ink sm:text-5xl">
-            Vende o arrienda sin complicaciones
+            Vende tu inmueble sin complicaciones
           </h1>
           <p className="mt-4 text-lg leading-relaxed text-muted">
             Déjanos los datos de tu inmueble y un asesor te contactará. Nosotros nos
-            encargamos del resto para que vendas o arriendes de forma rápida y segura.
+            encargamos del resto para que vendas de forma rápida y segura.
           </p>
 
           <div className="mt-8 grid gap-4 sm:grid-cols-2">
@@ -52,7 +52,7 @@ export default function VenderPage() {
           <div className="mt-8">
             <WhatsAppButton
               size="lg"
-              message={`Hola ${siteConfig.name}, quiero vender/arrendar mi inmueble. ¿Me pueden ayudar?`}
+              message={`Hola ${siteConfig.name}, quiero vender mi inmueble. ¿Me pueden ayudar?`}
               label="Prefiero hablar por WhatsApp"
             />
           </div>

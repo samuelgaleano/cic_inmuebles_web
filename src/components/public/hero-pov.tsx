@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { preload } from "react-dom";
 
 /**
  * Hero "POV": la foto del inmueble avanza (zoom + leve ascenso) a medida que
@@ -13,6 +14,10 @@ import { useEffect, useRef } from "react";
 export function HeroPov({ bg, children }: { bg: string; children: React.ReactNode }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLDivElement>(null);
+
+  // El fondo va como background-image de CSS, que el navegador descubre tarde;
+  // este preload emite <link rel="preload"> en el <head> y mejora el LCP.
+  preload(bg, { as: "image", fetchPriority: "high" });
 
   useEffect(() => {
     const root = rootRef.current;
