@@ -1,0 +1,16 @@
+# CIC Inmuebles
+
+> Inmobiliaria boutique colombiana enfocada en la venta de apartamentos y casas, con inventario principalmente en Bogotá y alrededores. Portafolio corto, visitado y verificado. Contacto directo por WhatsApp al +57 324 907 1717.
+
+CIC Inmuebles ayuda a compradores a encontrar apartamentos y casas en venta en Colombia, y a propietarios a vender su inmueble de forma rápida y segura: fotos profesionales, publicación, coordinación de visitas y acompañamiento en la negociación y la promesa de compraventa hasta el cierre. También hace alianzas con agentes inmobiliarios compartiendo la comisión 50/50.
+
+## Páginas principales
+
+- [Inicio](https://www.cicinmuebles.com/): portafolio destacado y propuesta de valor
+- [Inmuebles en venta](https://www.cicinmuebles.com/inmuebles): catálogo completo con filtros por ciudad, tipo y precio
+- [Vende tu inmueble](https://www.cicinmuebles.com/vender): servicio para propietarios y preguntas frecuentes
+- [Contacto](https://www.cicinmuebles.com/contacto): WhatsApp, teléfono y correo
+
+## Datos
+
+- [Sitemap](https://www.cicinmuebles.com/sitemap.xml): todas las URLs indexables, incluidas las fichas de cada inmueble

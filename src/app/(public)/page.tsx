@@ -29,21 +29,9 @@ export const metadata: Metadata = {
   alternates: { canonical: "/" },
 };
 
-// Datos estructurados (schema.org) para buscadores: quiénes somos y qué hacemos.
-// Solo depende de la configuración del sitio, así que se construye una vez.
-const homeJsonLd = {
-  "@context": "https://schema.org",
-  "@type": "RealEstateAgent",
-  name: siteConfig.name,
-  description: siteConfig.description,
-  url: siteConfig.url,
-  telephone: siteConfig.phone,
-  email: siteConfig.email,
-  image: `${siteConfig.url}/hero.jpg`,
-  address: { "@type": "PostalAddress", addressCountry: "CO" },
-  areaServed: { "@type": "Country", name: "Colombia" },
-  knowsLanguage: "es",
-};
+// Red de seguridad: regenera la página cada hora aunque falle la
+// revalidación bajo demanda del panel admin.
+export const revalidate = 3600;
 
 export default async function HomePage() {
   const repo = getRepository();
@@ -86,9 +74,22 @@ export default async function HomePage() {
     { value: "WhatsApp", label: "respuesta directa" },
   ];
 
+  // Enriquece el nodo de organización del layout (mismo @id) con el área de
+  // servicio real: las ciudades del inventario publicado, además del país.
+  const cityNames = [...new Set(vitrina.map((p) => p.ubicacion.ciudad).filter(Boolean))];
+  const areaJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "RealEstateAgent",
+    "@id": `${siteConfig.url}/#org`,
+    areaServed: [
+      { "@type": "Country", name: "Colombia" },
+      ...cityNames.map((name) => ({ "@type": "City", name })),
+    ],
+  };
+
   return (
     <>
-      <JsonLd data={homeJsonLd} />
+      <JsonLd data={areaJsonLd} />
 
       {/* ─────────── Hero POV: entras al inmueble al deslizar ─────────── */}
       <section className="-mt-[4.5rem] text-white">

@@ -36,6 +36,10 @@ const SCHEMA_ITEM_TYPE: Record<PropertyType, string> = {
   lote: "Place",
 };
 
+// numberOfBedrooms/numberOfBathroomsTotal/floorSize son propiedades de
+// Accommodation: solo aplican a los tipos residenciales, no a Place.
+const ACCOMMODATION_TYPES = new Set(["Apartment", "House"]);
+
 export async function generateStaticParams() {
   try {
     const properties = await getRepository().properties.listPublic();
@@ -45,6 +49,36 @@ export async function generateStaticParams() {
     console.error("[inmuebles] generateStaticParams:", err);
     return [];
   }
+}
+
+/**
+ * Title y description de la ficha a partir de los campos estructurados.
+ * El campo libre `descripcion` es texto operativo (emojis, saltos de línea)
+ * y no sirve como snippet de buscador.
+ */
+function propertyMeta(p: NonNullable<Awaited<ReturnType<ReturnType<typeof getRepository>["properties"]["getPublicBySlug"]>>>) {
+  const tipo = PROPERTY_TYPE_LABELS[p.tipo];
+  const lugar = [p.ubicacion.sector, p.ubicacion.ciudad].filter(Boolean).join(", ");
+  const c = p.caracteristicas;
+
+  const title = lugar ? `${p.titulo} — ${tipo} en venta en ${p.ubicacion.ciudad}` : `${p.titulo} — ${tipo} en venta`;
+
+  const detalles = [
+    c.habitaciones != null && `${c.habitaciones} habitaciones`,
+    c.banos != null && `${c.banos} baños`,
+    c.area != null && formatArea(c.area),
+  ]
+    .filter(Boolean)
+    .join(", ");
+  const description = [
+    `${tipo} en venta${lugar ? ` en ${lugar}` : ""}`,
+    detalles || null,
+    `${formatPrice(p.precio)}. Agenda tu visita con ${siteConfig.name}.`,
+  ]
+    .filter(Boolean)
+    .join(". ");
+
+  return { title, description: description.slice(0, 160) };
 }
 
 export async function generateMetadata({
@@ -57,13 +91,14 @@ export async function generateMetadata({
   if (!property) return { title: "Inmueble no encontrado" };
 
   const images = property.medios.filter((m) => m.type === "image").map((m) => m.url);
+  const meta = propertyMeta(property);
   return {
-    title: property.titulo,
-    description: property.descripcion,
+    title: meta.title,
+    description: meta.description,
     alternates: { canonical: `/inmuebles/${property.slug}` },
     openGraph: {
-      title: property.titulo,
-      description: property.descripcion,
+      title: meta.title,
+      description: meta.description,
       // Si el inmueble no tiene fotos, usamos la imagen de marca del sitio
       // (este openGraph reemplaza por completo al del layout raíz).
       images: images.length > 0 ? images.slice(0, 1) : ["/hero.jpg"],
@@ -117,27 +152,32 @@ export default async function PropertyDetailPage({
 
   // Datos estructurados (schema.org): la ficha como oferta inmobiliaria
   // (Offer + itemOffered, no Product: Google no admite Product para finca raíz)
-  // + migas de pan.
+  // + migas de pan. El seller enlaza al nodo de organización del layout (@id).
+  const schemaType = SCHEMA_ITEM_TYPE[property.tipo];
+  const esVivienda = ACCOMMODATION_TYPES.has(schemaType);
   const jsonLd = [
     {
       "@context": "https://schema.org",
       "@type": "Offer",
       name: property.titulo,
-      description: property.descripcion,
+      description: propertyMeta(property).description,
       sku: property.codigo,
       category: PROPERTY_TYPE_LABELS[property.tipo],
       url: fichaUrl,
       price: property.precio,
       priceCurrency: "COP",
       availability: SCHEMA_AVAILABILITY[property.estado],
+      seller: { "@id": `${siteConfig.url}/#org` },
       ...(images.length > 0 && { image: images.slice(0, 3).map((m) => m.url) }),
       itemOffered: {
-        "@type": SCHEMA_ITEM_TYPE[property.tipo],
+        "@type": schemaType,
         name: property.titulo,
-        ...(c.habitaciones != null && { numberOfRooms: c.habitaciones }),
-        ...(c.area != null && {
-          floorSize: { "@type": "QuantitativeValue", value: c.area, unitCode: "MTK" },
-        }),
+        ...(esVivienda && c.habitaciones != null && { numberOfBedrooms: c.habitaciones }),
+        ...(esVivienda && c.banos != null && { numberOfBathroomsTotal: c.banos }),
+        ...(esVivienda &&
+          c.area != null && {
+            floorSize: { "@type": "QuantitativeValue", value: c.area, unitCode: "MTK" },
+          }),
         ...(ubicacion.ciudad && {
           address: {
             "@type": "PostalAddress",
@@ -180,6 +220,7 @@ export default async function PropertyDetailPage({
                 title={`Video de ${property.titulo}`}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
+                loading="lazy"
                 className="h-full w-full"
               />
             </div>
@@ -207,19 +248,20 @@ export default async function PropertyDetailPage({
             </div>
           </div>
 
-          {/* Especificaciones */}
+          {/* Especificaciones: lista de definición (par campo-valor legible
+              por buscadores e IAs, no solo divs decorativos) */}
           {specs.length > 0 && (
-            <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <dl className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
               {specs.map((s) => (
                 <div key={s.label} className="rounded-xl border border-line bg-white p-4 transition-colors hover:border-brand-200">
                   <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-50 text-brand-700">
                     <s.icon className="h-5 w-5" />
                   </span>
-                  <p className="mt-3 text-xs text-muted">{s.label}</p>
-                  <p className="font-semibold text-ink">{s.value}</p>
+                  <dt className="mt-3 text-xs text-muted">{s.label}</dt>
+                  <dd className="font-semibold text-ink">{s.value}</dd>
                 </div>
               ))}
-            </div>
+            </dl>
           )}
 
           {/* Descripción */}
