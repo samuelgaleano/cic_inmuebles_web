@@ -4,14 +4,14 @@
  * de modo que el proyecto compile y funcione sin configuración previa.
  */
 // URL canónica del sitio, sin barra final (alimenta metadataBase, sitemap,
-// canonicals, Open Graph y JSON-LD). Prioridad: dominio propio configurado →
-// dominio de producción que expone Vercel → URL de producción actual.
-const siteUrl = (
-  process.env.NEXT_PUBLIC_SITE_URL ??
-  (process.env.VERCEL_PROJECT_PRODUCTION_URL
-    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-    : "https://cic-inmuebles-web-samuelgaleanoalvis-8896s-projects.vercel.app")
-).replace(/\/+$/, "");
+// canonicals, Open Graph y JSON-LD). Fija al dominio propio del negocio:
+// no usamos VERCEL_PROJECT_PRODUCTION_URL porque elige "el dominio más corto
+// del proyecto" y puede capturar dominios ajenos colgados de la cuenta
+// (pasó con specifinance.com). NEXT_PUBLIC_SITE_URL permite sobreescribir.
+const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://cicinmuebles.com").replace(
+  /\/+$/,
+  "",
+);
 
 export const siteConfig = {
   name: "CIC Inmuebles",
