@@ -6,7 +6,9 @@ import { siteConfig } from "@/lib/config/site";
 
 export const metadata: Metadata = {
   title: "Contacto",
-  description: "Contáctanos. Resolvemos tus dudas sobre inmuebles, visitas y ventas.",
+  description:
+    "Contáctanos. Resolvemos tus dudas sobre inmuebles en venta y arriendo, visitas y alianzas con agentes inmobiliarios.",
+  alternates: { canonical: "/contacto" },
 };
 
 const channels = [

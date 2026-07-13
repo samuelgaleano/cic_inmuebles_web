@@ -14,8 +14,10 @@ import {
 } from "@/lib/domain";
 
 export const metadata: Metadata = {
-  title: "Inmuebles",
-  description: "Explora el catálogo de inmuebles en venta de CIC Inmuebles.",
+  title: "Inmuebles en venta y arriendo",
+  description:
+    "Explora apartamentos y casas en venta y arriendo en Colombia. Filtra por ciudad, tipo y precio, y agenda tu visita con CIC Inmuebles.",
+  alternates: { canonical: "/inmuebles" },
 };
 
 type SearchParams = Record<string, string | string[] | undefined>;

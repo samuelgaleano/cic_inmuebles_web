@@ -19,26 +19,46 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const fullTitle = `${siteConfig.name} — ${siteConfig.tagline}`;
+
+// Nota: no definimos `twitter` porque Next lo deriva automáticamente del
+// `openGraph` resuelto de cada página (así las fichas usan su propia foto).
 export const metadata: Metadata = {
   metadataBase: new URL(siteConfig.url),
   title: {
-    default: `${siteConfig.name} — ${siteConfig.tagline}`,
+    default: fullTitle,
     template: `%s | ${siteConfig.name}`,
   },
   description: siteConfig.description,
   keywords: [
-    "inmobiliaria",
-    "apartamentos",
-    "casas",
-    "venta de inmuebles",
+    "apartamentos en venta",
+    "casas en venta",
+    "apartamentos en arriendo",
+    "casas en arriendo",
+    "inmuebles en venta Colombia",
+    "inmuebles en arriendo Colombia",
+    "vender apartamento",
+    "vender casa",
+    "arrendar apartamento",
+    "arrendar casa",
+    "finca raíz Colombia",
+    "inmobiliaria en Colombia",
     siteConfig.name,
   ],
   openGraph: {
     type: "website",
     locale: "es_CO",
     siteName: siteConfig.name,
-    title: `${siteConfig.name} — ${siteConfig.tagline}`,
+    title: fullTitle,
     description: siteConfig.description,
+    images: [
+      {
+        url: "/hero.jpg",
+        width: 1920,
+        height: 1280,
+        alt: fullTitle,
+      },
+    ],
   },
 };
 

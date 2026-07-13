@@ -3,12 +3,22 @@
  * entorno se leen de variables de entorno con valores por defecto seguros,
  * de modo que el proyecto compile y funcione sin configuración previa.
  */
+// URL canónica del sitio, sin barra final (alimenta metadataBase, sitemap,
+// canonicals, Open Graph y JSON-LD). Prioridad: dominio propio configurado →
+// dominio de producción que expone Vercel → URL de producción actual.
+const siteUrl = (
+  process.env.NEXT_PUBLIC_SITE_URL ??
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : "https://cic-inmuebles-web-samuelgaleanoalvis-8896s-projects.vercel.app")
+).replace(/\/+$/, "");
+
 export const siteConfig = {
   name: "CIC Inmuebles",
-  tagline: "Tu próximo hogar, sin complicaciones",
+  tagline: "Apartamentos y casas en venta y arriendo en Colombia",
   description:
-    "Catálogo de apartamentos y casas en venta. Encuentra tu inmueble ideal y agenda una visita en segundos con CIC Inmuebles.",
-  url: process.env.NEXT_PUBLIC_SITE_URL ?? "https://cicinmuebles.com",
+    "Encuentra apartamentos y casas en venta y arriendo en Colombia. Te ayudamos a vender o arrendar tu inmueble de forma rápida y segura: fotos profesionales, visitas y negociación, con respuesta directa por WhatsApp.",
+  url: siteUrl,
 
   // Contacto público (número fijo del negocio, igual en toda la página)
   email: process.env.NEXT_PUBLIC_CONTACT_EMAIL ?? "cc.inmuebles@gmail.com",
@@ -31,4 +41,9 @@ export type SiteConfig = typeof siteConfig;
 /** Construye un enlace de WhatsApp con mensaje predefinido. */
 export function whatsappLink(message: string): string {
   return `https://wa.me/${siteConfig.whatsapp}?text=${encodeURIComponent(message)}`;
+}
+
+/** URL pública absoluta de la ficha de un inmueble. */
+export function propertyUrl(slug: string): string {
+  return `${siteConfig.url}/inmuebles/${slug}`;
 }

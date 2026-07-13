@@ -1,6 +1,6 @@
 import type { Property } from "@/lib/domain";
 import { PROPERTY_STATUS_LABELS, PROPERTY_TYPE_LABELS } from "@/lib/domain";
-import { siteConfig } from "@/lib/config/site";
+import { propertyUrl } from "@/lib/config/site";
 import { getGoogleAccessToken, isGoogleServiceAccountConfigured } from "./google-auth";
 
 /**
@@ -89,7 +89,7 @@ export function propertyToSheetRow(p: Property): Cell[] {
     fotos,
     p.slug,
     p.actualizadoEn ?? "",
-    `${siteConfig.url}/inmuebles/${p.slug}`,
+    propertyUrl(p.slug),
   ];
 }
 

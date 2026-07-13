@@ -1,10 +1,11 @@
 import type { MetadataRoute } from "next";
 import { getRepository } from "@/lib/data";
 import type { PublicProperty } from "@/lib/domain";
-import { siteConfig } from "@/lib/config/site";
+import { propertyUrl, siteConfig } from "@/lib/config/site";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const base = siteConfig.url.replace(/\/$/, "");
+  // siteConfig.url ya viene normalizada sin barra final.
+  const base = siteConfig.url;
   let properties: PublicProperty[] = [];
   try {
     properties = await getRepository().properties.listPublic();
@@ -20,7 +21,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
 
   const propertyRoutes: MetadataRoute.Sitemap = properties.map((p) => ({
-    url: `${base}/inmuebles/${p.slug}`,
+    url: propertyUrl(p.slug),
     lastModified: p.actualizadoEn,
     changeFrequency: "weekly",
     priority: 0.8,
