@@ -4,11 +4,12 @@
  * de modo que el proyecto compile y funcione sin configuración previa.
  */
 // URL canónica del sitio, sin barra final (alimenta metadataBase, sitemap,
-// canonicals, Open Graph y JSON-LD). Fija al dominio propio del negocio:
-// no usamos VERCEL_PROJECT_PRODUCTION_URL porque elige "el dominio más corto
-// del proyecto" y puede capturar dominios ajenos colgados de la cuenta
+// canonicals, Open Graph y JSON-LD). Fija al dominio propio del negocio, en
+// su variante www porque así está configurado Vercel (el ápex redirige 308 a
+// www). No usamos VERCEL_PROJECT_PRODUCTION_URL porque elige "el dominio más
+// corto del proyecto" y puede capturar dominios ajenos colgados de la cuenta
 // (pasó con specifinance.com). NEXT_PUBLIC_SITE_URL permite sobreescribir.
-const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://cicinmuebles.com").replace(
+const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.cicinmuebles.com").replace(
   /\/+$/,
   "",
 );
