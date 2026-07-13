@@ -5,9 +5,10 @@ import { WhatsAppButton } from "@/components/public/whatsapp-button";
 import { siteConfig } from "@/lib/config/site";
 
 export const metadata: Metadata = {
-  title: "Vende tu inmueble",
+  title: "Vende o arrienda tu inmueble",
   description:
-    "Publica tu apartamento, casa o lote con CIC Inmuebles. Nos encargamos de fotos, visitas y negociación.",
+    "Publica tu apartamento o casa con CIC Inmuebles y véndelo o arriéndalo de forma rápida y segura en toda Colombia. Nos encargamos de fotos, visitas y negociación.",
+  alternates: { canonical: "/vender" },
 };
 
 const benefits = [
@@ -30,7 +31,7 @@ export default function VenderPage() {
           </h1>
           <p className="mt-4 text-lg leading-relaxed text-muted">
             Déjanos los datos de tu inmueble y un asesor te contactará. Nosotros nos
-            encargamos del resto para que vendas de forma rápida y segura.
+            encargamos del resto para que vendas o arriendes de forma rápida y segura.
           </p>
 
           <div className="mt-8 grid gap-4 sm:grid-cols-2">

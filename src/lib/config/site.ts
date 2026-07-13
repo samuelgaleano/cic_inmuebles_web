@@ -5,10 +5,13 @@
  */
 export const siteConfig = {
   name: "CIC Inmuebles",
-  tagline: "Tu próximo hogar, sin complicaciones",
+  tagline: "Apartamentos y casas en venta y arriendo en Colombia",
   description:
-    "Catálogo de apartamentos y casas en venta. Encuentra tu inmueble ideal y agenda una visita en segundos con CIC Inmuebles.",
-  url: process.env.NEXT_PUBLIC_SITE_URL ?? "https://cicinmuebles.com",
+    "Encuentra apartamentos y casas en venta y arriendo en Colombia. Te ayudamos a vender o arrendar tu inmueble de forma rápida y segura: fotos profesionales, visitas y negociación, con respuesta directa por WhatsApp.",
+  // URL canónica real del sitio (al comprar dominio propio, cámbiala vía NEXT_PUBLIC_SITE_URL)
+  url:
+    process.env.NEXT_PUBLIC_SITE_URL ??
+    "https://cic-inmuebles-web-samuelgaleanoalvis-8896s-projects.vercel.app",
 
   // Contacto público (número fijo del negocio, igual en toda la página)
   email: process.env.NEXT_PUBLIC_CONTACT_EMAIL ?? "cc.inmuebles@gmail.com",

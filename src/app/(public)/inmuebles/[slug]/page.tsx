@@ -34,6 +34,7 @@ export async function generateMetadata({
   return {
     title: property.titulo,
     description: property.descripcion,
+    alternates: { canonical: `/inmuebles/${property.slug}` },
     openGraph: {
       title: property.titulo,
       description: property.descripcion,
@@ -84,9 +85,47 @@ export default async function PropertyDetailPage({
 
   const ubicacionTexto = [ubicacion.sector, ubicacion.ciudad].filter(Boolean).join(", ");
   const whatsappMessage = `Hola ${siteConfig.name}, me interesa el inmueble "${property.titulo}" (${property.codigo}). ${siteConfig.url}/inmuebles/${property.slug}`;
+  const propertyUrl = `${siteConfig.url}/inmuebles/${property.slug}`;
+
+  // Datos estructurados (schema.org): ficha con precio para buscadores + migas de pan.
+  const jsonLd = [
+    {
+      "@context": "https://schema.org",
+      "@type": "Product",
+      name: property.titulo,
+      description: property.descripcion,
+      sku: property.codigo,
+      category: PROPERTY_TYPE_LABELS[property.tipo],
+      url: propertyUrl,
+      ...(images.length > 0 && { image: images.slice(0, 3).map((m) => m.url) }),
+      offers: {
+        "@type": "Offer",
+        price: property.precio,
+        priceCurrency: "COP",
+        url: propertyUrl,
+        availability:
+          property.estado === "vendido"
+            ? "https://schema.org/SoldOut"
+            : "https://schema.org/InStock",
+      },
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Inicio", item: siteConfig.url },
+        { "@type": "ListItem", position: 2, name: "Inmuebles", item: `${siteConfig.url}/inmuebles` },
+        { "@type": "ListItem", position: 3, name: property.titulo, item: propertyUrl },
+      ],
+    },
+  ];
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
+      />
       <Link
         href="/inmuebles"
         className="inline-flex items-center gap-1.5 text-sm font-medium text-muted transition-colors hover:gap-2 hover:text-brand-700"
