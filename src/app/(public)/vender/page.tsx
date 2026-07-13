@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { BadgeCheck, Camera, Handshake, Megaphone } from "lucide-react";
 import { LeadForm } from "@/components/public/lead-form";
 import { WhatsAppButton } from "@/components/public/whatsapp-button";
+import { JsonLd } from "@/components/seo/json-ld";
 import { siteConfig } from "@/lib/config/site";
 
 export const metadata: Metadata = {
@@ -9,6 +10,41 @@ export const metadata: Metadata = {
   description:
     "Publica tu apartamento o casa con CIC Inmuebles y véndelo de forma rápida y segura en toda Colombia. Nos encargamos de fotos, visitas y negociación.",
   alternates: { canonical: "/vender" },
+};
+
+// Preguntas frecuentes reales del proceso. Formato pregunta-respuesta:
+// cada respuesta es un pasaje autocontenible citable por buscadores e IAs.
+const faqs = [
+  {
+    q: "¿Cómo publico mi inmueble con CIC Inmuebles?",
+    a: "Déjanos los datos básicos en el formulario (toma menos de un minuto) o escríbenos por WhatsApp. Un asesor te contacta, visitamos y verificamos el inmueble, tomamos fotos profesionales y lo publicamos en nuestro portafolio.",
+  },
+  {
+    q: "¿Qué hace CIC Inmuebles durante la venta?",
+    a: "Nos encargamos de todo el proceso: presentación profesional del inmueble, publicación y promoción, atención de interesados, coordinación de visitas y acompañamiento en la negociación y la promesa de compraventa hasta el cierre.",
+  },
+  {
+    q: "¿En qué ciudades venden inmuebles?",
+    a: "Operamos en Colombia, con inventario principalmente en Bogotá y sus alrededores. Cuéntanos dónde está tu inmueble y te confirmamos enseguida si podemos gestionarlo.",
+  },
+  {
+    q: "¿Trabajan con agentes inmobiliarios?",
+    a: "Sí. Si eres agente y tienes un inmueble para vender, hacemos alianza: tú lo traes, nosotros lo promocionamos y gestionamos, y compartimos la comisión 50/50.",
+  },
+  {
+    q: "¿Cómo los contacto?",
+    a: `Por WhatsApp o llamada al ${siteConfig.phoneDisplay}, por correo a ${siteConfig.email}, o con el formulario de esta página. Respondemos directamente, sin intermediarios.`,
+  },
+];
+
+const faqJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: faqs.map((f) => ({
+    "@type": "Question",
+    name: f.q,
+    acceptedAnswer: { "@type": "Answer", text: f.a },
+  })),
 };
 
 const benefits = [
@@ -21,6 +57,7 @@ const benefits = [
 export default function VenderPage() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
+      <JsonLd data={faqJsonLd} />
       <div className="grid gap-10 lg:grid-cols-2">
         <div>
           <span className="inline-flex items-center gap-2 rounded-full bg-brand-50 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">
@@ -56,6 +93,21 @@ export default function VenderPage() {
               label="Prefiero hablar por WhatsApp"
             />
           </div>
+
+          {/* Preguntas frecuentes */}
+          <section className="mt-12" aria-labelledby="faq-title">
+            <h2 id="faq-title" className="text-2xl font-bold tracking-tight text-ink">
+              Preguntas frecuentes
+            </h2>
+            <div className="mt-5 space-y-5">
+              {faqs.map((f) => (
+                <div key={f.q} className="rounded-2xl border border-line bg-white p-5">
+                  <h3 className="font-bold text-ink">{f.q}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-muted">{f.a}</p>
+                </div>
+              ))}
+            </div>
+          </section>
         </div>
 
         <div className="lg:pl-6">

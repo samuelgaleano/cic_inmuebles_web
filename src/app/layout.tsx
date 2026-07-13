@@ -62,13 +62,45 @@ export const metadata: Metadata = {
   },
 };
 
-// Identidad del sitio para buscadores, presente en todas las páginas.
-const websiteJsonLd = {
+// Identidad del sitio para buscadores, presente en todas las páginas:
+// grafo conectado (WebSite → publisher → organización) con @id estables.
+// El SearchAction apunta al buscador real del catálogo (/inmuebles?q=).
+const ORG_ID = `${siteConfig.url}/#org`;
+const siteJsonLd = {
   "@context": "https://schema.org",
-  "@type": "WebSite",
-  name: siteConfig.name,
-  url: siteConfig.url,
-  inLanguage: "es",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": `${siteConfig.url}/#website`,
+      name: siteConfig.name,
+      url: siteConfig.url,
+      inLanguage: "es",
+      publisher: { "@id": ORG_ID },
+      potentialAction: {
+        "@type": "SearchAction",
+        target: {
+          "@type": "EntryPoint",
+          urlTemplate: `${siteConfig.url}/inmuebles?q={search_term_string}`,
+        },
+        "query-input": "required name=search_term_string",
+      },
+    },
+    {
+      "@type": "RealEstateAgent",
+      "@id": ORG_ID,
+      name: siteConfig.name,
+      description: siteConfig.description,
+      url: siteConfig.url,
+      telephone: siteConfig.phone,
+      email: siteConfig.email,
+      image: `${siteConfig.url}/hero.jpg`,
+      address: { "@type": "PostalAddress", addressCountry: "CO" },
+      knowsLanguage: "es",
+      ...((siteConfig.social.instagram || siteConfig.social.facebook) && {
+        sameAs: [siteConfig.social.instagram, siteConfig.social.facebook].filter(Boolean),
+      }),
+    },
+  ],
 };
 
 export default function RootLayout({
@@ -78,11 +110,15 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="es"
+      lang="es-CO"
       className={`${sora.variable} ${jakarta.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col bg-white text-ink">
-        <JsonLd data={websiteJsonLd} />
+        {/* Las fotos de los inmuebles se sirven desde Google Drive: adelantar
+            el handshake reduce el LCP de galerías y tarjetas. React los iza al <head>. */}
+        <link rel="preconnect" href="https://lh3.googleusercontent.com" />
+        <link rel="dns-prefetch" href="https://lh3.googleusercontent.com" />
+        <JsonLd data={siteJsonLd} />
         {children}
       </body>
     </html>

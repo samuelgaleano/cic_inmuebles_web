@@ -21,6 +21,27 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "images.unsplash.com" },
     ],
   },
+  async headers() {
+    return [
+      {
+        // Cabeceras de seguridad base (Vercel solo añade HSTS por defecto).
+        // Sin CSP completa: Next inyecta scripts inline y una CSP estricta
+        // requiere nonces; se cubre el resto de vectores sin riesgo de rotura.
+        source: "/:path*",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+        ],
+      },
+      {
+        // Assets del hero: nombres versionados (hero-960/hero-1920), caché larga.
+        source: "/:hero(hero.*)",
+        headers: [{ key: "Cache-Control", value: "public, max-age=86400, stale-while-revalidate=604800" }],
+      },
+    ];
+  },
 };
 
 export default nextConfig;

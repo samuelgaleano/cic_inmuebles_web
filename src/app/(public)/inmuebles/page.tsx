@@ -18,7 +18,7 @@ import {
 export const metadata: Metadata = {
   title: "Inmuebles en venta",
   description:
-    "Explora apartamentos y casas en venta en Colombia. Filtra por ciudad, tipo y precio, y agenda tu visita con CIC Inmuebles.",
+    "Explora apartamentos y casas en venta en Bogotá y toda Colombia. Filtra por ciudad, tipo y precio, y agenda tu visita con CIC Inmuebles.",
   alternates: { canonical: "/inmuebles" },
 };
 
@@ -90,23 +90,27 @@ export default async function InmueblesPage({
   const safePage = Math.min(page, totalPages);
   const pageItems = sorted.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
-  // Datos estructurados (schema.org): lista de inmuebles visibles en esta página.
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "ItemList",
-    name: "Inmuebles en venta",
-    numberOfItems: pageItems.length,
-    itemListElement: pageItems.map((p, i) => ({
-      "@type": "ListItem",
-      position: (safePage - 1) * PAGE_SIZE + i + 1,
-      name: p.titulo,
-      url: propertyUrl(p.slug),
-    })),
-  };
+  // Datos estructurados (schema.org): lista de inmuebles visibles en esta
+  // página. Se omite cuando no hay resultados (un ItemList vacío no aporta).
+  const jsonLd =
+    pageItems.length > 0
+      ? {
+          "@context": "https://schema.org",
+          "@type": "ItemList",
+          name: "Inmuebles en venta",
+          numberOfItems: pageItems.length,
+          itemListElement: pageItems.map((p, i) => ({
+            "@type": "ListItem",
+            position: (safePage - 1) * PAGE_SIZE + i + 1,
+            name: p.titulo,
+            url: propertyUrl(p.slug),
+          })),
+        }
+      : null;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
-      <JsonLd data={jsonLd} />
+      {jsonLd && <JsonLd data={jsonLd} />}
       <header className="mb-8">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-600">Catálogo</p>
         <h1 className="mt-2 text-3xl font-bold tracking-tight text-ink sm:text-4xl">Inmuebles en venta</h1>
