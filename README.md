@@ -6,6 +6,10 @@ Plataforma web de una inmobiliaria: **catálogo público** orientado a venta y u
 Ejes de diseño: **costo ≈ 0**, **catálogo siempre sincronizado** y buenas
 prácticas de software escalables desde el inicio.
 
+> 🧭 **¿Cómo está organizada la empresa?** Empieza por el
+> **[Sistema CIC Inmuebles](docs/sistema/README.md)** — el panel que conecta
+> modelo de negocio, SEO, contenido, operación del catálogo y el plan de acción.
+>
 > Arquitectura completa y decisiones técnicas en
 > [`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md).
 
@@ -25,7 +29,7 @@ Funciona de inmediato con **datos de ejemplo** (sin servicios externos). Para
 producción, ver [`docs/ACTIVACION.md`](docs/ACTIVACION.md).
 
 **Sitio público**
-- Catálogo con filtros (operación, tipo, ciudad, habitaciones, estado).
+- Catálogo con filtros (tipo, ciudad, habitaciones, precio, estado) — **solo venta**.
 - Ficha de inmueble: galería, video, especificaciones, estado y descripción.
 - Captación de **compradores** (agendar visita / más información) y de
   **vendedores**, con mínima fricción + contacto por WhatsApp.
@@ -68,10 +72,11 @@ pnpm typecheck   # verificación de tipos
 ```
 src/
 ├─ app/            # rutas (sitio público, sitemap/robots)
-├─ components/     # UI reutilizable (ui/ y public/)
+├─ components/     # UI reutilizable (ui/, public/, seo/)
 └─ lib/            # config, dominio, datos (repositorio), acciones, utils
 supabase/migrations/  # esquema de base de datos (blueprint)
-docs/                 # documentación de arquitectura
+docs/                 # documentación técnica
+└─ sistema/           # 🧭 sistema de la empresa (negocio, SEO, contenido, operación)
 ```
 
 ## Hoja de ruta
