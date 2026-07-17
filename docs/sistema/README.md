@@ -18,6 +18,7 @@ consultarse de forma continua, no para leerse una vez.
 | 2 | **Sistema SEO** | Cómo el sitio aparece en Google y en las IA, y cómo se mantiene | [`02-sistema-seo.md`](./02-sistema-seo.md) |
 | 3 | **Sistema de contenido** | Qué se publica, con qué plantilla y en qué orden | [`03-sistema-de-contenido.md`](./03-sistema-de-contenido.md) |
 | 4 | **Operación del catálogo** | El recorrido de un inmueble: de Drive a publicado | [`04-operacion-del-catalogo.md`](./04-operacion-del-catalogo.md) |
+| 5 | **Planes y pagos** | La sección "Publica tu inmueble" y la pasarela Wompi | [`07-planes-y-pagos.md`](./07-planes-y-pagos.md) |
 
 Y dos documentos que hacen que el sistema **se sostenga en el tiempo**:
 
