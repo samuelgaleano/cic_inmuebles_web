@@ -29,6 +29,7 @@ export function SiteFooter() {
             <ul className="mt-4 space-y-2.5 text-sm">
               <li><Link href="/inmuebles" className="transition-colors hover:text-white">Inmuebles</Link></li>
               <li><Link href="/vender" className="transition-colors hover:text-white">Vender mi inmueble</Link></li>
+              <li><Link href="/publica" className="transition-colors hover:text-white">Publica tu inmueble</Link></li>
               <li><Link href="/contacto" className="transition-colors hover:text-white">Contacto</Link></li>
             </ul>
           </div>
