@@ -51,16 +51,16 @@ export function SiteHeader() {
               {item.label}
             </Link>
           ))}
-          {/* CTA de venta, junto a los demás enlaces, con animación */}
+          {/* CTA "Trabaja con nosotros", junto a los demás enlaces, con animación */}
           <Link
-            href="/vender"
+            href="/publica"
             className={buttonVariants({
               variant: "primary",
               size: "sm",
               className: "ml-2 rounded-full transition-transform hover:-translate-y-0.5",
             })}
           >
-            Vende tu inmueble
+            Publica tu inmueble
             <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5">
               <ArrowUpRight className="h-3 w-3" />
             </span>
@@ -124,7 +124,7 @@ export function SiteHeader() {
             </Link>
           ))}
           <Link
-            href="/vender"
+            href="/publica"
             onClick={() => setOpen(false)}
             className={buttonVariants({
               variant: "primary",
@@ -136,7 +136,7 @@ export function SiteHeader() {
             })}
             style={{ transitionDelay: open ? `${120 + navItems.length * 70}ms` : "0ms" }}
           >
-            Vende tu inmueble
+            Publica tu inmueble
             <ArrowUpRight className="h-4 w-4" />
           </Link>
         </nav>

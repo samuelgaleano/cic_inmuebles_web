@@ -71,6 +71,15 @@ export default function VenderPage() {
             encargamos del resto para que vendas de forma rápida y segura.
           </p>
 
+          <div className="mt-6 rounded-2xl border border-brand-200 bg-brand-50/60 p-5">
+            <p className="text-sm leading-relaxed text-ink-soft">
+              <strong className="text-ink">Sin costo inicial.</strong> Nos convertimos en tu
+              agencia inmobiliaria de cabecera: si quieres, tomamos fotos y videos de tu inmueble
+              para darle más exposición y atraer más clientes. Solo cobramos una comisión del{" "}
+              <strong className="text-brand-700">3% cuando se cierra la venta</strong>.
+            </p>
+          </div>
+
           <div className="mt-8 grid gap-4 sm:grid-cols-2">
             {benefits.map((b) => (
               <div
