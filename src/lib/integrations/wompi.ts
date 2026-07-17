@@ -15,9 +15,39 @@ import { siteConfig } from "@/lib/config/site";
 export function wompiConfig() {
   return {
     publicKey: process.env.WOMPI_PUBLIC_KEY ?? "",
+    privateKey: process.env.WOMPI_PRIVATE_KEY ?? "",
     integritySecret: process.env.WOMPI_INTEGRITY_SECRET ?? "",
     eventsSecret: process.env.WOMPI_EVENTS_SECRET ?? "",
   };
+}
+
+/** Base de la API de Wompi: sandbox o producción, inferida por la clave. */
+export function wompiApiBase(): string {
+  const { publicKey, privateKey } = wompiConfig();
+  const isTest = `${publicKey}${privateKey}`.includes("_test_");
+  return isTest ? "https://sandbox.wompi.co/v1" : "https://production.wompi.co/v1";
+}
+
+/**
+ * Defensa en profundidad: re-consulta el estado real de la transacción a la
+ * API de Wompi con la llave privada, para no fiarse solo del payload del
+ * webhook. Devuelve el status ("APPROVED", …) o null si no se pudo verificar
+ * (p. ej. sin WOMPI_PRIVATE_KEY): en ese caso el llamador usa el checksum.
+ */
+export async function fetchTransactionStatus(transactionId: string): Promise<string | null> {
+  const { privateKey } = wompiConfig();
+  if (!privateKey || !transactionId) return null;
+  try {
+    const res = await fetch(`${wompiApiBase()}/transactions/${transactionId}`, {
+      headers: { Authorization: `Bearer ${privateKey}` },
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const json = (await res.json()) as { data?: { status?: string } };
+    return json.data?.status ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export function isWompiConfigured(): boolean {

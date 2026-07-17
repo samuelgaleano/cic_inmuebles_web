@@ -18,8 +18,6 @@ const inputClass =
 
 /** Carga el widget de Wompi una sola vez. */
 function useWompiWidget() {
-  // Inicializador perezoso: si el widget ya está cargado, arranca en true
-  // (evita un setState síncrono dentro del effect).
   const [ready, setReady] = useState(() => typeof window !== "undefined" && Boolean(window.WidgetCheckout));
   useEffect(() => {
     if (ready) return;
@@ -39,6 +37,12 @@ function useWompiWidget() {
   return ready;
 }
 
+const FIELDS = [
+  { key: "nombre", label: "Nombre completo", type: "text", autoComplete: "name" },
+  { key: "email", label: "Correo electrónico", type: "email", autoComplete: "email" },
+  { key: "telefono", label: "Teléfono (WhatsApp)", type: "tel", autoComplete: "tel" },
+] as const;
+
 export function PlanCheckout({
   planId,
   planNombre,
@@ -55,12 +59,38 @@ export function PlanCheckout({
   const [form, setForm] = useState({ nombre: "", email: "", telefono: "" });
   const dialogRef = useRef<HTMLDivElement>(null);
 
+  // Bloqueo de scroll del body + foco inicial + Escape + trampa de foco.
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    document.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     dialogRef.current?.querySelector<HTMLInputElement>("input")?.focus();
-    return () => document.removeEventListener("keydown", onKey);
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setOpen(false);
+        return;
+      }
+      if (e.key !== "Tab") return;
+      const focusables = dialogRef.current?.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input, [tabindex]:not([tabindex="-1"])',
+      );
+      if (!focusables || focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
   }, [open]);
 
   const pay = async (e: React.FormEvent) => {
@@ -71,7 +101,7 @@ export function PlanCheckout({
       const res = await fetch("/api/pagos/wompi", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planId, ...form }),
+        body: JSON.stringify({ planId }),
       });
       const data = await res.json();
       if (!res.ok || !data.ok) {
@@ -132,7 +162,7 @@ export function PlanCheckout({
         >
           <div
             ref={dialogRef}
-            className="w-full max-w-md rounded-t-[1.6rem] border border-line bg-white p-6 shadow-2xl sm:rounded-[1.6rem]"
+            className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-[1.6rem] border border-line bg-white p-6 shadow-2xl sm:rounded-[1.6rem]"
           >
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -144,22 +174,41 @@ export function PlanCheckout({
                 type="button"
                 onClick={() => setOpen(false)}
                 aria-label="Cerrar"
-                className="flex h-9 w-9 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface hover:text-ink"
+                className="flex h-9 w-9 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
             <form onSubmit={pay} className="mt-5 space-y-3">
-              <input required placeholder="Nombre completo" value={form.nombre} onChange={set("nombre")} className={inputClass} autoComplete="name" />
-              <input required type="email" placeholder="Correo electrónico" value={form.email} onChange={set("email")} className={inputClass} autoComplete="email" />
-              <input required type="tel" placeholder="Teléfono (WhatsApp)" value={form.telefono} onChange={set("telefono")} className={inputClass} autoComplete="tel" />
+              {FIELDS.map((f) => (
+                <div key={f.key}>
+                  <label htmlFor={`chk-${f.key}-${planId}`} className="sr-only">
+                    {f.label}
+                  </label>
+                  <input
+                    id={`chk-${f.key}-${planId}`}
+                    required
+                    type={f.type}
+                    placeholder={f.label}
+                    value={form[f.key]}
+                    onChange={set(f.key)}
+                    className={inputClass}
+                    autoComplete={f.autoComplete}
+                  />
+                </div>
+              ))}
 
-              {error && <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>}
+              {error && (
+                <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                  {error}
+                </p>
+              )}
 
               <button
                 type="submit"
                 disabled={loading}
+                aria-busy={loading}
                 className={buttonVariants({ variant: "primary", size: "lg", className: "w-full justify-center" })}
               >
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}

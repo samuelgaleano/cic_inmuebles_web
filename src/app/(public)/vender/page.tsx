@@ -80,7 +80,8 @@ export default function VenderPage() {
             </p>
           </div>
 
-          <div className="mt-8 grid gap-4 sm:grid-cols-2">
+          <h2 className="mt-10 text-2xl font-bold tracking-tight text-ink">Por qué vender con CIC</h2>
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
             {benefits.map((b) => (
               <div
                 key={b.title}

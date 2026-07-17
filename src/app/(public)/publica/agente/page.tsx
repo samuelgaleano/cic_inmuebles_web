@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeft, Check, CheckCircle2, MessageCircle, Sparkles } from "lucide-react";
+import { ArrowLeft, Camera, Check, CheckCircle2, MessageCircle, Sparkles } from "lucide-react";
 import { PlanCheckout } from "@/components/public/plan-checkout";
 import { JsonLd } from "@/components/seo/json-ld";
 import { PLANS } from "@/lib/config/plans";
 import { isWompiConfigured } from "@/lib/integrations/wompi";
+import { buttonVariants } from "@/components/ui/button";
 import { formatPrice } from "@/lib/utils/format";
 import { siteConfig, whatsappLink } from "@/lib/config/site";
 import { cn } from "@/lib/utils/cn";
@@ -23,7 +24,8 @@ export default async function AgentePlanesPage({
 }) {
   const sp = await searchParams;
   const wompiOn = isWompiConfigured();
-  const agentes = PLANS.filter((p) => p.audience === "agente");
+  const pagables = PLANS.filter((p) => p.audience === "agente" && p.mode === "pago");
+  const contenido = PLANS.find((p) => p.id === "contenido-profesional");
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -51,7 +53,16 @@ export default async function AgentePlanesPage({
             <p className="font-semibold">Recibimos tu pago</p>
             <p className="mt-1 text-sm text-emerald-800">
               Estamos confirmando la transacción con Wompi{sp.ref ? ` (ref. ${sp.ref})` : ""}. Te
-              contactaremos para crear la ficha de tu inmueble. Si tienes dudas, escríbenos por WhatsApp.
+              contactaremos para crear la ficha de tu inmueble. Si tienes dudas,{" "}
+              <a
+                href={whatsappLink(`Hola ${siteConfig.name}, acabo de hacer un pago de publicación${sp.ref ? ` (ref. ${sp.ref})` : ""} y tengo una duda.`)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold text-emerald-700 underline underline-offset-2 hover:text-emerald-900"
+              >
+                escríbenos por WhatsApp
+              </a>
+              .
             </p>
           </div>
         </div>
@@ -77,7 +88,7 @@ export default async function AgentePlanesPage({
       )}
 
       <div className="mt-10 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-        {agentes.map((plan) => (
+        {pagables.map((plan) => (
           <article
             key={plan.id}
             className={cn(
@@ -92,7 +103,6 @@ export default async function AgentePlanesPage({
             )}
             <h2 className="text-lg font-bold tracking-tight text-ink">{plan.nombre}</h2>
             <div className="mt-3 flex items-baseline gap-1.5">
-              {plan.desde && <span className="text-sm font-medium text-muted">desde</span>}
               <span className="font-display text-3xl font-extrabold tracking-tight text-ink">{formatPrice(plan.precioCOP)}</span>
             </div>
             <p className="mt-0.5 text-xs font-medium text-muted">{plan.periodo}</p>
@@ -108,28 +118,16 @@ export default async function AgentePlanesPage({
             </ul>
 
             <div className="mt-6">
-              {plan.mode === "pago" ? (
-                wompiOn ? (
-                  <PlanCheckout planId={plan.id} planNombre={plan.nombre} precioCOP={plan.precioCOP} />
-                ) : (
-                  <a
-                    href={whatsappLink(`Hola ${siteConfig.name}, me interesa el plan "${plan.nombre}" (${formatPrice(plan.precioCOP)}). ¿Cómo lo contrato?`)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#25D366] px-5 text-sm font-semibold text-white transition-colors hover:bg-[#1ebe5d]"
-                  >
-                    <MessageCircle className="h-4 w-4" /> Contratar por WhatsApp
-                  </a>
-                )
+              {wompiOn ? (
+                <PlanCheckout planId={plan.id} planNombre={plan.nombre} precioCOP={plan.precioCOP} />
               ) : (
-                /* Plan de precio variable → siempre por WhatsApp */
                 <a
-                  href={whatsappLink(`Hola ${siteConfig.name}, quiero cotizar el "${plan.nombre}" para mi inmueble.`)}
+                  href={whatsappLink(`Hola ${siteConfig.name}, me interesa el plan "${plan.nombre}" (${formatPrice(plan.precioCOP)}). ¿Cómo lo contrato?`)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-line bg-white px-5 text-sm font-semibold text-ink transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-800"
+                  className={buttonVariants({ variant: "whatsapp", size: "md", className: "w-full justify-center" })}
                 >
-                  <MessageCircle className="h-4 w-4" /> Cotizar por WhatsApp
+                  <MessageCircle className="h-4 w-4" /> Contratar por WhatsApp
                 </a>
               )}
             </div>
@@ -137,9 +135,46 @@ export default async function AgentePlanesPage({
         ))}
       </div>
 
+      {/* Contenido profesional: precio variable → banda propia a todo el ancho */}
+      {contenido && (
+        <div className="mt-6 grid items-center gap-6 rounded-[1.6rem] border border-line bg-surface p-6 sm:p-8 lg:grid-cols-[1.5fr_1fr]">
+          <div>
+            <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-brand-700">
+              <Camera className="h-3.5 w-3.5" /> Contenido profesional
+            </span>
+            <h2 className="mt-3 text-2xl font-bold tracking-tight text-ink">{contenido.nombre}</h2>
+            <p className="mt-2 text-sm leading-relaxed text-ink-soft">{contenido.resumen}</p>
+            <ul className="mt-4 grid gap-2 sm:grid-cols-2">
+              {contenido.incluye.map((f) => (
+                <li key={f} className="flex items-start gap-2 text-sm text-ink-soft">
+                  <Check className="mt-0.5 h-4 w-4 flex-none text-brand-600" />
+                  <span>{f}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="text-center lg:text-right">
+            <p className="text-sm text-muted">desde</p>
+            <p className="font-display text-4xl font-extrabold tracking-tight text-ink">{formatPrice(contenido.precioCOP)}</p>
+            <p className="mt-1 text-xs text-muted">El precio final depende del inmueble.</p>
+            <a
+              href={whatsappLink(`Hola ${siteConfig.name}, quiero cotizar el "${contenido.nombre}" para mi inmueble.`)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={buttonVariants({ variant: "outline", size: "md", className: "mt-4 w-full justify-center lg:w-auto" })}
+            >
+              <MessageCircle className="h-4 w-4" /> Cotizar por WhatsApp
+            </a>
+          </div>
+        </div>
+      )}
+
       <p className="mt-10 text-center text-sm text-muted">
-        Todos los planes funcionan por espacios activos y se rigen por las condiciones de publicación.{" "}
-        <Link href="/contacto" className="font-semibold text-brand-700 hover:underline">¿Dudas? Escríbenos</Link>.
+        Todos los planes funcionan mediante espacios activos y se rigen por las{" "}
+        <Link href="/publica/condiciones" className="font-semibold text-brand-700 hover:underline">
+          condiciones de publicación
+        </Link>
+        . <Link href="/contacto" className="font-semibold text-brand-700 hover:underline">¿Dudas? Escríbenos</Link>.
       </p>
     </div>
   );
