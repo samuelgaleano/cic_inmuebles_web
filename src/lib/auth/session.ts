@@ -11,6 +11,23 @@ import crypto from "node:crypto";
 const SECRET =
   process.env.ADMIN_SESSION_SECRET ?? "dev-insecure-secret-cambia-esto-en-produccion";
 
+// Aviso de seguridad: en produccion, correr con los valores por defecto deja el
+// panel admin expuesto (el secreto de firma y las credenciales estan en el
+// repo). Se registra en los logs para que se definan en Vercel; no rompe el
+// arranque para no dejar el sitio caido si aun no estan configurados.
+if (process.env.NODE_ENV === "production") {
+  if (!process.env.ADMIN_SESSION_SECRET) {
+    console.warn(
+      "[seguridad] ADMIN_SESSION_SECRET no esta definido: el panel admin es vulnerable a sesiones falsificadas. Definelo en Vercel.",
+    );
+  }
+  if (!process.env.ADMIN_EMAIL || !process.env.ADMIN_PASSWORD) {
+    console.warn(
+      "[seguridad] ADMIN_EMAIL/ADMIN_PASSWORD no definidos: se usan credenciales por defecto conocidas. Definelas en Vercel.",
+    );
+  }
+}
+
 export const SESSION_COOKIE = "cic_admin";
 const DEFAULT_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 días
 
