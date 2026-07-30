@@ -1,7 +1,12 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import crypto from "crypto";
 import { buildReference, integritySignature, planIdFromReference } from "./wompi";
-import { PAYABLE_PLANS, getPlan, wompiAmountInCents } from "@/lib/config/plans";
+import {
+  PAYABLE_PLANS,
+  amountMatchesPlan,
+  getPlan,
+  wompiAmountInCents,
+} from "@/lib/config/plans";
 
 describe("montos de Wompi (dinero real)", () => {
   it("convierte pesos a centavos multiplicando por 100", () => {
@@ -64,3 +69,36 @@ describe("referencia de transacción", () => {
     expect(planIdFromReference("XCT-123-456")).toBeUndefined();
   });
 });
+
+describe("el webhook verifica que el monto pagado corresponda al plan", () => {
+  // El monto ya viaja firmado con el secreto de integridad, así que una
+  // discrepancia no debería ocurrir nunca. Si ocurre, hay que verla.
+  it("acepta el monto exacto del plan", () => {
+    const plan = getPlan("alianza-90")!;
+    expect(amountMatchesPlan(plan, 1_000_000)).toBe(true);
+  });
+
+  it("rechaza un monto 100 veces menor (el error clásico de centavos)", () => {
+    const plan = getPlan("alianza-90")!;
+    expect(amountMatchesPlan(plan, 10_000)).toBe(false);
+  });
+
+  it("rechaza cualquier monto distinto, por poco que sea", () => {
+    const plan = getPlan("anual-10")!;
+    const correcto = wompiAmountInCents(plan);
+    expect(amountMatchesPlan(plan, correcto)).toBe(true);
+    expect(amountMatchesPlan(plan, correcto - 1)).toBe(false);
+    expect(amountMatchesPlan(plan, correcto + 1)).toBe(false);
+  });
+
+  it("rechaza el monto de OTRO plan (no se paga el barato y se reclama el caro)", () => {
+    const caro = getPlan("anual-10")!;
+    const barato = getPlan("alianza-90")!;
+    expect(amountMatchesPlan(caro, wompiAmountInCents(barato))).toBe(false);
+  });
+
+  it("no afirma nada si Wompi no reporta monto", () => {
+    const plan = getPlan("alianza-90")!;
+    expect(amountMatchesPlan(plan, undefined)).toBe(true);
+  });
+})

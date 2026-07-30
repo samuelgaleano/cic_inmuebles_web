@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { fetchTransactionStatus, planIdFromReference, wompiConfig } from "@/lib/integrations/wompi";
-import { getPlan } from "@/lib/config/plans";
+import { amountMatchesPlan, getPlan, wompiAmountInCents } from "@/lib/config/plans";
 import { sendPaymentNotification } from "@/lib/notifications/payment";
 
 export const runtime = "nodejs";
@@ -101,6 +101,22 @@ export async function POST(req: Request) {
   if (status === "APPROVED") {
     const planId = planIdFromReference(tx.reference);
     const plan = planId ? getPlan(planId) : undefined;
+
+    // Defensa en profundidad: el monto va firmado con el secreto de integridad,
+    // así que no debería poder diferir del precio del plan. Si difiere, el aviso
+    // sale marcado (nunca se descarta) para que se revise antes de publicar.
+    const montoCoincide = plan ? amountMatchesPlan(plan, tx.amount_in_cents) : true;
+    if (!montoCoincide) {
+      console.error(
+        "[pago] el monto no corresponde al plan:",
+        JSON.stringify({
+          reference: tx.reference,
+          recibido: tx.amount_in_cents,
+          esperado: wompiAmountInCents(plan!),
+        }),
+      );
+    }
+
     await sendPaymentNotification({
       reference: tx.reference,
       status: "APPROVED",
@@ -108,6 +124,7 @@ export async function POST(req: Request) {
       amountInCents: tx.amount_in_cents,
       planNombre: plan?.nombre ?? planId,
       customerEmail: tx.customer_email ?? null,
+      montoCoincide,
     });
   }
 

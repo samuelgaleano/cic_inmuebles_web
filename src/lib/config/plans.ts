@@ -160,3 +160,19 @@ export const PAYABLE_PLANS = PLANS.filter((p) => p.mode === "pago");
 export function wompiAmountInCents(plan: Plan): number {
   return Math.round(plan.precioCOP * 100);
 }
+
+/**
+ * ¿El monto que reporta Wompi corresponde al precio del plan?
+ *
+ * Defensa en profundidad para el webhook. El monto viaja firmado con el secreto
+ * de integridad, que solo vive en el servidor, así que una discrepancia no
+ * debería poder producirse; si aparece, es señal de manipulación o de un error
+ * de configuración y hay que verla, no dejarla pasar en silencio.
+ *
+ * Devuelve `true` cuando no hay monto: sin dato no se afirma nada, para no
+ * marcar como sospechoso un pago legítimo por un payload incompleto.
+ */
+export function amountMatchesPlan(plan: Plan, amountInCents: number | undefined): boolean {
+  if (amountInCents == null) return true;
+  return amountInCents === wompiAmountInCents(plan);
+}

@@ -7,6 +7,8 @@ export interface PaymentNotice {
   amountInCents?: number;
   planNombre?: string;
   customerEmail?: string | null;
+  /** false si el monto cobrado no corresponde al precio del plan. */
+  montoCoincide?: boolean;
 }
 
 /**
@@ -17,8 +19,14 @@ export interface PaymentNotice {
 export async function sendPaymentNotification(p: PaymentNotice): Promise<void> {
   const pesos = p.amountInCents != null ? p.amountInCents / 100 : undefined;
   const monto = pesos != null ? `$${pesos.toLocaleString("es-CO")}` : "—";
-  const subject = `💳 Pago ${p.status} · ${p.planNombre ?? "plan"} (${p.reference})`;
+  // El aviso se marca, nunca se descarta: perder la notificación de un pago
+  // real sería peor que recibirla con una advertencia.
+  const sospechoso = p.montoCoincide === false;
+  const subject = `${sospechoso ? "⚠️ REVISAR — " : ""}💳 Pago ${p.status} · ${p.planNombre ?? "plan"} (${p.reference})`;
   const body = [
+    sospechoso
+      ? "⚠️ ATENCIÓN: el monto pagado NO corresponde al precio del plan. Verifica la transacción en el panel de Wompi antes de activar la publicación."
+      : null,
     `Estado: ${p.status}`,
     `Plan: ${p.planNombre ?? "—"}`,
     `Monto: ${monto}`,
