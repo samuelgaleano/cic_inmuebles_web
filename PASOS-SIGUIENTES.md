@@ -34,7 +34,7 @@
 | Área | Estado | Nota |
 |---|---|---|
 | Secretos en el repo | ✅ Limpio | Ningún `.env` rastreado; `.gitignore` cubre `.env*` |
-| Tipos / Lint / Tests | ✅ Verde | **29/29** tests; `tsc` y `eslint` sin errores |
+| Tipos / Lint / Tests | ✅ Verde | **34/34** tests; `tsc` y `eslint` sin errores |
 | Build | ✅ Verde | 19 páginas generadas |
 | Pasarela de pagos | ✅ Correcta y segura | Monto inmanipulable; webhook con firma oficial; falla cerrado |
 | Autenticación admin | ✅ Resuelto | Variables ya estaban en Vercel; además el código ahora **falla cerrado** |
@@ -153,12 +153,11 @@ Se revisó el repo `samuelgaleano/XIAOMI_FINAL`. **Lo del cobro 100× menor era 
 suposición equivocada**, pero apareció algo peor.
 
 **1. El cobro está BIEN en producción.** `vercel.json` enruta `/api/*` a
-`api_index.ts`, que sí convierte a centavos (`amount * 100`, línea 88). El bug
-existe en `server.ts` (línea 167 firma con `amount` y línea 213 manda
-`amountInCents: amount`, sin ×100), pero **ese archivo no lo sirve Vercel**: solo
-lo usan `npm run dev` y `npm start`. Es una mina enterrada: `api/index.ts`
-envuelve `server.ts`, así que si alguien quita el bloque `builds` de
-`vercel.json`, Vercel tomaría la ruta con el bug y empezaría a cobrar 100× menos.
+`api_index.ts`, que sí convierte a centavos. El bug del 100× vivía en
+`server.ts`, que Vercel no sirve (solo lo usan `npm run dev` y `npm start`),
+pero era una mina: `api/index.ts` lo envuelve, así que habría bastado quitar el
+bloque `builds` de `vercel.json` para activarlo. **Ya está corregido** en el
+commit `92890e6` de ese repo.
 
 **2. 🔴 URGENTE — un parche de seguridad quedó aplicado al archivo equivocado.**
 El endurecimiento que hizo el commit `9ea3f268` se escribió sobre `server.ts`, el
@@ -172,7 +171,7 @@ personales (Ley 1581 de 2012) y arréglalo antes de seguir vendiendo.
 ---
 
 ## Checklist maestro
-- [x] Paso 0 — el proyecto corre en local (29/29 tests, tipos, lint y build verdes).
+- [x] Paso 0 — el proyecto corre en local (34/34 tests, tipos, lint y build verdes).
 - [x] Paso 1 — `ADMIN_SESSION_SECRET`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` en Vercel
       (ya estaban) + código endurecido para fallar cerrado.
 - [ ] Paso 2 — llaves `WOMPI_*` en Vercel + webhook registrado + pago de prueba OK.
@@ -181,6 +180,17 @@ personales (Ley 1581 de 2012) y arréglalo antes de seguir vendiendo.
       descripción SEO ya no repite el precio a mano).
 - [x] Paso 4 — cambios en `main` y desplegados (verificado en producción).
 - [ ] (Aparte) XIAOMI corregido — sigue pendiente, ver recordatorio arriba.
-- [ ] (Limpieza) Borrar `NEXT_PUBLIC_SITE_URL` del proyecto CIC en Vercel: vale
-      `https://specifinance.com` (otro proyecto). Hoy es inofensivo porque
-      `site.ts` fija el dominio en código, pero es una trampa esperando.
+- [x] (Limpieza) `NEXT_PUBLIC_SITE_URL` corregida en Vercel: valía
+      `https://specifinance.com` (otro proyecto), ahora `https://www.cicinmuebles.com`.
+- [ ] **Los avisos de leads por correo NO están llegando.** Falta `RESEND_API_KEY`
+      en Vercel. Los leads **no se pierden** (se guardan en la base y se ven en
+      `/admin/leads`), pero nadie recibe notificación: hay que entrar al panel a
+      mirarlos. Crea una clave gratuita en resend.com y cárgala; de paso activa
+      también el correo de "pago aprobado" de Wompi.
+- [ ] (Opcional) Revisar dos variables que ya no lee ningún código y solo
+      confunden: `NEXT_PUBLIC_WHATSAPP` y `NEXT_PUBLIC_SUPABASE_ANON_KEY`. El
+      teléfono y el dominio están fijos en `src/lib/config/site.ts`.
+- [ ] (Comprobar) Los leads y los avisos de pago se envían a
+      `cc.inmuebles@gmail.com` (el correo público del sitio), que **no** es el
+      mismo que `ADMIN_EMAIL` (`cic.inmuebles@gmail.com`). Confirma que esa
+      bandeja existe y la lees, o define `LEADS_NOTIFICATION_EMAIL`.

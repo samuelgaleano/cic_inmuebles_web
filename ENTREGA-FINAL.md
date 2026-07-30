@@ -5,7 +5,7 @@
 > activar la pasarela de pagos** (las "modificaciones finales").
 >
 > Última corroboración (30-jul-2026): build ✅ · lint ✅ · tipos ✅ ·
-> **29/29 tests ✅** · producción en vivo y verificada ruta por ruta ✅.
+> **34/34 tests ✅** · producción en vivo y verificada ruta por ruta ✅.
 
 ---
 
@@ -126,7 +126,7 @@ cambia `id` (único, sin espacios), `nombre`, `precioCOP`, `periodo`, `resumen` 
 - **UX / accesibilidad (agente dedicado):** modal de pago con foco atrapado,
   etiquetas para lectores de pantalla, mensajes de error anunciados, bloqueo de
   scroll y diseño responsive (móvil/escritorio).
-- **Automático:** `pnpm typecheck`, `pnpm lint`, `pnpm test` (29 pruebas: monto,
+- **Automático:** `pnpm typecheck`, `pnpm lint`, `pnpm test` (34 pruebas: monto,
   firma y referencia de pago; parseo de las fichas de Drive; y el blindaje de la
   sesión de admin) y `pnpm build`, todos en verde.
 - **En vivo:** cada caso probado contra el servidor (pago correcto, plan
@@ -136,13 +136,12 @@ cambia `id` (único, sin espacios), `nombre`, `precioCOP`, `periodo`, `resumen` 
   (307 al login), webhook 503 mientras no haya credenciales, cron 401 sin
   autorización, dominio canónico correcto y ápex redirigiendo 308 a `www`.
 
-### Recomendación abierta (no bloquea)
-El webhook confía en el monto que reporta Wompi sin compararlo con el precio del
-plan. Hoy no es explotable —el monto va firmado con el secreto de integridad,
-que solo está en el servidor— pero comparar `amount_in_cents` contra
-`wompiAmountInCents(plan)` antes de dar un pago por bueno sería defensa en
-profundidad barata. Se dejó sin tocar para no modificar la ruta de cobro sin
-poder probarla contra Wompi real.
+### Verificación del monto en el webhook (implementado)
+El webhook compara `amount_in_cents` contra `wompiAmountInCents(plan)`. Si no
+cuadra, el aviso **se envía igual** pero con "REVISAR" en el asunto y una
+advertencia en el cuerpo, y queda un `console.error` con lo recibido y lo
+esperado. Se marca en vez de descartarse porque perder la notificación de un
+pago real sería peor que recibirla con una advertencia.
 
 ---
 
@@ -178,7 +177,9 @@ cobrar de verdad). El archivo `.env.example` lista todas las variables.
 ## 7. ✅ Checklist de las modificaciones finales
 
 - [ ] Cargar `WOMPI_PUBLIC_KEY`, `WOMPI_INTEGRITY_SECRET`, `WOMPI_EVENTS_SECRET` en Vercel (CIC).
-- [ ] (Opcional) `WOMPI_PRIVATE_KEY`, `RESEND_API_KEY`, `LEADS_NOTIFICATION_EMAIL`.
+- [ ] (Opcional) `WOMPI_PRIVATE_KEY`.
+- [ ] **`RESEND_API_KEY`** — hoy no llega ningún correo, ni de leads ni de pagos.
+      Los leads se guardan igual y se ven en `/admin/leads`, pero sin aviso.
 - [ ] Registrar el webhook `…/api/pagos/wompi/webhook` en Wompi.
 - [ ] Redesplegar y hacer un pago de prueba de $10.000.
 - [ ] Revisar/ajustar precios en `src/lib/config/plans.ts` si hace falta.
