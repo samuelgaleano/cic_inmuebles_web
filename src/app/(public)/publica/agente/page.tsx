@@ -10,10 +10,18 @@ import { formatPrice } from "@/lib/utils/format";
 import { siteConfig, whatsappLink } from "@/lib/config/site";
 import { cn } from "@/lib/utils/cn";
 
+// El precio sale de plans.ts (fuente única de verdad) para que la descripción
+// no quede desactualizada al cambiar la tarifa.
+const desdeCOP = Math.min(
+  ...PLANS.filter((p) => p.audience === "agente" && p.mode === "pago").map((p) => p.precioCOP),
+);
+
 export const metadata: Metadata = {
   title: "Planes para agentes e inmobiliarias",
   description:
-    "Publica tus inmuebles en CIC: alianza por resultados desde $10.000, publicación independiente y paquetes mensuales o anuales para varios inmuebles. Pago en línea seguro.",
+    `Publica tus inmuebles en CIC: alianza por resultados desde ${formatPrice(desdeCOP)}, ` +
+    "publicación independiente y paquetes mensuales o anuales para varios inmuebles. " +
+    "Pago en línea seguro.",
   alternates: { canonical: "/publica/agente" },
 };
 
