@@ -4,8 +4,8 @@
 > cómo bajar la versión final a tu computador, y **exactamente qué falta para
 > activar la pasarela de pagos** (las "modificaciones finales").
 >
-> Última corroboración: build ✅ · lint ✅ · tipos ✅ · **17/17 tests ✅** ·
-> producción en vivo ✅.
+> Última corroboración (30-jul-2026): build ✅ · lint ✅ · tipos ✅ ·
+> **29/29 tests ✅** · producción en vivo y verificada ruta por ruta ✅.
 
 ---
 
@@ -124,11 +124,23 @@ cambia `id` (único, sin espacios), `nombre`, `precioCOP`, `periodo`, `resumen` 
 - **UX / accesibilidad (agente dedicado):** modal de pago con foco atrapado,
   etiquetas para lectores de pantalla, mensajes de error anunciados, bloqueo de
   scroll y diseño responsive (móvil/escritorio).
-- **Automático:** `pnpm typecheck`, `pnpm lint`, `pnpm test` (17 pruebas que
-  blindan el monto, la firma y la referencia) y `pnpm build`, todos en verde.
+- **Automático:** `pnpm typecheck`, `pnpm lint`, `pnpm test` (29 pruebas: monto,
+  firma y referencia de pago; parseo de las fichas de Drive; y el blindaje de la
+  sesión de admin) y `pnpm build`, todos en verde.
 - **En vivo:** cada caso probado contra el servidor (pago correcto, plan
   inexistente → 404, plan de contacto → 400, sin credenciales → 503, webhook
   válido → 200, inválido → 401, duplicado → deduplicado).
+- **Producción (30-jul-2026):** todas las rutas públicas 200, `/admin` protegido
+  (307 al login), webhook 503 mientras no haya credenciales, cron 401 sin
+  autorización, dominio canónico correcto y ápex redirigiendo 308 a `www`.
+
+### Recomendación abierta (no bloquea)
+El webhook confía en el monto que reporta Wompi sin compararlo con el precio del
+plan. Hoy no es explotable —el monto va firmado con el secreto de integridad,
+que solo está en el servidor— pero comparar `amount_in_cents` contra
+`wompiAmountInCents(plan)` antes de dar un pago por bueno sería defensa en
+profundidad barata. Se dejó sin tocar para no modificar la ruta de cobro sin
+poder probarla contra Wompi real.
 
 ---
 

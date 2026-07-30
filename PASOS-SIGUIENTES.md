@@ -29,29 +29,44 @@
 
 ---
 
-## 📋 Resultado de la auditoría (29-jul-2026)
+## 📋 Resultado de la auditoría (actualizado 30-jul-2026)
 
 | Área | Estado | Nota |
 |---|---|---|
 | Secretos en el repo | ✅ Limpio | Ningún `.env` rastreado; `.gitignore` cubre `.env*` |
-| Tipos / Lint / Tests | ✅ Verde | 17/17 tests; `tsc` y `eslint` sin errores |
+| Tipos / Lint / Tests | ✅ Verde | **29/29** tests; `tsc` y `eslint` sin errores |
 | Build | ✅ Verde | 19 páginas generadas |
 | Pasarela de pagos | ✅ Correcta y segura | Monto inmanipulable; webhook con firma oficial; falla cerrado |
-| Autenticación admin | 🟠 **Acción requerida** | Ver Riesgo 1 — hay valores por defecto inseguros |
-| Dependencias | 🟡 Mejorado | Next 16.2.9→**16.2.12** (parche de seguridad). Quedan 4 vulns transitivas de build (postcss/sharp dentro de Next), riesgo práctico bajo |
-| Endpoint cron | ✅ Protegido | Exige `Authorization: Bearer CRON_SECRET` |
+| Autenticación admin | ✅ Resuelto | Variables ya estaban en Vercel; además el código ahora **falla cerrado** |
+| Dependencias | 🟡 Sin ruta de arreglo | Next **16.2.12** (última). Quedan 4 vulns transitivas de build (postcss 8.4.31 y sharp, clavadas dentro de Next); se corrigen cuando Next las actualice |
+| Endpoint cron | ✅ Protegido | Exige `Authorization: Bearer CRON_SECRET` (verificado: 401 en producción) |
 
-### 🔴 Riesgo 1 (el más importante): credenciales admin por defecto
-`src/lib/auth/session.ts` usa valores **por defecto conocidos** si no defines las
-variables de entorno:
-- `ADMIN_SESSION_SECRET` → si falta, el secreto de firma de sesión es un texto
-  público del repo ⇒ **cualquiera podría falsificar una sesión de admin.**
-- `ADMIN_EMAIL` / `ADMIN_PASSWORD` → si faltan, valen
-  `admin@cicinmuebles.com` / `cic-admin-2026` ⇒ **login abierto con credenciales
-  conocidas.**
+### ✅ Riesgo 1 — cerrado (la auditoría anterior se equivocaba)
+La auditoría del 29-jul dio por hecho que faltaban las variables. **No era así:**
+`ADMIN_EMAIL`, `ADMIN_PASSWORD` y `ADMIN_SESSION_SECRET` ya estaban definidas en
+Vercel desde el 21-jun, para Production y Preview. `ADMIN_EMAIL` vale
+`cic.inmuebles@gmail.com`, no el valor por defecto del repo.
 
-➡️ **Corrección:** definir esas 3 variables en Vercel con valores fuertes
-(**Paso 1**). El código ya avisa en los logs de producción si faltan.
+Aun así se endureció el código (defensa en profundidad): antes, si una de esas
+variables se borraba, `session.ts` volvía en silencio a los valores por defecto
+—que están publicados en este repositorio— y el panel quedaba abierto. Ahora,
+**en producción, si falta cualquiera de las tres el panel queda inaccesible**:
+no se validan credenciales, no se emiten sesiones y las existentes dejan de
+verificarse.
+
+> Verificado en producción sin usar credenciales: `proxy.ts` llama
+> `verifySessionToken` en toda ruta `/admin/*`, y los logs de Vercel no
+> muestran el error `[seguridad] Panel admin DESACTIVADO`.
+
+### 🐛 Dos defectos encontrados al ejecutar este runbook
+1. **`parseSpecDoc` no leía archivos con saltos de línea de Windows (CRLF).** La
+   expresión regular no llevaba flag `/m` y en JavaScript `.` no coincide con
+   `\r`, así que solo se reconocían los campos vacíos. Un `especificaciones.md`
+   escrito en Bloc de notas y subido a Drive **se importaba vacío y sin error**.
+   Corregido normalizando los saltos de línea al entrar (commit `49a45b3`).
+2. **`pnpm-workspace.yaml` estaba subido con los marcadores sin resolver**
+   (`sharp: set this to true or false`), lo que rompía cualquier comando con
+   pnpm 11. Resuelto manteniendo el comportamiento de producción.
 
 ---
 
@@ -68,19 +83,21 @@ pnpm dev           # abre http://localhost:3000 para revisar visualmente
 
 ---
 
-## 🔐 PASO 1 — Asegurar el panel admin (Riesgo 1) — **REQUIERE AL USUARIO**
+## ✅ PASO 1 — Asegurar el panel admin — **HECHO**
 
-1. El agente **genera** un secreto fuerte y se lo muestra al usuario:
-   ```bash
-   node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
-   ```
-2. **DETENTE.** Pídele al usuario que, en **Vercel → proyecto CIC → Settings →
-   Environment Variables (Production)**, cree:
-   - `ADMIN_SESSION_SECRET` = (el valor generado arriba)
-   - `ADMIN_EMAIL` = (el correo real del administrador)
-   - `ADMIN_PASSWORD` = (una contraseña nueva y fuerte, no la de por defecto)
-3. Verificación: tras redeploy, entra a `/admin/login` y confirma que las
-   credenciales nuevas funcionan y las viejas **no**.
+Las tres variables ya estaban cargadas en Vercel (Production y Preview) desde el
+21-jun, así que no hubo nada que crear. El código además se endureció para
+fallar cerrado (ver Riesgo 1 arriba). **Nada pendiente.**
+
+Si algún día hay que rotar el secreto de firma:
+```bash
+node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
+```
+y se reemplaza `ADMIN_SESSION_SECRET` en Vercel. Rotarlo cierra todas las
+sesiones abiertas, que es justo lo que se busca al rotarlo.
+
+⚠️ Ojo: al fallar cerrado, **borrar** cualquiera de las tres variables deja el
+panel inaccesible hasta volver a definirla y redesplegar.
 
 ---
 
@@ -137,9 +154,15 @@ Revisar el proyecto **XIAOMI**: con el mismo patrón de Wompi probablemente cobr
 ---
 
 ## Checklist maestro
-- [ ] Paso 0 — el proyecto corre en local (todo verde).
-- [ ] Paso 1 — `ADMIN_SESSION_SECRET`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` en Vercel.
+- [x] Paso 0 — el proyecto corre en local (29/29 tests, tipos, lint y build verdes).
+- [x] Paso 1 — `ADMIN_SESSION_SECRET`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` en Vercel
+      (ya estaban) + código endurecido para fallar cerrado.
 - [ ] Paso 2 — llaves `WOMPI_*` en Vercel + webhook registrado + pago de prueba OK.
-- [ ] Paso 3 — precios y textos revisados.
-- [ ] Paso 4 — cambios en `main` y desplegados.
-- [ ] (Aparte) XIAOMI corregido.
+      **Único paso pendiente.** Requiere las llaves de la cuenta de Wompi.
+- [x] Paso 3 — precios y textos revisados (todos salen de `plans.ts`; la
+      descripción SEO ya no repite el precio a mano).
+- [x] Paso 4 — cambios en `main` y desplegados (verificado en producción).
+- [ ] (Aparte) XIAOMI corregido — sigue pendiente, ver recordatorio arriba.
+- [ ] (Limpieza) Borrar `NEXT_PUBLIC_SITE_URL` del proyecto CIC en Vercel: vale
+      `https://specifinance.com` (otro proyecto). Hoy es inofensivo porque
+      `site.ts` fija el dominio en código, pero es una trampa esperando.
