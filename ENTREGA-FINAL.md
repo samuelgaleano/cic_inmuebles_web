@@ -36,8 +36,10 @@ No hay una copia "aparte": el repo = la verdad. Para tenerla en tu carpeta local
 - **Cada plan cobra su propio precio**, y el precio se decide **en el servidor**,
   no en el navegador → un usuario **no puede pagar menos** manipulando la página.
 - **El monto va correcto**: en Wompi los valores van en *centavos* (pesos × 100).
-  $10.000 → `1.000.000`. ⚠️ Se corrigió el error del proyecto **XIAOMI**, que
-  mandaba los pesos como centavos y por eso **cobra 100 veces menos**. Revísalo.
+  $10.000 → `1.000.000`. (Nota: se revisó XIAOMI el 30-jul y **su cobro en
+  producción está bien**; el bug del 100× vive en un archivo que Vercel no
+  despliega. Pero ese repo tiene un asunto de seguridad urgente: ver
+  `PASOS-SIGUIENTES.md`.)
 - **Confirmación segura**: cuando un pago se aprueba, Wompi avisa a un "webhook"
   que valida la firma oficial; si la firma no cuadra, se rechaza. Al aprobarse,
   llega un **correo** al negocio con el plan, el monto y la referencia.
@@ -181,7 +183,9 @@ cobrar de verdad). El archivo `.env.example` lista todas las variables.
 - [ ] Redesplegar y hacer un pago de prueba de $10.000.
 - [ ] Revisar/ajustar precios en `src/lib/config/plans.ts` si hace falta.
 - [ ] Revisar los textos de `/publica`, `/vender` y `/publica/agente`.
-- [ ] (Recomendado) Corregir el cobro 100× menor en el proyecto **XIAOMI**.
+- [ ] 🔴 (URGENTE, otro proyecto) **XIAOMI**: un parche de seguridad quedó en un
+      archivo que Vercel no despliega, así que producción sigue sin él. El cobro
+      sí está bien. Ver `PASOS-SIGUIENTES.md`.
 
 ---
 

@@ -147,9 +147,27 @@ Luego fusionar a `main` (Vercel despliega solo). **No** usar `--force`.
 
 ---
 
-## 📌 Recordatorio aparte
-Revisar el proyecto **XIAOMI**: con el mismo patrón de Wompi probablemente cobra
-**100× menos** (mandaba pesos como centavos). En CIC ya está corregido.
+## 📌 Recordatorio aparte — XIAOMI (revisado 30-jul-2026)
+
+Se revisó el repo `samuelgaleano/XIAOMI_FINAL`. **Lo del cobro 100× menor era una
+suposición equivocada**, pero apareció algo peor.
+
+**1. El cobro está BIEN en producción.** `vercel.json` enruta `/api/*` a
+`api_index.ts`, que sí convierte a centavos (`amount * 100`, línea 88). El bug
+existe en `server.ts` (línea 167 firma con `amount` y línea 213 manda
+`amountInCents: amount`, sin ×100), pero **ese archivo no lo sirve Vercel**: solo
+lo usan `npm run dev` y `npm start`. Es una mina enterrada: `api/index.ts`
+envuelve `server.ts`, así que si alguien quita el bloque `builds` de
+`vercel.json`, Vercel tomaría la ruta con el bug y empezaría a cobrar 100× menos.
+
+**2. 🔴 URGENTE — un parche de seguridad quedó aplicado al archivo equivocado.**
+El endurecimiento que hizo el commit `9ea3f268` se escribió sobre `server.ts`, el
+archivo que Vercel **no** despliega, así que nunca llegó a producción. El
+handler que sí se sirve quedó sin esa protección.
+
+Este documento vive en un repositorio **público**, así que el detalle no va aquí.
+Está descrito en la conversación de entrega; trátalo como incidente de datos
+personales (Ley 1581 de 2012) y arréglalo antes de seguir vendiendo.
 
 ---
 
