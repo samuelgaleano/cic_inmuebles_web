@@ -327,7 +327,12 @@ export function parseSpecDoc(text: string): ParsedSpec {
   let descripcionCorta = "";
   const descLines: string[] = [];
 
-  const [head, ...rest] = text.split(/^---\s*$/m);
+  // Los documentos los escribe el usuario (Windows, Mac, Drive), así que pueden
+  // llegar con CRLF o CR. Se normalizan a LF: en JS `.` no coincide con `\r` y
+  // sin esto ningún campo con valor se reconocería.
+  const normalizado = text.replace(/\r\n?/g, "\n");
+
+  const [head, ...rest] = normalizado.split(/^---\s*$/m);
   for (const line of head.split("\n")) {
     const m = line.match(/^([a-z_]+):\s*(.*)$/i);
     if (m) fields[m[1].trim().toLowerCase()] = m[2].trim();

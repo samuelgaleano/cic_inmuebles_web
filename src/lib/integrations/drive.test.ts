@@ -33,6 +33,18 @@ describe("parseSpecDoc (round-trip con generateSpecDoc)", () => {
     const parsed = parseSpecDoc("texto suelto\nciudad: Medellín\n");
     expect(parsed.fields.ciudad).toBe("Medellín");
   });
+
+  // Los especificaciones.md los escribe el usuario en Windows (Bloc de notas) y
+  // llegan desde Drive con finales de línea CRLF: deben parsearse igual que LF.
+  it("parsea igual un documento con finales de línea de Windows (CRLF)", () => {
+    const doc = generateSpecDoc(property);
+    const conLf = parseSpecDoc(doc);
+    const conCrlf = parseSpecDoc(doc.replace(/\n/g, "\r\n"));
+
+    expect(conCrlf.fields).toEqual(conLf.fields);
+    expect(conCrlf.descripcion).toBe(conLf.descripcion);
+    expect(conCrlf.descripcionCorta).toBe(conLf.descripcionCorta);
+  });
 });
 
 describe("plantilla especificaciones.md (docs/)", () => {
