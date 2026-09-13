@@ -5,6 +5,10 @@
     {
       "path": "/api/cron/sync",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/pagos/wompi/reconciliar",
+      "schedule": "30 6 * * *"
     }
   ]
 }

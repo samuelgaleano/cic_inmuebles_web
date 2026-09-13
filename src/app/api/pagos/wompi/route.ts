@@ -7,6 +7,7 @@ import {
   isWompiConfigured,
   wompiConfig,
 } from "@/lib/integrations/wompi";
+import { getPagosStore, isPagosStoreConfigured } from "@/lib/pagos/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -50,6 +51,17 @@ export async function POST(req: Request) {
   const signature = integritySignature(reference, amountInCents, "COP");
   const { publicKey } = wompiConfig();
 
+  // Se registra la referencia emitida para que la reconciliación pueda listar
+  // las que nunca recibieron confirmación. Si falla, el cobro sigue: la
+  // referencia también viaja en el redirect y en el evento de Wompi.
+  if (isPagosStoreConfigured()) {
+    try {
+      await getPagosStore().recordReference({ reference, planId: plan.id, amountInCents });
+    } catch (err) {
+      console.error("[pago] no se pudo registrar la referencia:", err instanceof Error ? err.message : err);
+    }
+  }
+
   return NextResponse.json({
     ok: true,
     publicKey,
@@ -58,6 +70,7 @@ export async function POST(req: Request) {
     reference,
     signature,
     plan: { id: plan.id, nombre: plan.nombre, precioCOP: plan.precioCOP },
+    // Wompi agrega ?id=<transacción> al volver; la página confirma con la API.
     redirectUrl: `${appUrl()}/publica/agente?pago=procesado&ref=${encodeURIComponent(reference)}`,
   });
 }

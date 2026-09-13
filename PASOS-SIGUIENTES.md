@@ -101,24 +101,29 @@ panel inaccesible hasta volver a definirla y redesplegar.
 
 ---
 
-## 💳 PASO 2 — Activar la pasarela de pagos — **REQUIERE AL USUARIO**
+## 💳 PASO 2 — Activar la pasarela de pagos — **actualizado 13-sep-2026**
 
-Detalle completo en `ENTREGA-FINAL.md` (sección 3). Resumen accionable:
+Las 4 llaves de Wompi (`WOMPI_PUBLIC_KEY`, `WOMPI_INTEGRITY_SECRET`,
+`WOMPI_EVENTS_SECRET`, `WOMPI_PRIVATE_KEY`), `RESEND_API_KEY` y
+`LEADS_NOTIFICATION_EMAIL` **ya están en Vercel (Production)**. Lo que queda:
 
-1. **DETENTE.** Pide al usuario las llaves de **Wompi → Desarrolladores**
-   (las mismas de su proyecto XIAOMI):
-   `WOMPI_PUBLIC_KEY`, `WOMPI_INTEGRITY_SECRET`, `WOMPI_EVENTS_SECRET`, y
-   opcional `WOMPI_PRIVATE_KEY`.
-2. El usuario las carga en **Vercel (Production)**. (Opcional: `RESEND_API_KEY` y
-   `LEADS_NOTIFICATION_EMAIL` para el correo de "pago aprobado".)
-3. El usuario registra en **Wompi → Eventos** la URL:
-   `https://www.cicinmuebles.com/api/pagos/wompi/webhook`
-4. Redeploy. Verificación del agente: `curl -s -o /dev/null -w "%{http_code}"
-   -X POST https://www.cicinmuebles.com/api/pagos/wompi -H "Content-Type:
-   application/json" -d '{"planId":"alianza-90"}'` debe responder **200** (ya no
-   503). En la web, el botón debe decir **"Contratar por $10.000"**.
-5. El usuario hace **un pago de prueba real** de $10.000 (plan "Alianza por
-   resultados") y confirma que llega el correo.
+1. **Aplicar la migración** `supabase/migrations/0003_pagos.sql` en el SQL
+   Editor de Supabase (tablas `pagos_referencias` y `pagos_eventos`). Sin ella
+   el webhook responde 503 y la página de retorno no confirma.
+2. Cargar `PAGOS_ALERT_EMAIL` en Vercel (correo operativo, no el del cliente).
+3. Redeploy. Verificación: `curl -s -o /dev/null -w "%{http_code}" -X POST
+   https://www.cicinmuebles.com/api/pagos/wompi/webhook -d '{}'` debe responder
+   **401** (firma inválida; ya no 503). En la web, el botón debe decir
+   **"Contratar por $10.000"**.
+4. **Pago de prueba real** de $10.000 (plan "Alianza por resultados"): al volver,
+   la página debe decir **"Pago aprobado"** y debe llegar el correo. Traza:
+   `curl -H "Authorization: Bearer $CRON_SECRET"
+   "https://www.cicinmuebles.com/api/pagos/wompi/reconciliar?tx=<id>"`.
+5. **NO registrar todavía** la URL de Eventos en Wompi: la cuenta se comparte
+   con otro sitio y Wompi admite una sola URL. Se cambia solo cuando ese sitio
+   tenga su propia cuenta (plan en la documentación del proyecto). Mientras
+   tanto CIC se entera de los pagos por la página de retorno y por la
+   reconciliación diaria.
 
 > Para probar en local sin cobrar de verdad: crear `.env.local` con las llaves
 > **de pruebas** de Wompi (`pub_test_…`, `prv_test_…`). Ver `.env.example`.
@@ -171,26 +176,26 @@ personales (Ley 1581 de 2012) y arréglalo antes de seguir vendiendo.
 ---
 
 ## Checklist maestro
-- [x] Paso 0 — el proyecto corre en local (34/34 tests, tipos, lint y build verdes).
+- [x] Paso 0 — el proyecto corre en local (83/83 tests, tipos, lint y build verdes).
 - [x] Paso 1 — `ADMIN_SESSION_SECRET`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` en Vercel
       (ya estaban) + código endurecido para fallar cerrado.
-- [ ] Paso 2 — llaves `WOMPI_*` en Vercel + webhook registrado + pago de prueba OK.
-      **Único paso pendiente.** Requiere las llaves de la cuenta de Wompi.
+- [ ] Paso 2 — llaves `WOMPI_*` en Vercel ✅ (13-sep-2026) · migración 0003 en
+      Supabase ☐ · `PAGOS_ALERT_EMAIL` ☐ · pago de prueba ☐ · URL de Eventos en
+      Wompi ☐ (solo cuando el otro sitio tenga su cuenta).
 - [x] Paso 3 — precios y textos revisados (todos salen de `plans.ts`; la
       descripción SEO ya no repite el precio a mano).
 - [x] Paso 4 — cambios en `main` y desplegados (verificado en producción).
 - [ ] (Aparte) XIAOMI corregido — sigue pendiente, ver recordatorio arriba.
 - [x] (Limpieza) `NEXT_PUBLIC_SITE_URL` corregida en Vercel: valía
       `https://specifinance.com` (otro proyecto), ahora `https://www.cicinmuebles.com`.
-- [ ] **Los avisos de leads por correo NO están llegando.** Falta `RESEND_API_KEY`
-      en Vercel. Los leads **no se pierden** (se guardan en la base y se ven en
-      `/admin/leads`), pero nadie recibe notificación: hay que entrar al panel a
-      mirarlos. Crea una clave gratuita en resend.com y cárgala; de paso activa
-      también el correo de "pago aprobado" de Wompi.
+- [x] **Avisos de leads y de pagos por correo.** `RESEND_API_KEY` y
+      `LEADS_NOTIFICATION_EMAIL=cic.inmuebles@gmail.com` cargadas el 13-sep-2026.
+      El dominio `cicinmuebles.com` está en verificación en Resend; cuando quede
+      "Verified", definir `RESEND_FROM="CIC Inmuebles <notificaciones@cicinmuebles.com>"`.
 - [ ] (Opcional) Revisar dos variables que ya no lee ningún código y solo
       confunden: `NEXT_PUBLIC_WHATSAPP` y `NEXT_PUBLIC_SUPABASE_ANON_KEY`. El
       teléfono y el dominio están fijos en `src/lib/config/site.ts`.
-- [ ] (Comprobar) Los leads y los avisos de pago se envían a
-      `cc.inmuebles@gmail.com` (el correo público del sitio), que **no** es el
-      mismo que `ADMIN_EMAIL` (`cic.inmuebles@gmail.com`). Confirma que esa
-      bandeja existe y la lees, o define `LEADS_NOTIFICATION_EMAIL`.
+- [ ] (Comprobar) El sitio público muestra `cc.inmuebles@gmail.com` (footer y
+      contacto) mientras que la tarjeta del negocio y `ADMIN_EMAIL` dicen
+      `cic.inmuebles@gmail.com`. Confirmar cuál es el correo público correcto y
+      corregir `src/lib/config/site.ts` si hace falta.

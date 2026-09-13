@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeft, Camera, Check, CheckCircle2, MessageCircle, Sparkles } from "lucide-react";
+import { ArrowLeft, Camera, Check, CheckCircle2, Clock, MessageCircle, Sparkles, XCircle } from "lucide-react";
 import { PlanCheckout } from "@/components/public/plan-checkout";
 import { JsonLd } from "@/components/seo/json-ld";
 import { PLANS } from "@/lib/config/plans";
 import { isWompiConfigured } from "@/lib/integrations/wompi";
+import { confirmFromRedirect } from "@/lib/pagos/process";
+import { isPagosStoreConfigured } from "@/lib/pagos/store";
 import { buttonVariants } from "@/components/ui/button";
 import { formatPrice } from "@/lib/utils/format";
 import { siteConfig, whatsappLink } from "@/lib/config/site";
@@ -25,13 +27,42 @@ export const metadata: Metadata = {
   alternates: { canonical: "/publica/agente" },
 };
 
+const RETORNO: Record<string, { titulo: string; detalle: string; tono: "ok" | "espera" | "error" }> = {
+  APPROVED: {
+    titulo: "Pago aprobado",
+    detalle: "Wompi confirmó tu pago. Te contactaremos para crear la ficha de tu inmueble.",
+    tono: "ok",
+  },
+  PENDING: {
+    titulo: "Pago en proceso",
+    detalle: "Wompi aún está confirmando la transacción. Te avisamos en cuanto quede aprobada; no es necesario pagar de nuevo.",
+    tono: "espera",
+  },
+  DECLINED: {
+    titulo: "Pago rechazado",
+    detalle: "La transacción fue rechazada por el medio de pago. Puedes intentarlo de nuevo con otro medio.",
+    tono: "error",
+  },
+  VOIDED: { titulo: "Pago anulado", detalle: "La transacción fue anulada. Si no fuiste tú, escríbenos.", tono: "error" },
+  ERROR: { titulo: "Error en el pago", detalle: "Hubo un error en la pasarela. Puedes intentarlo de nuevo.", tono: "error" },
+};
+
 export default async function AgentePlanesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ pago?: string; ref?: string }>;
+  searchParams: Promise<{ pago?: string; ref?: string; id?: string }>;
 }) {
   const sp = await searchParams;
   const wompiOn = isWompiConfigured();
+
+  // Retorno del widget: Wompi agrega ?id=<transacción>. Se confirma con la API
+  // (fuente de verdad) y se muestra el estado real; la notificación al negocio
+  // es idempotente, así que recargar esta página no duplica avisos.
+  const retorno =
+    sp.pago === "procesado" && sp.id && sp.ref && wompiOn && isPagosStoreConfigured()
+      ? await confirmFromRedirect(sp.id, sp.ref)
+      : null;
+  const estado = retorno?.found ? RETORNO[retorno.status] ?? RETORNO.PENDING : null;
   const pagables = PLANS.filter((p) => p.audience === "agente" && p.mode === "pago");
   const contenido = PLANS.find((p) => p.id === "contenido-profesional");
 
@@ -55,18 +86,35 @@ export default async function AgentePlanesPage({
 
       {/* Aviso de retorno desde la pasarela */}
       {sp.pago === "procesado" && (
-        <div className="mt-5 flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-900">
-          <CheckCircle2 className="mt-0.5 h-5 w-5 flex-none text-emerald-600" />
+        <div
+          className={cn(
+            "mt-5 flex items-start gap-3 rounded-2xl border p-5",
+            estado?.tono === "error"
+              ? "border-red-200 bg-red-50 text-red-900"
+              : estado?.tono === "ok"
+                ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                : "border-amber-200 bg-amber-50 text-amber-900",
+          )}
+          role="status"
+        >
+          {estado?.tono === "error" ? (
+            <XCircle className="mt-0.5 h-5 w-5 flex-none text-red-600" />
+          ) : estado?.tono === "ok" ? (
+            <CheckCircle2 className="mt-0.5 h-5 w-5 flex-none text-emerald-600" />
+          ) : (
+            <Clock className="mt-0.5 h-5 w-5 flex-none text-amber-600" />
+          )}
           <div>
-            <p className="font-semibold">Recibimos tu pago</p>
-            <p className="mt-1 text-sm text-emerald-800">
-              Estamos confirmando la transacción con Wompi{sp.ref ? ` (ref. ${sp.ref})` : ""}. Te
-              contactaremos para crear la ficha de tu inmueble. Si tienes dudas,{" "}
+            <p className="font-semibold">{estado?.titulo ?? "Recibimos tu solicitud de pago"}</p>
+            <p className="mt-1 text-sm opacity-90">
+              {estado?.detalle ??
+                "No pudimos confirmar la transacción en este momento; la verificamos en unas horas y te contactamos."}
+              {sp.ref ? ` Ref. ${sp.ref}.` : ""} Si tienes dudas,{" "}
               <a
                 href={whatsappLink(`Hola ${siteConfig.name}, acabo de hacer un pago de publicación${sp.ref ? ` (ref. ${sp.ref})` : ""} y tengo una duda.`)}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="font-semibold text-emerald-700 underline underline-offset-2 hover:text-emerald-900"
+                className="font-semibold underline underline-offset-2"
               >
                 escríbenos por WhatsApp
               </a>

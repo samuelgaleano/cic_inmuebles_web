@@ -1,4 +1,5 @@
 import { siteConfig } from "@/lib/config/site";
+import { sendEmail } from "./resend";
 
 export interface PaymentNotice {
   reference: string;
@@ -12,18 +13,18 @@ export interface PaymentNotice {
 }
 
 /**
- * Aviso por correo cuando un pago de publicación es aprobado (u otro estado).
- * Mismo enfoque de costo cero que los leads: usa Resend si hay RESEND_API_KEY;
- * de lo contrario registra en consola sin bloquear el webhook.
+ * Aviso al negocio cuando un pago de publicación queda aprobado. Devuelve true
+ * solo si Resend aceptó el correo: el llamador marca la notificación como
+ * hecha únicamente en ese caso, para que un fallo se reintente después.
  */
-export async function sendPaymentNotification(p: PaymentNotice): Promise<void> {
+export async function sendPaymentNotification(p: PaymentNotice): Promise<boolean> {
   const pesos = p.amountInCents != null ? p.amountInCents / 100 : undefined;
   const monto = pesos != null ? `$${pesos.toLocaleString("es-CO")}` : "—";
   // El aviso se marca, nunca se descarta: perder la notificación de un pago
   // real sería peor que recibirla con una advertencia.
   const sospechoso = p.montoCoincide === false;
   const subject = `${sospechoso ? "⚠️ REVISAR — " : ""}💳 Pago ${p.status} · ${p.planNombre ?? "plan"} (${p.reference})`;
-  const body = [
+  const text = [
     sospechoso
       ? "⚠️ ATENCIÓN: el monto pagado NO corresponde al precio del plan. Verifica la transacción en el panel de Wompi antes de activar la publicación."
       : null,
@@ -37,26 +38,22 @@ export async function sendPaymentNotification(p: PaymentNotice): Promise<void> {
     .filter(Boolean)
     .join("\n");
 
-  const to = process.env.LEADS_NOTIFICATION_EMAIL ?? siteConfig.email;
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
-    console.info(`[pago] (correo no enviado: falta RESEND_API_KEY) -> ${to}\n${subject}\n${body}`);
-    return;
-  }
+  return sendEmail({
+    to: process.env.LEADS_NOTIFICATION_EMAIL ?? siteConfig.email,
+    subject,
+    text,
+  });
+}
 
-  try {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        from: process.env.RESEND_FROM ?? "CIC Inmuebles <onboarding@resend.dev>",
-        to,
-        subject,
-        text: body,
-      }),
-    });
-    if (!res.ok) console.error("[pago] Resend respondió", res.status, await res.text());
-  } catch (err) {
-    console.error("[pago] no se pudo enviar el aviso:", err);
+/**
+ * Alerta operativa para Pixies (no para el cliente): referencias sin destino,
+ * montos que no cuadran, Resend caído, pendientes en la reconciliación.
+ */
+export async function sendPagosAlert(subject: string, text: string): Promise<boolean> {
+  const to = process.env.PAGOS_ALERT_EMAIL;
+  if (!to) {
+    console.warn(`[pago] alerta no enviada: falta PAGOS_ALERT_EMAIL (${subject.slice(0, 60)})`);
+    return false;
   }
+  return sendEmail({ to, subject: `[CIC pagos] ${subject}`, text });
 }
