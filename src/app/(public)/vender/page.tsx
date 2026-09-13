@@ -67,8 +67,8 @@ export default function VenderPage() {
             Vende tu inmueble sin complicaciones
           </h1>
           <p className="mt-4 text-lg leading-relaxed text-muted">
-            Déjanos los datos de tu inmueble y un asesor te contactará. Nosotros nos
-            encargamos del resto para que vendas de forma rápida y segura.
+            Déjanos los datos y un asesor te contactará. Nosotros nos encargamos del
+            resto para que vendas de forma rápida y segura.
           </p>
 
           <div className="mt-6 rounded-2xl border border-brand-200 bg-brand-50/60 p-5">

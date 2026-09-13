@@ -29,9 +29,12 @@ export const siteConfig = {
   phoneDisplay: "+57 324 907 1717",
   city: "Colombia",
 
+  // Redes públicas del negocio. Fijas en código por la misma razón que el
+  // teléfono y la URL: se alimentan al footer y al `sameAs` del JSON-LD.
   social: {
-    instagram: process.env.NEXT_PUBLIC_INSTAGRAM ?? "",
-    facebook: process.env.NEXT_PUBLIC_FACEBOOK ?? "",
+    facebook: "https://www.facebook.com/profile.php?id=61568737075250",
+    instagram: "https://www.instagram.com/cic_inmuebles",
+    tiktok: "https://www.tiktok.com/@cic_inmuebles",
   },
 } as const;
 

@@ -41,7 +41,7 @@ export const PLANS: Plan[] = [
     resumen:
       "Tarifa administrativa para publicar; CIC gestiona los clientes y se comparte la comisión 50/50 cuando CIC consigue el negocio.",
     incluye: [
-      "Publicación 90 días + ficha comercial",
+      "Ficha individual + hasta 10 fotografías",
       "Promoción básica en Instagram, TikTok y estados de WhatsApp",
       "CIC atiende clientes, coordina visitas y acompaña el cierre",
       "Comisión compartida 50/50 (según acuerdo previo)",
@@ -58,7 +58,7 @@ export const PLANS: Plan[] = [
     resumen:
       "Publicas tu inmueble en CIC como vitrina digital, pero atiendes tú a los interesados y conservas tu comisión.",
     incluye: [
-      "Ficha individual + hasta 15 fotografías",
+      "Ficha individual + hasta 10 fotografías",
       "Precio, área, ubicación y características",
       "Botón de contacto directo al agente",
       "Inclusión en los filtros de búsqueda",
@@ -72,12 +72,13 @@ export const PLANS: Plan[] = [
     precioCOP: 75000,
     periodo: "hasta 5 inmuebles · mes",
     resumen:
-      "Inventario activo de hasta 5 inmuebles simultáneos, con reemplazo de los que se vendan o retiren. Equivale a $15.000 por espacio.",
+      "Publicas tu inmueble en CIC como vitrina digital, pero atiendes tú a los interesados y conservas tu comisión. Inventario activo de hasta 5 inmuebles simultáneos, con reemplazo de los que se vendan o retiren. Equivale a $15.000 por espacio.",
     incluye: [
-      "Hasta 5 inmuebles publicados a la vez",
+      "Ficha individual + hasta 10 fotografías de 5 inmuebles",
       "Reemplazo de propiedades vendidas o retiradas",
-      "Hasta 15 fotografías por inmueble",
+      "Hasta 10 fotografías por inmueble",
       "Actualización de precios y disponibilidad",
+      "Botón de contacto directo al agente",
     ],
   },
   {
@@ -90,9 +91,9 @@ export const PLANS: Plan[] = [
     resumen:
       "Inventario activo de hasta 10 inmuebles simultáneos, con rotación. Equivale a $15.000 por espacio.",
     incluye: [
-      "Hasta 10 inmuebles publicados a la vez",
+      "Ficha individual + hasta 10 fotografías de 10 inmuebles",
       "Reemplazo de propiedades vendidas o retiradas",
-      "Hasta 15 fotografías por inmueble",
+      "Hasta 10 fotografías por inmueble",
       "Actualización de precios y disponibilidad",
     ],
   },
@@ -108,7 +109,7 @@ export const PLANS: Plan[] = [
     incluye: [
       "5 espacios activos durante un año",
       "Reemplazo de propiedades vendidas o retiradas",
-      "Hasta 15 fotografías por inmueble",
+      "Hasta 10 fotografías por inmueble",
       "Atención prioritaria para cambios",
     ],
   },
@@ -124,7 +125,7 @@ export const PLANS: Plan[] = [
     incluye: [
       "10 espacios activos durante un año",
       "Reemplazo de propiedades vendidas o retiradas",
-      "Hasta 15 fotografías por inmueble",
+      "Hasta 10 fotografías por inmueble",
       "Atención prioritaria para cambios",
     ],
   },

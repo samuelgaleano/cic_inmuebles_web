@@ -3,6 +3,43 @@ import { Lock, Mail, MapPin, Phone } from "lucide-react";
 import { Logo } from "@/components/brand/brand-mark";
 import { siteConfig, whatsappLink } from "@/lib/config/site";
 
+const pillClass =
+  "inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white transition-colors hover:border-brand-400/50 hover:bg-brand-500/10";
+
+type IconProps = { className?: string };
+
+function FacebookIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className={className}>
+      <path d="M13.5 21v-7.2h2.4l.4-2.9h-2.8V9.1c0-.8.2-1.4 1.4-1.4h1.5V5.1c-.3 0-1.2-.1-2.2-.1-2.2 0-3.7 1.3-3.7 3.8v2.1H8v2.9h2.5V21h3z" />
+    </svg>
+  );
+}
+
+function InstagramIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={className}>
+      <rect x="3" y="3" width="18" height="18" rx="5" />
+      <circle cx="12" cy="12" r="3.8" />
+      <circle cx="17.3" cy="6.7" r="0.9" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function TikTokIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className={className}>
+      <path d="M16.6 3c.3 2.3 1.6 3.7 3.9 3.9v3.2c-1.5 0-2.8-.4-3.9-1.2v6.6c0 3.4-2.6 5.5-5.5 5.5A5.5 5.5 0 0 1 5.5 15.5c0-3.5 3-5.9 6.1-5.4v3.3c-1.4-.4-2.9.6-2.9 2.1 0 1.2 1 2.2 2.3 2.2 1.4 0 2.4-1 2.4-2.6V3h3.2z" />
+    </svg>
+  );
+}
+
+const SOCIALS = [
+  { label: "Facebook", href: siteConfig.social.facebook, Icon: FacebookIcon },
+  { label: "Instagram", href: siteConfig.social.instagram, Icon: InstagramIcon },
+  { label: "TikTok", href: siteConfig.social.tiktok, Icon: TikTokIcon },
+];
+
 export function SiteFooter() {
   const year = new Date().getFullYear();
 
@@ -15,13 +52,27 @@ export function SiteFooter() {
             <p className="mt-5 max-w-xs text-sm leading-relaxed text-white/55">
               {siteConfig.description}
             </p>
-            <Link
-              href={whatsappLink(`Hola ${siteConfig.name}, quiero más información.`)}
-              className="mt-6 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white transition-colors hover:border-brand-400/50 hover:bg-brand-500/10"
-            >
-              <span className="h-1.5 w-1.5 rounded-full bg-brand-400" />
-              Escríbenos por WhatsApp
-            </Link>
+            <div className="mt-6 flex flex-wrap gap-2.5">
+              <Link
+                href={whatsappLink(`Hola ${siteConfig.name}, quiero más información.`)}
+                className={pillClass}
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-brand-400" />
+                Escríbenos por WhatsApp
+              </Link>
+              {SOCIALS.map(({ label, href, Icon }) => (
+                <a
+                  key={label}
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={pillClass}
+                >
+                  <Icon className="h-4 w-4 text-brand-400" />
+                  {label}
+                </a>
+              ))}
+            </div>
           </div>
 
           <div>

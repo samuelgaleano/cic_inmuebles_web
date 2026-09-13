@@ -96,9 +96,7 @@ const siteJsonLd = {
       image: `${siteConfig.url}/hero.jpg`,
       address: { "@type": "PostalAddress", addressCountry: "CO" },
       knowsLanguage: "es",
-      ...((siteConfig.social.instagram || siteConfig.social.facebook) && {
-        sameAs: [siteConfig.social.instagram, siteConfig.social.facebook].filter(Boolean),
-      }),
+      sameAs: Object.values(siteConfig.social),
     },
   ],
 };
