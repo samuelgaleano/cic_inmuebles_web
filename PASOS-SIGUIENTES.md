@@ -107,14 +107,12 @@ Las 4 llaves de Wompi (`WOMPI_PUBLIC_KEY`, `WOMPI_INTEGRITY_SECRET`,
 `WOMPI_EVENTS_SECRET`, `WOMPI_PRIVATE_KEY`), `RESEND_API_KEY` y
 `LEADS_NOTIFICATION_EMAIL` **ya están en Vercel (Production)**. Lo que queda:
 
-1. **Aplicar la migración** `supabase/migrations/0003_pagos.sql` en el SQL
-   Editor de Supabase (tablas `pagos_referencias` y `pagos_eventos`). Sin ella
-   el webhook responde 503 y la página de retorno no confirma.
-2. Cargar `PAGOS_ALERT_EMAIL` en Vercel (correo operativo, no el del cliente).
-3. Redeploy. Verificación: `curl -s -o /dev/null -w "%{http_code}" -X POST
-   https://www.cicinmuebles.com/api/pagos/wompi/webhook -d '{}'` debe responder
-   **401** (firma inválida; ya no 503). En la web, el botón debe decir
-   **"Contratar por $10.000"**.
+1. ~~Aplicar la migración `0003_pagos.sql`~~ **Hecha el 13-sep-2026** (tablas
+   `pagos_referencias`, `pagos_eventos`, `pagos_avisos`).
+2. ~~Cargar `PAGOS_ALERT_EMAIL`~~ **Hecho** (`cic.inmuebles@gmail.com`).
+3. ~~Redeploy~~ **Hecho y verificado el 13-sep-2026**: el webhook responde
+   **401** a peticiones sin firma, `/api/pagos/wompi/reconciliar` responde 401
+   sin Bearer, y los seis planes muestran **"Contratar por $…"**.
 4. **Pago de prueba real** de $10.000 (plan "Alianza por resultados"): al volver,
    la página debe decir **"Pago aprobado"** y debe llegar el correo. Traza:
    `curl -H "Authorization: Bearer $CRON_SECRET"
@@ -179,9 +177,10 @@ personales (Ley 1581 de 2012) y arréglalo antes de seguir vendiendo.
 - [x] Paso 0 — el proyecto corre en local (83/83 tests, tipos, lint y build verdes).
 - [x] Paso 1 — `ADMIN_SESSION_SECRET`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` en Vercel
       (ya estaban) + código endurecido para fallar cerrado.
-- [ ] Paso 2 — llaves `WOMPI_*` en Vercel ✅ (13-sep-2026) · migración 0003 en
-      Supabase ☐ · `PAGOS_ALERT_EMAIL` ☐ · pago de prueba ☐ · URL de Eventos en
-      Wompi ☐ (solo cuando el otro sitio tenga su cuenta).
+- [ ] Paso 2 — llaves `WOMPI_*` en Vercel ✅ · migración 0003 en Supabase ✅ ·
+      `PAGOS_ALERT_EMAIL` ✅ · desplegado y verificado ✅ (13-sep-2026) ·
+      **pago de prueba real ☐** · URL de Eventos en Wompi ☐ (solo cuando el
+      otro sitio tenga su cuenta).
 - [x] Paso 3 — precios y textos revisados (todos salen de `plans.ts`; la
       descripción SEO ya no repite el precio a mano).
 - [x] Paso 4 — cambios en `main` y desplegados (verificado en producción).

@@ -16,10 +16,10 @@
 - **Llaves de Wompi cargadas** en Vercel (pública, integridad, eventos y
   privada). Con el siguiente despliegue los planes cobran en línea.
 - **Pagos endurecidos.** El webhook ya no rechaza los reintentos de Wompi,
-  persiste cada evento en Supabase (tablas `pagos_referencias` y
-  `pagos_eventos`, migración `0003_pagos.sql`, **hay que aplicarla en el SQL
-  Editor**), confirma estado/referencia/monto contra la API de Wompi y nunca
-  avisa "pago aprobado" por referencias que no sean de CIC.
+  persiste cada evento en Supabase (tablas `pagos_referencias`, `pagos_eventos`
+  y `pagos_avisos`, migración `0003_pagos.sql` ya aplicada), confirma
+  estado/referencia/monto contra la API de Wompi y nunca avisa "pago aprobado"
+  por referencias que no sean de CIC.
 - **Confirmación por la página de retorno.** Al volver del widget la página
   consulta la transacción y muestra el estado real (aprobado / pendiente /
   rechazado) y dispara el aviso al negocio, sin depender del webhook.
@@ -204,8 +204,9 @@ cobrar de verdad). El archivo `.env.example` lista todas las variables.
 - [x] Cargar `WOMPI_PUBLIC_KEY`, `WOMPI_INTEGRITY_SECRET`, `WOMPI_EVENTS_SECRET` en Vercel (CIC). *(13-sep-2026)*
 - [x] `WOMPI_PRIVATE_KEY` (ahora obligatoria: la API es la fuente de verdad). *(13-sep-2026)*
 - [x] **`RESEND_API_KEY`** y `LEADS_NOTIFICATION_EMAIL`. *(13-sep-2026)*
-- [ ] Aplicar la migración `supabase/migrations/0003_pagos.sql` en el SQL Editor de Supabase.
-- [ ] Cargar `PAGOS_ALERT_EMAIL` en Vercel (correo operativo, no el del cliente).
+- [x] Aplicar la migración `supabase/migrations/0003_pagos.sql` en el SQL Editor de Supabase. *(13-sep-2026)*
+- [x] Cargar `PAGOS_ALERT_EMAIL` en Vercel (`cic.inmuebles@gmail.com`, decisión del negocio). *(13-sep-2026)*
+- [x] `RESEND_FROM="CIC Inmuebles <notificaciones@cicinmuebles.com>"` (dominio verificado en Resend). *(13-sep-2026)*
 - [ ] Registrar el webhook `…/api/pagos/wompi/webhook` en Wompi — **solo cuando el otro
       sitio que usa la cuenta tenga la suya** (ver planes de acción del 13-sep-2026).
 - [ ] Redesplegar y hacer un pago de prueba de $10.000; comprobar que la página de
