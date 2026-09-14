@@ -198,14 +198,14 @@ export async function confirmFromRedirect(
   txId: string,
   reference: string,
   deps: ProcessDeps = defaultDeps(),
-): Promise<{ found: false } | { found: true; status: string; reference: string }> {
+): Promise<{ found: false } | { found: true; status: string; reference: string; amountInCents?: number }> {
   if (!WOMPI_TX_ID.test(txId) || !CIC_REFERENCE.test(reference)) return { found: false };
   try {
     const tx = await deps.fetchTransaction(txId);
     if (!tx || tx.reference !== reference) return { found: false };
     const r = await processTransaction(txId, { source: "redirect", tx }, deps);
     if (r.outcome === "store_error") return { found: false };
-    return { found: true, status: tx.status, reference: tx.reference };
+    return { found: true, status: tx.status, reference: tx.reference, amountInCents: tx.amountInCents };
   } catch (err) {
     console.error(`[pago] confirmación por retorno falló para ${txId}:`, describe(err));
     return { found: false };

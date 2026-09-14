@@ -11,17 +11,23 @@
 
 export type PlanAudience = "agente" | "propietario";
 export type PlanMode = "pago" | "contacto";
+/** Eje de decisión de la página de planes: cobro por inmueble o por paquete de espacios. */
+export type PlanGrupo = "inmueble" | "mensual" | "anual";
 
 export interface Plan {
   id: string;
   audience: PlanAudience;
   /** "pago": se cobra en línea con Wompi. "contacto": precio variable → WhatsApp. */
   mode: PlanMode;
+  /** Grupo en el que se muestra dentro de la página de planes (solo planes de pago). */
+  grupo?: PlanGrupo;
   nombre: string;
   /** Precio en pesos (COP). En planes de contacto es un valor "desde". */
   precioCOP: number;
   /** Sufijo mostrado junto al precio, p. ej. "por inmueble · 90 días". */
   periodo: string;
+  /** Espacios activos (inmuebles publicados a la vez) que incluye un paquete. */
+  espacios?: number;
   /** true cuando el precio es un mínimo ("desde"). */
   desde?: boolean;
   resumen: string;
@@ -35,6 +41,7 @@ export const PLANS: Plan[] = [
     id: "alianza-90",
     audience: "agente",
     mode: "pago",
+    grupo: "inmueble",
     nombre: "Alianza por resultados",
     precioCOP: 10000,
     periodo: "por inmueble · 90 días",
@@ -52,6 +59,7 @@ export const PLANS: Plan[] = [
     id: "publicacion-1",
     audience: "agente",
     mode: "pago",
+    grupo: "inmueble",
     nombre: "Publicación independiente",
     precioCOP: 20000,
     periodo: "por inmueble · 30 días",
@@ -68,15 +76,17 @@ export const PLANS: Plan[] = [
     id: "paquete-5",
     audience: "agente",
     mode: "pago",
+    grupo: "mensual",
     nombre: "Paquete Mensual 5",
     precioCOP: 75000,
     periodo: "hasta 5 inmuebles · mes",
+    espacios: 5,
     resumen:
-      "Publicas tu inmueble en CIC como vitrina digital, pero atiendes tú a los interesados y conservas tu comisión. Inventario activo de hasta 5 inmuebles simultáneos, con reemplazo de los que se vendan o retiren. Equivale a $15.000 por espacio.",
+      "Cinco inmuebles publicados a la vez, atendidos por ti. Si vendes o retiras uno, lo reemplazas por otro sin pagar de nuevo.",
     incluye: [
-      "Ficha individual + hasta 10 fotografías de 5 inmuebles",
-      "Reemplazo de propiedades vendidas o retiradas",
+      "5 fichas individuales activas a la vez",
       "Hasta 10 fotografías por inmueble",
+      "Reemplazo de propiedades vendidas o retiradas",
       "Actualización de precios y disponibilidad",
       "Botón de contacto directo al agente",
     ],
@@ -85,25 +95,30 @@ export const PLANS: Plan[] = [
     id: "paquete-10",
     audience: "agente",
     mode: "pago",
+    grupo: "mensual",
     nombre: "Paquete Mensual 10",
     precioCOP: 150000,
     periodo: "hasta 10 inmuebles · mes",
+    espacios: 10,
     resumen:
-      "Inventario activo de hasta 10 inmuebles simultáneos, con rotación. Equivale a $15.000 por espacio.",
+      "Diez inmuebles publicados a la vez, atendidos por ti. Si vendes o retiras uno, lo reemplazas por otro sin pagar de nuevo.",
     incluye: [
-      "Ficha individual + hasta 10 fotografías de 10 inmuebles",
-      "Reemplazo de propiedades vendidas o retiradas",
+      "10 fichas individuales activas a la vez",
       "Hasta 10 fotografías por inmueble",
+      "Reemplazo de propiedades vendidas o retiradas",
       "Actualización de precios y disponibilidad",
+      "Botón de contacto directo al agente",
     ],
   },
   {
     id: "anual-5",
     audience: "agente",
     mode: "pago",
+    grupo: "anual",
     nombre: "Anual Aliado 5",
     precioCOP: 239900,
     periodo: "hasta 5 inmuebles · año",
+    espacios: 5,
     resumen:
       "Cinco espacios activos durante 12 meses, con rotación y atención prioritaria. Precio especial de lanzamiento.",
     incluye: [
@@ -117,9 +132,11 @@ export const PLANS: Plan[] = [
     id: "anual-10",
     audience: "agente",
     mode: "pago",
+    grupo: "anual",
     nombre: "Anual Aliado 10",
     precioCOP: 399900,
     periodo: "hasta 10 inmuebles · año",
+    espacios: 10,
     resumen:
       "Diez espacios activos durante 12 meses, con rotación y atención prioritaria. Precio especial de lanzamiento.",
     incluye: [

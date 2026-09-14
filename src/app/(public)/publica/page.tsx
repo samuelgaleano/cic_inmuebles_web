@@ -2,7 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Building2, Home as HomeIcon, Handshake } from "lucide-react";
 import { JsonLd } from "@/components/seo/json-ld";
+import { PLANS } from "@/lib/config/plans";
 import { siteConfig } from "@/lib/config/site";
+import { formatPrice } from "@/lib/utils/format";
+
+// Derivado del catálogo: si cambia la tarifa mínima, cambia aquí solo.
+const desdeCOP = Math.min(
+  ...PLANS.filter((p) => p.audience === "agente" && p.mode === "pago").map((p) => p.precioCOP),
+);
 
 export const metadata: Metadata = {
   title: "Publica tu inmueble · Trabaja con nosotros",
@@ -26,7 +33,7 @@ const opciones = [
     tag: "Soy agente o inmobiliaria",
     titulo: "Quiero publicar mis inmuebles",
     desc: "Publica tus propiedades en la vitrina de CIC. Elige entre alianza por resultados, publicación independiente o paquetes de varios inmuebles.",
-    resaltar: "Desde $10.000 · pago en línea",
+    resaltar: `Desde ${formatPrice(desdeCOP)} · pago en línea`,
   },
 ];
 
@@ -48,7 +55,7 @@ export default function PublicaPage() {
         <span className="inline-flex items-center gap-2 rounded-full bg-brand-50 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">
           <Handshake className="h-3.5 w-3.5" /> Trabaja con nosotros
         </span>
-        <h1 className="mt-5 text-4xl font-bold tracking-tight text-ink sm:text-5xl">
+        <h1 className="mt-5 text-balance text-4xl font-bold tracking-tight text-ink sm:text-5xl">
           Publica, promociona o vende tu inmueble con CIC
         </h1>
         <p className="mt-4 text-lg leading-relaxed text-muted">
@@ -67,7 +74,7 @@ export default function PublicaPage() {
             <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-600 text-white shadow-[0_10px_24px_-12px_rgba(7,162,118,0.7)] transition-transform duration-500 group-hover:scale-105">
               <o.icon className="h-6 w-6" />
             </span>
-            <p className="mt-5 text-xs font-semibold uppercase tracking-[0.16em] text-brand-600">{o.tag}</p>
+            <p className="mt-5 text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">{o.tag}</p>
             <h2 className="mt-1.5 text-xl font-bold tracking-tight text-ink">{o.titulo}</h2>
             <p className="mt-2 flex-1 text-sm leading-relaxed text-muted">{o.desc}</p>
             <div className="mt-5 flex items-center justify-between">

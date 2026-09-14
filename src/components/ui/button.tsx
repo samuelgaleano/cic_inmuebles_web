@@ -14,7 +14,8 @@ const variants: Record<Variant, string> = {
   outline:
     "border border-line bg-white text-ink hover:border-brand-300 hover:bg-brand-50 hover:text-brand-800",
   ghost: "text-ink hover:bg-brand-50 hover:text-brand-800",
-  whatsapp: "bg-[#25D366] text-white shadow-[0_10px_26px_-12px_rgba(37,211,102,0.9)] hover:bg-[#1ebe5d]",
+  // Tinta sobre el verde de WhatsApp: ~9:1 de contraste (blanco daba ~2:1).
+  whatsapp: "bg-[#25D366] text-ink shadow-[0_10px_26px_-12px_rgba(37,211,102,0.9)] hover:bg-[#1ebe5d]",
 };
 
 const sizes: Record<Size, string> = {

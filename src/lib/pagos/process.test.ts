@@ -200,7 +200,8 @@ describe("confirmFromRedirect", () => {
   it("devuelve el estado real cuando id y referencia coinciden", async () => {
     const d = deps();
     const r = await confirmFromRedirect(APROBADA.id, APROBADA.reference, d);
-    expect(r).toEqual({ found: true, status: "APPROVED", reference: APROBADA.reference });
+    // El monto que se muestra al usuario es el que Wompi cobró, no el del catálogo.
+    expect(r).toEqual({ found: true, status: "APPROVED", reference: APROBADA.reference, amountInCents: 1_000_000 });
     expect(d.sendPaymentNotification).toHaveBeenCalledTimes(1);
     expect(d.fetchTransaction).toHaveBeenCalledTimes(1);
   });

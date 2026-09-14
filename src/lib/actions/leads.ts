@@ -39,12 +39,31 @@ const leadSchema = z.object({
   website: z.string().max(0).optional(),
 });
 
+/** Campos visibles que se devuelven en el estado de error para repoblar el formulario. */
+const VISIBLE_FIELDS = ["nombre", "telefono", "email", "ciudad", "tipoInmueble", "preferencia", "mensaje"] as const;
+export type LeadFieldName = (typeof VISIBLE_FIELDS)[number];
+
 export interface LeadFormState {
   status: "idle" | "success" | "error";
   message?: string;
   errors?: Record<string, string>;
+  /**
+   * Lo que el usuario escribió, solo en estado de error. React 19 vacía los
+   * campos no controlados al terminar una acción; sin esto, un teléfono mal
+   * escrito obliga a reescribir todo el formulario.
+   */
+  values?: Partial<Record<LeadFieldName, string>>;
   /** Enlace wa.me prellenado para continuar la conversación (click-to-chat). */
   whatsappUrl?: string;
+}
+
+function visibleValues(raw: Record<string, FormDataEntryValue>): LeadFormState["values"] {
+  const values: Partial<Record<LeadFieldName, string>> = {};
+  for (const key of VISIBLE_FIELDS) {
+    const v = raw[key];
+    if (typeof v === "string" && v !== "") values[key] = v;
+  }
+  return values;
 }
 
 /** Construye el enlace de WhatsApp (click-to-chat) con el resumen del lead. */
@@ -94,8 +113,9 @@ export async function createLeadAction(
     }
     return {
       status: "error",
-      message: "Revisa los datos del formulario.",
+      message: "Revisa los datos marcados.",
       errors,
+      values: visibleValues(raw),
     };
   }
 
@@ -130,6 +150,7 @@ export async function createLeadAction(
     return {
       status: "error",
       message: "No pudimos registrar tu solicitud. Intenta de nuevo o escríbenos por WhatsApp.",
+      values: visibleValues(raw),
     };
   }
 

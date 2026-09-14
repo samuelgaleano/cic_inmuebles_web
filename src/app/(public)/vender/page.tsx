@@ -58,20 +58,43 @@ export default function VenderPage() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
       <JsonLd data={faqJsonLd} />
-      <div className="grid gap-10 lg:grid-cols-2">
-        <div>
-          <span className="inline-flex items-center gap-2 rounded-full bg-brand-50 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">
-            Para propietarios
-          </span>
-          <h1 className="mt-5 text-4xl font-bold tracking-tight text-ink sm:text-5xl">
-            Vende tu inmueble sin complicaciones
-          </h1>
-          <p className="mt-4 text-lg leading-relaxed text-muted">
-            Déjanos los datos y un asesor te contactará. Nosotros nos encargamos del
-            resto para que vendas de forma rápida y segura.
-          </p>
+      <header className="max-w-2xl">
+        <span className="inline-flex items-center gap-2 rounded-full bg-brand-50 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">
+          Para propietarios
+        </span>
+        <h1 className="mt-5 text-balance text-4xl font-bold tracking-tight text-ink sm:text-5xl">
+          Vende tu inmueble sin complicaciones
+        </h1>
+        <p className="mt-4 text-lg leading-relaxed text-muted">
+          Déjanos los datos y un asesor te contactará. Nosotros nos encargamos del
+          resto para que vendas de forma rápida y segura.
+        </p>
+      </header>
 
-          <div className="mt-6 rounded-2xl border border-brand-200 bg-brand-50/60 p-5">
+      {/*
+        El formulario va primero en el DOM: en móvil aparece justo después del
+        titular (antes quedaba al final de una página de 4.500 px). En escritorio
+        se muestra a la derecha y se queda pegado solo si el viewport es lo
+        bastante alto para verlo entero (en portátiles bajos fluye con la página).
+      */}
+      <div className="mt-8 grid gap-10 lg:mt-10 lg:grid-cols-2 lg:items-start">
+        <div className="lg:order-2 lg:pl-6">
+          <div
+            id="formulario"
+            className="scroll-mt-24 rounded-[1.6rem] border border-line bg-white p-6 shadow-[0_20px_50px_-30px_rgba(11,26,21,0.4)] sm:p-7 lg:top-24 lg:[@media(min-height:800px)]:sticky"
+          >
+            <h2 className="text-xl font-bold tracking-tight text-ink">Cuéntanos sobre tu inmueble</h2>
+            <p className="mt-1 text-sm text-muted">
+              Solo necesitamos lo básico para contactarte. Toma menos de un minuto.
+            </p>
+            <div className="mt-5">
+              <LeadForm tipo="vendedor" variant="vendedor" submitLabel="Quiero vender mi inmueble" />
+            </div>
+          </div>
+        </div>
+
+        <div className="lg:order-1">
+          <div className="rounded-2xl border border-brand-200 bg-brand-50/60 p-5">
             <p className="text-sm leading-relaxed text-ink-soft">
               <strong className="text-ink">Sin costo inicial.</strong> Nos convertimos en tu
               agencia inmobiliaria de cabecera: si quieres, tomamos fotos y videos de tu inmueble
@@ -118,18 +141,6 @@ export default function VenderPage() {
               ))}
             </div>
           </section>
-        </div>
-
-        <div className="lg:pl-6">
-          <div className="rounded-[1.6rem] border border-line bg-white p-6 shadow-[0_20px_50px_-30px_rgba(11,26,21,0.4)] lg:sticky lg:top-24 sm:p-7">
-            <h2 className="text-xl font-bold tracking-tight text-ink">Cuéntanos sobre tu inmueble</h2>
-            <p className="mt-1 text-sm text-muted">
-              Solo necesitamos lo básico para contactarte. Toma menos de un minuto.
-            </p>
-            <div className="mt-5">
-              <LeadForm tipo="vendedor" variant="vendedor" submitLabel="Quiero vender mi inmueble" />
-            </div>
-          </div>
         </div>
       </div>
     </div>

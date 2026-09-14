@@ -38,7 +38,6 @@
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 
   --ease-fluid: cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 :root {
@@ -69,6 +68,20 @@ h3 {
 ::selection {
   background: var(--color-brand-200);
   color: var(--color-ink);
+}
+
+/* Superficies del navegador que también llevan la marca: placeholder legible
+   (5.2:1 sobre surface; el default de Tailwind quedaba en 3.4:1), caret y
+   controles nativos en esmeralda. */
+::placeholder {
+  color: var(--color-muted);
+  opacity: 1;
+}
+input,
+textarea,
+select {
+  caret-color: var(--color-brand-600);
+  accent-color: var(--color-brand-600);
 }
 
 /* Línea de recorte para descripciones en tarjetas */
@@ -165,6 +178,15 @@ h3 {
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
+  }
+  /* Cubre también las utilidades de Tailwind (hover:-translate-y-1, active:scale…)
+     que el bloque de abajo no alcanza: el cambio ocurre, pero sin animarse. */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
   .reveal,
   .animate-rise,
