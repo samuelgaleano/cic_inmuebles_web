@@ -23,8 +23,10 @@ export const siteConfig = {
     "Apartamentos en venta en el norte de Bogotá, visitados y verificados por nosotros. Te ayudamos a vender tu inmueble: fotos profesionales, visitas y negociación, con respuesta directa por WhatsApp.",
   url: siteUrl,
 
-  // Contacto público (número fijo del negocio, igual en toda la página)
-  email: process.env.NEXT_PUBLIC_CONTACT_EMAIL ?? "cc.inmuebles@gmail.com",
+  // Contacto público (número fijo del negocio, igual en toda la página).
+  // Mismo correo que la tarjeta del negocio, ADMIN_EMAIL y los avisos de
+  // leads/pagos (antes decía "cc.inmuebles@gmail.com" por un typo de una letra).
+  email: process.env.NEXT_PUBLIC_CONTACT_EMAIL ?? "cic.inmuebles@gmail.com",
   // WhatsApp: formato internacional sin "+", solo dígitos (para enlaces wa.me)
   whatsapp: "573249071717",
   // Enlace de llamada (tel:) en formato internacional con "+"

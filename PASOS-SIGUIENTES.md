@@ -194,7 +194,7 @@ personales (Ley 1581 de 2012) y arréglalo antes de seguir vendiendo.
 - [ ] (Opcional) Revisar dos variables que ya no lee ningún código y solo
       confunden: `NEXT_PUBLIC_WHATSAPP` y `NEXT_PUBLIC_SUPABASE_ANON_KEY`. El
       teléfono y el dominio están fijos en `src/lib/config/site.ts`.
-- [ ] (Comprobar) El sitio público muestra `cc.inmuebles@gmail.com` (footer y
+- [x] (Comprobar) El sitio público mostraba `cc.inmuebles@gmail.com` (footer y
       contacto) mientras que la tarjeta del negocio y `ADMIN_EMAIL` dicen
-      `cic.inmuebles@gmail.com`. Confirmar cuál es el correo público correcto y
-      corregir `src/lib/config/site.ts` si hace falta.
+      `cic.inmuebles@gmail.com`. Confirmado con Samuel: era un typo de una
+      letra. Corregido en `src/lib/config/site.ts` y desplegado (14-sep-2026).
