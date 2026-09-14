@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
-import { cache, Suspense } from "react";
+import Link from "next/link";
+import { Suspense } from "react";
 import { PropertyFilters } from "@/components/public/property-filters";
 import { PropertyGrid } from "@/components/public/property-grid";
 import { Pagination } from "@/components/public/pagination";
 import { JsonLd } from "@/components/seo/json-ld";
 import { propertyUrl, siteConfig } from "@/lib/config/site";
 import { getRepository } from "@/lib/data";
+import { getPublicInventory } from "@/lib/data/public-inventory";
 import {
   PROPERTY_STATUSES,
   PROPERTY_TYPES,
@@ -14,21 +16,11 @@ import {
   type PropertyType,
   type PublicProperty,
 } from "@/lib/domain";
+import { agruparPorSector, sectorPath } from "@/lib/seo/sectores";
 import { titularInventario } from "@/lib/seo/titular";
 
-// Inventario completo (sin filtros) una sola vez por petición: alimenta el
-// <title>, el H1 y la descripción, que no cambian cuando el usuario filtra.
-const cargarInventario = cache(async (): Promise<PublicProperty[]> => {
-  try {
-    return await getRepository().properties.listPublic();
-  } catch (err) {
-    console.error("[inmuebles] error al cargar inventario:", err);
-    return [];
-  }
-});
-
 export async function generateMetadata(): Promise<Metadata> {
-  const t = titularInventario(await cargarInventario());
+  const t = titularInventario(await getPublicInventory());
   const donde = t.sectores.length > 0 ? `${t.lugar}: ${t.sectores.slice(0, 5).join(", ")}` : t.lugar;
   return {
     title: t.titulo,
@@ -95,12 +87,13 @@ export default async function InmueblesPage({
     [all, cities, todos] = await Promise.all([
       repo.properties.listPublic(filters),
       repo.properties.listCities(),
-      cargarInventario(),
+      getPublicInventory(),
     ]);
   } catch (err) {
     console.error("[inmuebles] error al cargar catálogo:", err);
   }
   const titular = titularInventario(todos);
+  const sectores = agruparPorSector(todos);
 
   const sorted = applySort(all, orden);
   const total = sorted.length;
@@ -134,13 +127,24 @@ export default async function InmueblesPage({
         <h1 className="mt-2 text-balance text-3xl font-bold tracking-tight text-ink sm:text-4xl">{titular.titulo}</h1>
         <p className="mt-2 text-muted">
           <span className="font-semibold text-ink">{total}</span> inmueble{total === 1 ? "" : "s"} disponible{total === 1 ? "" : "s"}
-          {titular.sectores.length > 0 && (
-            <>
-              {" "}· {titular.sectores.slice(0, 6).join(", ")}
-              {titular.sectores.length > 6 ? " y más" : ""}
-            </>
-          )}
         </p>
+        {sectores.length > 0 && (
+          <nav className="mt-4" aria-label="Sectores">
+            <ul className="flex flex-wrap gap-2">
+              {sectores.map((s) => (
+                <li key={s.slug}>
+                  <Link
+                    href={sectorPath(s)}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3.5 py-1.5 text-sm font-medium text-ink transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-800"
+                  >
+                    {s.nombre}
+                    <span className="text-xs text-muted">{s.inmuebles.length}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        )}
       </header>
 
       <div className="mb-8">

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { normalizarInmueble } from "@/lib/domain/normalizar";
 import {
   toPublicProperty,
   type Agent,
@@ -89,14 +90,14 @@ class MemoryPropertyRepository implements PropertyRepository {
   async create(input: PropertyInput): Promise<Property> {
     const now = new Date().toISOString();
     const slug = this.uniqueSlug(input.slug ? slugify(input.slug) : slugify(input.titulo));
-    const property: Property = {
+    const property: Property = normalizarInmueble({
       ...input,
       id: randomUUID(),
       codigo: input.codigo ?? this.nextCodigo(),
       slug,
       creadoEn: now,
       actualizadoEn: now,
-    };
+    });
     this.properties.unshift(property);
     return property;
   }
@@ -110,7 +111,7 @@ class MemoryPropertyRepository implements PropertyRepository {
       : patch.titulo
         ? this.uniqueSlug(slugify(patch.titulo), id)
         : prev.slug;
-    const updated: Property = {
+    const updated: Property = normalizarInmueble({
       ...prev,
       ...patch,
       slug,
@@ -118,7 +119,7 @@ class MemoryPropertyRepository implements PropertyRepository {
       codigo: patch.codigo ?? prev.codigo,
       creadoEn: prev.creadoEn,
       actualizadoEn: new Date().toISOString(),
-    };
+    });
     this.properties[idx] = updated;
     return updated;
   }

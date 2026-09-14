@@ -20,8 +20,9 @@ import { HeroPov } from "@/components/public/hero-pov";
 import { HeroSellCta } from "@/components/public/hero-sell-cta";
 import { JsonLd } from "@/components/seo/json-ld";
 import { PortfolioExpand } from "@/components/public/portfolio-expand";
-import { getRepository } from "@/lib/data";
+import { getPublicInventory } from "@/lib/data/public-inventory";
 import { getCoverMedia, PROPERTY_TYPE_LABELS } from "@/lib/domain";
+import { agruparPorSector, sectorPath } from "@/lib/seo/sectores";
 import { titularInventario } from "@/lib/seo/titular";
 import { formatPrice, formatPriceCompact } from "@/lib/utils/format";
 import { propertyUrl, siteConfig } from "@/lib/config/site";
@@ -45,22 +46,16 @@ function listaSectores(sectores: string[], max = 4): string {
 export const revalidate = 3600;
 
 export default async function HomePage() {
-  const repo = getRepository();
-  let vitrina: Awaited<ReturnType<typeof repo.properties.listPublic>> = [];
-  let todos: typeof vitrina = [];
-  try {
-    // Disponibles primero, luego en proceso y vendidos (orden del repositorio).
-    todos = await repo.properties.listPublic();
-    vitrina = todos.slice(0, 12);
-  } catch (err) {
-    console.error("[home] no se pudo cargar el catálogo:", err);
-  }
+  // Disponibles primero, luego en proceso y vendidos (orden del repositorio).
+  const todos = await getPublicInventory();
+  const vitrina = todos.slice(0, 12);
   const total = todos.length;
 
   // El titular sale de lo que hay publicado: hoy "Apartamentos en venta en
   // Bogotá"; si entra una casa o un inmueble de otra ciudad, se ensancha solo.
   const titular = titularInventario(todos);
   const sectores = listaSectores(titular.sectores);
+  const sectoresHome = agruparPorSector(todos);
 
   // Fondo fijo del hero: imagen de marca optimizada (local, sin dependencias).
   const heroBg = "/hero.jpg";
@@ -221,6 +216,26 @@ export default async function HomePage() {
               </Link>
             </div>
           </Reveal>
+
+          {sectoresHome.length > 0 && (
+            <Reveal>
+              <nav className="mt-6" aria-label="Sectores">
+                <ul className="flex flex-wrap gap-2">
+                  {sectoresHome.map((s) => (
+                    <li key={s.slug}>
+                      <Link
+                        href={sectorPath(s)}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3.5 py-1.5 text-sm font-medium text-ink transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-800"
+                      >
+                        {s.tipos} en {s.nombre}
+                        <span className="text-xs text-muted">{s.inmuebles.length}</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </nav>
+            </Reveal>
+          )}
 
           <div className="mt-10">
             {vitrina.length > 0 ? (

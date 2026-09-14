@@ -12,7 +12,7 @@ import type {
   Template,
   TemplateInput,
 } from "@/lib/domain";
-import { formatLugar } from "@/lib/utils/lugar";
+import { normalizarInmueble } from "@/lib/domain/normalizar";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -36,7 +36,9 @@ export function propertyRowToDomain(row: any): Property {
     .map(mediaRowToDomain)
     .sort((a: PropertyMedia, b: PropertyMedia) => a.order - b.order);
 
-  return {
+  // Lo ya guardado con errores de digitación ("BogotÁ", "BELLA SUIZA") se
+  // corrige al leer: ver src/lib/domain/normalizar.ts.
+  return normalizarInmueble({
     id: row.id,
     codigo: row.codigo,
     slug: row.slug,
@@ -45,11 +47,9 @@ export function propertyRowToDomain(row: any): Property {
     estado: row.estado,
     precio: Number(row.precio),
     administracion: row.administracion ?? undefined,
-    // Ciudad y sector se corrigen al leer ("BogotÁ", "BELLA SUIZA" llegan así
-    // del Sheet): terminan en el <title>, el H1 y el JSON-LD de la ficha.
     ubicacion: {
-      ciudad: formatLugar(row.ciudad) ?? "",
-      sector: formatLugar(row.sector) || undefined,
+      ciudad: row.ciudad,
+      sector: row.sector ?? undefined,
       conjunto: row.conjunto ?? undefined,
       direccion: row.direccion ?? undefined,
     },
@@ -74,11 +74,13 @@ export function propertyRowToDomain(row: any): Property {
     publicado: Boolean(row.publicado),
     creadoEn: row.created_at,
     actualizadoEn: row.updated_at,
-  };
+  });
 }
 
 /** PropertyInput -> fila de `properties` (sin medios, que van aparte). */
-export function propertyInputToRow(input: PropertyInput): Record<string, unknown> {
+export function propertyInputToRow(entrada: PropertyInput): Record<string, unknown> {
+  // Se guarda ya corregido: cubre el panel admin y la importación desde Drive.
+  const input = normalizarInmueble(entrada);
   return {
     titulo: input.titulo,
     tipo: input.tipo,

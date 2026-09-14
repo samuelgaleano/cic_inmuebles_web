@@ -25,6 +25,7 @@ import {
   type PropertyStatus,
   type PropertyType,
 } from "@/lib/domain";
+import { formatLugar, formatNombre } from "@/lib/utils/lugar";
 
 export interface DriveImportState {
   ran?: boolean;
@@ -60,35 +61,15 @@ function parseNum(v?: string): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
-const CITY_FIX: Record<string, string> = {
-  bogota: "Bogotá",
-  "bogota dc": "Bogotá",
-  "bogota d.c.": "Bogotá",
-  medellin: "Medellín",
-  cali: "Cali",
-  barranquilla: "Barranquilla",
-  cartagena: "Cartagena",
-  bucaramanga: "Bucaramanga",
-  cucuta: "Cúcuta",
-  pereira: "Pereira",
-  manizales: "Manizales",
-  ibague: "Ibagué",
-  "santa marta": "Santa Marta",
-  villavicencio: "Villavicencio",
-  armenia: "Armenia",
-  pasto: "Pasto",
-  neiva: "Neiva",
-  monteria: "Montería",
-  popayan: "Popayán",
-  "la calera": "La Calera",
-  chia: "Chía",
-  soacha: "Soacha",
-};
-
-function normalizeCity(name: string): string {
-  const key = name.trim().toLowerCase();
-  if (CITY_FIX[key]) return CITY_FIX[key];
-  return name.trim().replace(/\b\p{L}/gu, (c) => c.toUpperCase());
+/**
+ * Ciudad tal como viene de la carpeta o la ficha de Drive. Delegado al
+ * formato único del catálogo (tildes de ciudades conocidas, mayúsculas).
+ * Antes capitalizaba con límite de palabra + letra y, como ese límite en
+ * JavaScript es ASCII, veía uno antes de la "á": "Bogotá" salía "BogotÁ"
+ * en todas las fichas.
+ */
+export function normalizeCity(name: string): string {
+  return formatLugar(name) ?? "";
 }
 
 function estadoFromFolderName(name: string): PropertyStatus | undefined {
@@ -98,14 +79,18 @@ function estadoFromFolderName(name: string): PropertyStatus | undefined {
   return undefined;
 }
 
-function cleanTitle(raw: string): string {
+export function cleanTitle(raw: string): string {
   const t = raw
     .replace(/[_]+/g, " ")
     .replace(/\s*-\s*/g, " ")
     .replace(/\?+/g, "")
     .replace(/\s+/g, " ")
     .trim();
-  return t.replace(/\b\p{L}/gu, (c) => c.toUpperCase());
+  // La misma regla que el resto del catálogo (panel, lectura de Supabase):
+  // conserva siglas y mayúsculas internas ("Edificio BBVA") y solo corrige lo
+  // claramente mal digitado. Antes llamaba a `titulo()` directo, que baja a
+  // minúscula todo lo bien escrito con un resultado distinto al del panel.
+  return formatNombre(t) ?? "";
 }
 
 const IGNORE_RE = /seguimiento|plantilla|template|^\s*info\b|no.?importar|papelera|respaldo|backup/i;

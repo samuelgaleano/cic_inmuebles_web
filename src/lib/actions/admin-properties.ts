@@ -27,6 +27,10 @@ function revalidatePublic(slug?: string) {
   revalidatePath("/");
   revalidatePath("/inmuebles");
   if (slug) revalidatePath(`/inmuebles/${slug}`);
+  // Cambiar sector, ciudad o estado (vendido) mueve el conteo y la
+  // indexabilidad de la página de sector; sin esto queda hasta 1h desfasada
+  // (su `revalidate = 3600`) y puede seguir enlazando una ficha ya cambiada.
+  revalidatePath("/inmuebles/sector/[sector]", "page");
   revalidatePath("/admin/inmuebles");
 }
 

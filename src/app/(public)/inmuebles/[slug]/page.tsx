@@ -15,6 +15,8 @@ import {
 } from "@/lib/domain";
 import { formatArea, formatPrice } from "@/lib/utils/format";
 import { propertyUrl, siteConfig } from "@/lib/config/site";
+import { getPublicInventory } from "@/lib/data/public-inventory";
+import { agruparPorSector, encontrarSector, sectorPath } from "@/lib/seo/sectores";
 
 // Estado del inmueble → disponibilidad schema.org ("en_proceso" NO es InStock).
 const SCHEMA_AVAILABILITY: Record<PropertyStatus, string> = {
@@ -128,6 +130,11 @@ export default async function PropertyDetailPage({
   const { slug } = await params;
   const property = await getRepository().properties.getPublicBySlug(slug);
   if (!property) notFound();
+
+  // El grupo de sector exacto de este inmueble (mismo slug, así que sin
+  // ambigüedad de nombre ni de ciudad), para enlazar a la URL real que
+  // agruparPorSector generó — incluida la desambiguada por colisión.
+  const sector = encontrarSector(agruparPorSector(await getPublicInventory()), property);
 
   const images = property.medios.filter((m) => m.type === "image");
   const video = property.medios.find((m) => m.type === "video");
@@ -246,8 +253,19 @@ export default async function PropertyDetailPage({
               </h1>
               {ubicacionTexto && (
                 <p className="mt-1.5 flex items-center gap-1.5 text-muted">
-                  <MapPin className="h-4 w-4 text-brand-500" />
-                  {ubicacionTexto}
+                  <MapPin className="h-4 w-4 flex-none text-brand-500" aria-hidden="true" />
+                  {sector ? (
+                    // Un solo nodo de texto: el gap del flex solo separa el icono, no la coma de la ciudad.
+                    <span>
+                      {/* Enlace interno a la página del sector: le da a Google el contexto "apartamentos en X". */}
+                      <Link href={sectorPath(sector)} className="font-medium text-ink-soft underline-offset-4 hover:text-brand-700 hover:underline">
+                        {sector.nombre}
+                      </Link>
+                      {ubicacion.ciudad ? `, ${ubicacion.ciudad}` : ""}
+                    </span>
+                  ) : (
+                    <span>{ubicacionTexto}</span>
+                  )}
                 </p>
               )}
             </div>

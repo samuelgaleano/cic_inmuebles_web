@@ -12,5 +12,6 @@ export async function importPropertiesFromDriveAction(
   revalidatePath("/admin/inmuebles");
   revalidatePath("/");
   revalidatePath("/inmuebles");
+  revalidatePath("/inmuebles/sector/[sector]", "page");
   return result;
 }

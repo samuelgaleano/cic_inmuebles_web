@@ -20,6 +20,8 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const GOOGLE_SITE_VERIFICATION = "9wOGF6QxQDsYkPkneIlNQL-rvF7H8gkZu2PYkLaVO0w";
+
 const fullTitle = `${siteConfig.name} — ${siteConfig.tagline}`;
 
 // Nota: no definimos `twitter` porque Next lo deriva automáticamente del
@@ -31,6 +33,9 @@ export const metadata: Metadata = {
     template: `%s | ${siteConfig.name}`,
   },
   description: siteConfig.description,
+  // Search Console (propiedad de prefijo https://www.cicinmuebles.com/),
+  // verificada con la cuenta de CIC. Token público: sale en el HTML.
+  verification: { google: GOOGLE_SITE_VERIFICATION },
   keywords: [
     "apartamentos en venta en Bogotá",
     "apartamentos en venta norte de Bogotá",

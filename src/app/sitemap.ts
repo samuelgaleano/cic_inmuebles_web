@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 import { getRepository } from "@/lib/data";
 import type { PublicProperty } from "@/lib/domain";
 import { propertyUrl, siteConfig } from "@/lib/config/site";
+import { agruparPorSector, sectorPath } from "@/lib/seo/sectores";
 
 // Si Supabase falla justo durante un build, el sitemap quedaría congelado
 // solo con las rutas estáticas hasta el siguiente deploy; con revalidación
@@ -43,5 +44,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.8,
   }));
 
-  return [...staticRoutes, ...propertyRoutes];
+  // Páginas por sector: solo las que entran al índice (ver seo/sectores.ts).
+  const sectorRoutes: MetadataRoute.Sitemap = agruparPorSector(properties)
+    .filter((s) => s.indexable)
+    .map((s) => ({
+      url: `${base}${sectorPath(s)}`,
+      lastModified: s.inmuebles.map((p) => p.actualizadoEn).filter(Boolean).sort().at(-1),
+      changeFrequency: "weekly",
+      priority: 0.7,
+    }));
+
+  return [...staticRoutes, ...sectorRoutes, ...propertyRoutes];
 }
