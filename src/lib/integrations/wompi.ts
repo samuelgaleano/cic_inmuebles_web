@@ -133,10 +133,15 @@ export function appUrl(): string {
   return (process.env.APP_URL ?? siteConfig.url).replace(/\/+$/, "");
 }
 
+// PORTABLE A OTRO COMERCIO: cambia "CIC" por el prefijo del nuevo negocio
+// (p. ej. "FYC" para Fly & Chill) aquí y en `CIC_REFERENCE` de
+// `src/lib/pagos/process.ts`. Ver docs/2026-09-14-wompi-nuevo-comercio.md.
+const REFERENCE_PREFIX = "CIC";
+
 /** Referencia única de la transacción, legible en el panel de Wompi. */
 export function buildReference(planId: string): string {
   const rand = Math.floor(100000 + Math.random() * 900000);
-  return `CIC-${planId}-${rand}-${Date.now()}`;
+  return `${REFERENCE_PREFIX}-${planId}-${rand}-${Date.now()}`;
 }
 
 /**
@@ -146,7 +151,7 @@ export function buildReference(planId: string): string {
  */
 export function planIdFromReference(reference: string): string | undefined {
   const parts = reference.split("-");
-  if (parts.length < 4 || parts[0] !== "CIC") return undefined;
+  if (parts.length < 4 || parts[0] !== REFERENCE_PREFIX) return undefined;
   return parts.slice(1, -2).join("-");
 }
 

@@ -45,6 +45,10 @@ export async function sendPaymentNotification(p: PaymentNotice): Promise<boolean
   });
 }
 
+// PORTABLE A OTRO COMERCIO: solo la etiqueta del asunto identifica de qué
+// sitio viene la alerta — cámbiala por el nombre del nuevo negocio.
+const ALERT_TAG = "CIC pagos";
+
 /**
  * Alerta operativa para Pixies (no para el cliente): referencias sin destino,
  * montos que no cuadran, Resend caído, pendientes en la reconciliación.
@@ -55,5 +59,5 @@ export async function sendPagosAlert(subject: string, text: string): Promise<boo
     console.warn(`[pago] alerta no enviada: falta PAGOS_ALERT_EMAIL (${subject.slice(0, 60)})`);
     return false;
   }
-  return sendEmail({ to, subject: `[CIC pagos] ${subject}`, text });
+  return sendEmail({ to, subject: `[${ALERT_TAG}] ${subject}`, text });
 }

@@ -185,6 +185,10 @@ async function notifyOnce(tx: WompiTransaction, c: Classified & { estado: "ok" |
   return sent;
 }
 
+// PORTABLE A OTRO COMERCIO: mismo prefijo que `REFERENCE_PREFIX` de
+// src/lib/integrations/wompi.ts (deliberadamente literal, no vía env var: un
+// comercio nuevo copia este archivo a SU repo y pone SU prefijo aquí, no
+// comparte deploy con otros — ver docs/2026-09-14-wompi-nuevo-comercio.md).
 /** Referencias que emite CIC: CIC-<planId>-<6 dígitos>-<timestamp>. */
 const CIC_REFERENCE = /^CIC-[a-z0-9-]{1,40}-\d{6}-\d{10,16}$/;
 
