@@ -14,9 +14,13 @@ const siteUrl = "https://www.cicinmuebles.com";
 
 export const siteConfig = {
   name: "CIC Inmuebles",
-  tagline: "Apartamentos y casas en venta en Colombia",
+  // Posicionamiento del sitio: lo que CIC vende hoy (apartamentos en el norte
+  // de Bogotá), no "toda Colombia". Alimenta el <title> por defecto, Open
+  // Graph y el JSON-LD. El H1 de la home y del catálogo se deriva del
+  // inventario real (src/lib/seo/titular.ts); esto es la voz fija de la marca.
+  tagline: "Apartamentos en venta en Bogotá",
   description:
-    "Encuentra apartamentos y casas en venta en Colombia. Te ayudamos a vender tu inmueble de forma rápida y segura: fotos profesionales, visitas y negociación, con respuesta directa por WhatsApp.",
+    "Apartamentos en venta en el norte de Bogotá, visitados y verificados por nosotros. Te ayudamos a vender tu inmueble: fotos profesionales, visitas y negociación, con respuesta directa por WhatsApp.",
   url: siteUrl,
 
   // Contacto público (número fijo del negocio, igual en toda la página)
@@ -27,7 +31,9 @@ export const siteConfig = {
   phone: "+573249071717",
   // Número tal como se muestra en pantalla
   phoneDisplay: "+57 324 907 1717",
-  city: "Colombia",
+  // Sede y cobertura principal (hero, contacto, footer). El inventario puede
+  // ir más allá; la ciudad única de lo publicado la calcula titularInventario.
+  city: "Bogotá",
 
   // Redes públicas del negocio. Fijas en código por la misma razón que el
   // teléfono y la URL: se alimentan al footer y al `sameAs` del JSON-LD.

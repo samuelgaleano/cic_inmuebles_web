@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import { Suspense } from "react";
+import { cache, Suspense } from "react";
 import { PropertyFilters } from "@/components/public/property-filters";
 import { PropertyGrid } from "@/components/public/property-grid";
 import { Pagination } from "@/components/public/pagination";
 import { JsonLd } from "@/components/seo/json-ld";
-import { propertyUrl } from "@/lib/config/site";
+import { propertyUrl, siteConfig } from "@/lib/config/site";
 import { getRepository } from "@/lib/data";
 import {
   PROPERTY_STATUSES,
@@ -14,13 +14,28 @@ import {
   type PropertyType,
   type PublicProperty,
 } from "@/lib/domain";
+import { titularInventario } from "@/lib/seo/titular";
 
-export const metadata: Metadata = {
-  title: "Inmuebles en venta",
-  description:
-    "Explora apartamentos y casas en venta en Bogotá y toda Colombia. Filtra por ciudad, tipo y precio, y agenda tu visita con CIC Inmuebles.",
-  alternates: { canonical: "/inmuebles" },
-};
+// Inventario completo (sin filtros) una sola vez por petición: alimenta el
+// <title>, el H1 y la descripción, que no cambian cuando el usuario filtra.
+const cargarInventario = cache(async (): Promise<PublicProperty[]> => {
+  try {
+    return await getRepository().properties.listPublic();
+  } catch (err) {
+    console.error("[inmuebles] error al cargar inventario:", err);
+    return [];
+  }
+});
+
+export async function generateMetadata(): Promise<Metadata> {
+  const t = titularInventario(await cargarInventario());
+  const donde = t.sectores.length > 0 ? `${t.lugar}: ${t.sectores.slice(0, 5).join(", ")}` : t.lugar;
+  return {
+    title: t.titulo,
+    description: `${t.tipos} en venta en ${donde}. Filtra por precio y características y agenda tu visita con ${siteConfig.name}.`.slice(0, 160),
+    alternates: { canonical: "/inmuebles" },
+  };
+}
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -75,14 +90,17 @@ export default async function InmueblesPage({
   const repo = getRepository();
   let all: PublicProperty[] = [];
   let cities: string[] = [];
+  let todos: PublicProperty[] = [];
   try {
-    [all, cities] = await Promise.all([
+    [all, cities, todos] = await Promise.all([
       repo.properties.listPublic(filters),
       repo.properties.listCities(),
+      cargarInventario(),
     ]);
   } catch (err) {
     console.error("[inmuebles] error al cargar catálogo:", err);
   }
+  const titular = titularInventario(todos);
 
   const sorted = applySort(all, orden);
   const total = sorted.length;
@@ -97,12 +115,12 @@ export default async function InmueblesPage({
       ? {
           "@context": "https://schema.org",
           "@type": "ItemList",
-          name: "Inmuebles en venta",
+          name: titular.titulo,
           numberOfItems: pageItems.length,
           itemListElement: pageItems.map((p, i) => ({
             "@type": "ListItem",
             position: (safePage - 1) * PAGE_SIZE + i + 1,
-            name: p.titulo,
+            name: [p.titulo, p.ubicacion.sector, p.ubicacion.ciudad].filter(Boolean).join(" · "),
             url: propertyUrl(p.slug),
           })),
         }
@@ -112,10 +130,16 @@ export default async function InmueblesPage({
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
       {jsonLd && <JsonLd data={jsonLd} />}
       <header className="mb-8">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-600">Catálogo</p>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight text-ink sm:text-4xl">Inmuebles en venta</h1>
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-700">Catálogo</p>
+        <h1 className="mt-2 text-balance text-3xl font-bold tracking-tight text-ink sm:text-4xl">{titular.titulo}</h1>
         <p className="mt-2 text-muted">
           <span className="font-semibold text-ink">{total}</span> inmueble{total === 1 ? "" : "s"} disponible{total === 1 ? "" : "s"}
+          {titular.sectores.length > 0 && (
+            <>
+              {" "}· {titular.sectores.slice(0, 6).join(", ")}
+              {titular.sectores.length > 6 ? " y más" : ""}
+            </>
+          )}
         </p>
       </header>
 

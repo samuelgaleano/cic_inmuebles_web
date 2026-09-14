@@ -22,12 +22,23 @@ import { JsonLd } from "@/components/seo/json-ld";
 import { PortfolioExpand } from "@/components/public/portfolio-expand";
 import { getRepository } from "@/lib/data";
 import { getCoverMedia, PROPERTY_TYPE_LABELS } from "@/lib/domain";
-import { formatPrice } from "@/lib/utils/format";
-import { siteConfig } from "@/lib/config/site";
+import { titularInventario } from "@/lib/seo/titular";
+import { formatPrice, formatPriceCompact } from "@/lib/utils/format";
+import { propertyUrl, siteConfig } from "@/lib/config/site";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/" },
 };
+
+/** "Bella Suiza, Calleja y Gilmar" (máximo `max` nombres, el resto en "y más"). */
+function listaSectores(sectores: string[], max = 4): string {
+  const vis = sectores.slice(0, max);
+  if (vis.length === 0) return "";
+  if (vis.length === 1) return vis[0];
+  const ultimo = sectores.length > max ? "más sectores" : vis[vis.length - 1];
+  const primeros = sectores.length > max ? vis : vis.slice(0, -1);
+  return `${primeros.join(", ")} y ${ultimo}`;
+}
 
 // Red de seguridad: regenera la página cada hora aunque falle la
 // revalidación bajo demanda del panel admin.
@@ -36,17 +47,20 @@ export const revalidate = 3600;
 export default async function HomePage() {
   const repo = getRepository();
   let vitrina: Awaited<ReturnType<typeof repo.properties.listPublic>> = [];
-  let total = 0;
-  let ciudades = 0;
+  let todos: typeof vitrina = [];
   try {
     // Disponibles primero, luego en proceso y vendidos (orden del repositorio).
-    const todos = await repo.properties.listPublic();
+    todos = await repo.properties.listPublic();
     vitrina = todos.slice(0, 12);
-    total = todos.length;
-    ciudades = new Set(todos.map((p) => p.ubicacion.ciudad)).size;
   } catch (err) {
     console.error("[home] no se pudo cargar el catálogo:", err);
   }
+  const total = todos.length;
+
+  // El titular sale de lo que hay publicado: hoy "Apartamentos en venta en
+  // Bogotá"; si entra una casa o un inmueble de otra ciudad, se ensancha solo.
+  const titular = titularInventario(todos);
+  const sectores = listaSectores(titular.sectores);
 
   // Fondo fijo del hero: imagen de marca optimizada (local, sin dependencias).
   const heroBg = "/hero.jpg";
@@ -67,16 +81,20 @@ export default async function HomePage() {
     parqueaderos: p.caracteristicas.parqueaderos,
   }));
 
+  // Cifras reales del inventario, nada de relleno.
+  const nSectores = titular.sectores.length;
   const stats = [
-    { value: total > 0 ? `${total}` : "—", label: "inmuebles seleccionados" },
-    { value: ciudades > 0 ? `${ciudades}` : "—", label: ciudades === 1 ? "ciudad" : "ciudades" },
-    { value: "100%", label: "enfocados en venta" },
+    { value: total > 0 ? `${total}` : "—", label: `${titular.tipos.toLowerCase()} en venta` },
+    nSectores > 0
+      ? { value: `${nSectores}`, label: `${nSectores === 1 ? "sector" : "sectores"} de ${titular.lugar}` }
+      : { value: titular.lugar, label: "cobertura" },
+    { value: titular.desde ? `desde ${formatPriceCompact(titular.desde)}` : "—", label: "precio de entrada" },
     { value: "WhatsApp", label: "respuesta directa" },
   ];
 
   // Enriquece el nodo de organización del layout (mismo @id) con el área de
   // servicio real: las ciudades del inventario publicado, además del país.
-  const cityNames = [...new Set(vitrina.map((p) => p.ubicacion.ciudad).filter(Boolean))];
+  const cityNames = [...new Set(todos.map((p) => p.ubicacion.ciudad).filter(Boolean))];
   const areaJsonLd = {
     "@context": "https://schema.org",
     "@type": "RealEstateAgent",
@@ -87,9 +105,24 @@ export default async function HomePage() {
     ],
   };
 
+  // La vitrina como lista para buscadores: qué fichas hay y en qué orden.
+  const vitrinaJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name: titular.titulo,
+    numberOfItems: vitrina.length,
+    itemListElement: vitrina.map((p, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      url: propertyUrl(p.slug),
+      name: [p.titulo, PROPERTY_TYPE_LABELS[p.tipo], p.ubicacion.sector, p.ubicacion.ciudad].filter(Boolean).join(" · "),
+    })),
+  };
+
   return (
     <>
       <JsonLd data={areaJsonLd} />
+      {vitrina.length > 0 && <JsonLd data={vitrinaJsonLd} />}
 
       {/* ─────────── Hero POV: entras al inmueble al deslizar ─────────── */}
       <section className="-mt-[4.5rem] text-white">
@@ -103,16 +136,24 @@ export default async function HomePage() {
               className="animate-rise text-balance mt-6 max-w-3xl font-display text-4xl font-extrabold leading-[1.08] tracking-tight [text-shadow:0_2px_28px_rgba(6,20,16,0.55)] sm:text-5xl lg:text-6xl"
               style={{ animationDelay: "80ms" }}
             >
-              Apartamentos y casas <span className="text-brand-400">en venta</span> en Colombia
+              {titular.tipos} <span className="text-brand-400">en venta</span> en {titular.lugar}
             </h1>
 
             <p
               className="animate-rise mt-5 max-w-xl text-lg leading-relaxed text-white/80 [text-shadow:0_1px_16px_rgba(6,20,16,0.55)]"
               style={{ animationDelay: "160ms" }}
             >
-              Te ayudamos a vender tu inmueble en toda Colombia, de forma rápida y
-              segura. Encuentra el tuyo en un portafolio corto, visitado y verificado
-              por nosotros.
+              {titular.ciudad && sectores ? (
+                <>
+                  Un portafolio corto en {titular.ciudad}, en {sectores}: cada inmueble visitado y
+                  verificado por nosotros. ¿Vendes el tuyo? Te acompañamos de principio a fin.
+                </>
+              ) : (
+                <>
+                  Te ayudamos a vender tu inmueble de forma rápida y segura. Encuentra el tuyo en
+                  un portafolio corto, visitado y verificado por nosotros.
+                </>
+              )}
             </p>
 
             <div className="animate-rise mt-8 flex flex-wrap items-center justify-center gap-3" style={{ animationDelay: "240ms" }}>
@@ -176,7 +217,7 @@ export default async function HomePage() {
                 <p className="mt-2 hidden text-sm text-muted lg:block">Pasa el cursor sobre cada inmueble para verlo en grande.</p>
               </div>
               <Link href="/inmuebles" className="hidden shrink-0 items-center gap-1 text-sm font-semibold text-brand-700 transition-all hover:gap-2 sm:flex">
-                Ver con filtros <ArrowRight className="h-4 w-4" />
+                Ver {titular.tipos.toLowerCase()} con filtros <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
           </Reveal>

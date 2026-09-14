@@ -61,7 +61,12 @@ function propertyMeta(p: NonNullable<Awaited<ReturnType<ReturnType<typeof getRep
   const lugar = [p.ubicacion.sector, p.ubicacion.ciudad].filter(Boolean).join(", ");
   const c = p.caracteristicas;
 
-  const title = lugar ? `${p.titulo} — ${tipo} en venta en ${p.ubicacion.ciudad}` : `${p.titulo} — ${tipo} en venta`;
+  // Lo que la gente busca va primero ("Apartamento en venta en Bella Suiza,
+  // Bogotá"); el nombre del inmueble se agrega solo si aporta algo distinto
+  // del sector (p. ej. "Area19 Calleja" sí; "Bella Suiza" en Bella Suiza no).
+  const sector = p.ubicacion.sector?.toLocaleLowerCase("es");
+  const nombreAporta = !sector || p.titulo.toLocaleLowerCase("es") !== sector;
+  const title = `${tipo} en venta${lugar ? ` en ${lugar}` : ""}${nombreAporta ? ` · ${p.titulo}` : ""}`;
 
   const detalles = [
     c.habitaciones != null && `${c.habitaciones} habitaciones`,

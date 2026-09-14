@@ -12,6 +12,7 @@ import type {
   Template,
   TemplateInput,
 } from "@/lib/domain";
+import { formatLugar } from "@/lib/utils/lugar";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -44,9 +45,11 @@ export function propertyRowToDomain(row: any): Property {
     estado: row.estado,
     precio: Number(row.precio),
     administracion: row.administracion ?? undefined,
+    // Ciudad y sector se corrigen al leer ("BogotÁ", "BELLA SUIZA" llegan así
+    // del Sheet): terminan en el <title>, el H1 y el JSON-LD de la ficha.
     ubicacion: {
-      ciudad: row.ciudad,
-      sector: row.sector ?? undefined,
+      ciudad: formatLugar(row.ciudad) ?? "",
+      sector: formatLugar(row.sector) || undefined,
       conjunto: row.conjunto ?? undefined,
       direccion: row.direccion ?? undefined,
     },

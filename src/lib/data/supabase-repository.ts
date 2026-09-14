@@ -18,6 +18,7 @@ import {
   type Template,
   type TemplateInput,
 } from "@/lib/domain";
+import { formatLugar } from "@/lib/utils/lugar";
 import { slugify } from "@/lib/utils/slug";
 import { getSupabaseAdmin } from "./supabase/client";
 import {
@@ -101,7 +102,8 @@ class SupabasePropertyRepository implements PropertyRepository {
   async listCities(): Promise<string[]> {
     const { data, error } = await getSupabaseAdmin().from("properties").select("ciudad");
     if (error) throw error;
-    return [...new Set((data ?? []).map((r) => r.ciudad as string))].sort();
+    // Misma corrección que el mapper: "BogotÁ" y "Bogotá" son una sola ciudad en el filtro.
+    return [...new Set((data ?? []).map((r) => formatLugar(r.ciudad as string) ?? ""))].filter(Boolean).sort();
   }
 
   private async nextCodigo(): Promise<string> {
