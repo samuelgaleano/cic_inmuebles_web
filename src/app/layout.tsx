@@ -46,14 +46,7 @@ export const metadata: Metadata = {
     siteName: siteConfig.name,
     title: fullTitle,
     description: siteConfig.description,
-    images: [
-      {
-        url: "/hero.jpg",
-        width: 1920,
-        height: 1280,
-        alt: fullTitle,
-      },
-    ],
+    images: [siteConfig.ogImage],
   },
 };
 
@@ -88,7 +81,7 @@ const siteJsonLd = {
       url: siteConfig.url,
       telephone: siteConfig.phone,
       email: siteConfig.email,
-      image: `${siteConfig.url}/hero.jpg`,
+      image: `${siteConfig.url}${siteConfig.ogImage.url}`,
       address: { "@type": "PostalAddress", addressLocality: siteConfig.city, addressCountry: "CO" },
       knowsLanguage: "es",
       sameAs: Object.values(siteConfig.social),

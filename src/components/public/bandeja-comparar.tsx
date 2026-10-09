@@ -12,8 +12,10 @@ import { useComparar } from "@/lib/cliente/almacenes";
 export function BandejaComparar() {
   const { ids, vaciar } = useComparar();
   const pathname = usePathname();
-  // En la propia página de comparar la bandeja sobra: ahí ya está todo a la vista.
-  if (ids.length === 0 || pathname.startsWith("/comparar")) return null;
+  // Solo donde se está eligiendo (portada, catálogo, fichas, favoritos): en vender, contacto, planes
+  // o en la propia página de comparar sobra.
+  const enContextoDeCompra = pathname === "/" || pathname.startsWith("/inmuebles") || pathname === "/favoritos";
+  if (ids.length === 0 || !enContextoDeCompra) return null;
 
   const listo = ids.length >= 2;
 

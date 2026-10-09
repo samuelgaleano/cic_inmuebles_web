@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, ViewTransition } from "react";
 import { ChevronLeft, ChevronRight, Images, X } from "lucide-react";
 import { SafeImage } from "@/components/ui/safe-image";
 import { mediaLoader } from "@/lib/utils/image-loader";
@@ -22,14 +22,17 @@ const SIZES_VISOR = "100vw";
  * (object-contain sobre tinta). El visor es un <dialog> modal: foco atrapado y
  * Escape de serie; flechas del teclado, deslizar con el dedo y miniaturas.
  */
-export function Galeria({ fotos, titulo }: { fotos: FotoGaleria[]; titulo: string }) {
+export function Galeria({ fotos, titulo, slug }: { fotos: FotoGaleria[]; titulo: string; slug: string }) {
   const visor = useRef<HTMLDialogElement>(null);
   const [indice, setIndice] = useState(0);
+  // El visor solo pinta fotos mientras está abierto: cerrado no pide imágenes ni ocupa el DOM.
+  const [abierto, setAbierto] = useState(false);
   const total = fotos.length;
   const inicioToque = useRef<{ x: number; y: number } | null>(null);
 
   const abrir = (i: number) => {
     setIndice(i);
+    setAbierto(true);
     visor.current?.showModal();
     bloquearScroll(true);
   };
@@ -39,7 +42,10 @@ export function Galeria({ fotos, titulo }: { fotos: FotoGaleria[]; titulo: strin
   useEffect(() => {
     const d = visor.current;
     if (!d) return;
-    const alCerrar = () => bloquearScroll(false);
+    const alCerrar = () => {
+      bloquearScroll(false);
+      setAbierto(false);
+    };
     d.addEventListener("close", alCerrar);
     return () => {
       d.removeEventListener("close", alCerrar);
@@ -74,73 +80,77 @@ export function Galeria({ fotos, titulo }: { fotos: FotoGaleria[]; titulo: strin
     );
   }
 
-  // Distribución del mosaico según cuántas fotos hay.
+  // Distribución del mosaico (md y más) según cuántas fotos hay; en móvil todas van en una tira.
   const celdas = (() => {
-    if (total === 1) return ["col-span-4 row-span-2"];
-    if (total === 2) return ["col-span-2 row-span-2", "col-span-2 row-span-2"];
-    if (total === 3) return ["col-span-2 row-span-2", "col-span-2", "col-span-2"];
-    if (total === 4) return ["col-span-2 row-span-2", "col-span-2", "col-span-1", "col-span-1"];
-    return ["col-span-2 row-span-2", "", "", "", ""];
+    if (total === 1) return ["md:col-span-4 md:row-span-2"];
+    if (total === 2) return ["md:col-span-2 md:row-span-2", "md:col-span-2 md:row-span-2"];
+    if (total === 3) return ["md:col-span-2 md:row-span-2", "md:col-span-2", "md:col-span-2"];
+    if (total === 4) return ["md:col-span-2 md:row-span-2", "md:col-span-2", "md:col-span-1", "md:col-span-1"];
+    return ["md:col-span-2 md:row-span-2", "", "", "", ""];
   })();
-  const visibles = fotos.slice(0, celdas.length);
   const actual = fotos[indice];
 
-  const tile = (f: FotoGaleria, i: number, grande: boolean) => (
-    <button
-      key={f.id}
-      type="button"
-      onClick={() => abrir(i)}
-      aria-label={`Ver la foto ${i + 1} de ${total}`}
-      className={cn("group relative overflow-hidden bg-surface", celdas[i])}
-    >
-      <SafeImage
-        src={f.url}
-        alt={f.alt ?? `${titulo} — foto ${i + 1}`}
-        fill
-        fetchPriority={i === 0 ? "high" : undefined}
-        sizes={grande ? "(max-width: 1280px) 50vw, 600px" : "(max-width: 1280px) 25vw, 300px"}
-        className="object-cover transition-transform duration-[900ms] ease-[var(--ease-fluid)] group-hover:scale-[1.04]"
-      />
-    </button>
-  );
+  /** La primera foto lleva el nombre de la tarjeta de origen: al navegar, la foto viaja de una a otra. */
+  const conTransicion = (i: number, nodo: React.ReactElement) =>
+    i === 0 ? (
+      <ViewTransition key={fotos[0].id} name={`foto-${slug}`} share="morph" default="none">
+        {nodo}
+      </ViewTransition>
+    ) : (
+      nodo
+    );
 
   return (
     <div className="wrap">
-      {/* Escritorio: mosaico */}
-      <div className="relative hidden h-[min(34rem,46vw)] grid-cols-4 grid-rows-2 gap-2 overflow-hidden rounded-[var(--radius-tile)] md:grid">
-        {visibles.map((f, i) => tile(f, i, i === 0))}
+      {/* Una sola lista para todos los anchos: tira deslizable en móvil, mosaico desde md.
+          Así cada foto existe una vez (y un solo elemento lleva el nombre de la transición). */}
+      <div className="relative">
+        <ul
+          className={cn(
+            "-mx-5 flex snap-x snap-mandatory gap-3 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+            "md:mx-0 md:grid md:h-[min(34rem,46vw)] md:grid-cols-4 md:grid-rows-2 md:gap-2 md:overflow-hidden md:rounded-[var(--radius-tile)] md:p-0 md:pb-0",
+          )}
+        >
+          {fotos.map((f, i) => (
+            <li key={f.id} className={cn("w-[86vw] shrink-0 snap-center md:w-auto md:shrink", celdas[i] ?? "md:hidden")}>
+              {conTransicion(
+                i,
+                <button
+                  type="button"
+                  onClick={() => abrir(i)}
+                  aria-label={`Ver la foto ${i + 1} de ${total}`}
+                  className="group relative block aspect-[4/3] w-full overflow-hidden rounded-[var(--radius-card)] bg-surface md:aspect-auto md:h-full md:rounded-none"
+                >
+                  <SafeImage
+                    src={f.url}
+                    alt={f.alt ?? `${titulo} — foto ${i + 1}`}
+                    fill
+                    loading={i === 0 ? "eager" : undefined}
+                    fetchPriority={i === 0 ? "high" : undefined}
+                    sizes={
+                      i === 0
+                        ? "(max-width: 767px) 86vw, (max-width: 1280px) 50vw, 600px"
+                        : "(max-width: 767px) 86vw, (max-width: 1280px) 25vw, 300px"
+                    }
+                    className="object-cover transition-transform duration-[900ms] ease-[var(--ease-fluid)] group-hover:scale-[1.04]"
+                  />
+                  <span className="absolute bottom-3 right-3 rounded-full bg-white/95 px-2.5 py-1 text-[12px] font-medium text-ink md:hidden">
+                    <span className="tnum">{i + 1}</span> / <span className="tnum">{total}</span>
+                  </span>
+                </button>,
+              )}
+            </li>
+          ))}
+        </ul>
         {total > 1 && (
           <button
             type="button"
             onClick={() => abrir(0)}
-            className="absolute bottom-4 right-4 inline-flex h-10 items-center gap-2 rounded-full bg-white px-4 text-[14px] font-medium text-ink transition-transform duration-200 hover:scale-[1.03] active:scale-95"
+            className="absolute bottom-4 right-4 hidden h-10 items-center gap-2 rounded-full bg-white px-4 text-[14px] font-medium text-ink transition-transform duration-200 hover:scale-[1.03] active:scale-95 md:inline-flex"
           >
             <Images className="h-4 w-4" aria-hidden /> Ver las {total} fotos
           </button>
         )}
-      </div>
-
-      {/* Móvil: tira con ajuste */}
-      <div className="relative md:hidden">
-        <ul className="-mx-5 flex snap-x snap-mandatory gap-3 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {fotos.map((f, i) => (
-            <li key={f.id} className="w-[86vw] shrink-0 snap-center">
-              <button type="button" onClick={() => abrir(i)} aria-label={`Ver la foto ${i + 1} de ${total}`} className="relative block aspect-[4/3] w-full overflow-hidden rounded-[var(--radius-card)] bg-surface">
-                <SafeImage
-                  src={f.url}
-                  alt={f.alt ?? `${titulo} — foto ${i + 1}`}
-                  fill
-                  fetchPriority={i === 0 ? "high" : undefined}
-                  sizes="86vw"
-                  className="object-cover"
-                />
-                <span className="absolute bottom-3 right-3 rounded-full bg-white/95 px-2.5 py-1 text-[12px] font-medium text-ink">
-                  <span className="tnum">{i + 1}</span> / <span className="tnum">{total}</span>
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
       </div>
 
       {/* Visor */}
@@ -169,6 +179,7 @@ export function Galeria({ fotos, titulo }: { fotos: FotoGaleria[]; titulo: strin
           </button>
         </div>
 
+        {abierto && (
         <div
           className="relative min-h-0 flex-1 touch-pan-y select-none"
           onPointerDown={(e) => {
@@ -216,7 +227,9 @@ export function Galeria({ fotos, titulo }: { fotos: FotoGaleria[]; titulo: strin
           )}
         </div>
 
-        {total > 1 && (
+        )}
+
+        {abierto && total > 1 && (
           <ul className="flex h-24 shrink-0 gap-2 overflow-x-auto px-5 py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {fotos.map((f, i) => (
               <li key={f.id} className="shrink-0">

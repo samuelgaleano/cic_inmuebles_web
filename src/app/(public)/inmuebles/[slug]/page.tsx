@@ -128,7 +128,7 @@ export async function generateMetadata({
       images:
         images.length > 0
           ? [{ url: ogImageUrl(images[0]), width: 1200, height: 630, alt: property.titulo }]
-          : ["/hero.jpg"],
+          : [siteConfig.ogImage],
     },
   };
 }
@@ -312,10 +312,11 @@ export default async function PropertyDetailPage({
 
       <Galeria
         titulo={property.titulo}
+        slug={property.slug}
         fotos={images.map((m) => ({ id: m.id, url: m.url, alt: m.alt }))}
       />
 
-      <div className="wrap mt-16 grid gap-16 lg:grid-cols-[minmax(0,1fr)_25rem] lg:gap-20">
+      <div className="wrap mt-16 grid grid-cols-[minmax(0,1fr)] gap-16 lg:grid-cols-[minmax(0,1fr)_25rem] lg:gap-20">
         <div className="min-w-0 space-y-20">
           {cifras.length > 0 && (
             <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-[var(--radius-card)] bg-line sm:grid-cols-4">
@@ -360,7 +361,7 @@ export default async function PropertyDetailPage({
           {property.estado !== "vendido" && <SimuladorCuota precio={property.precio} />}
         </div>
 
-        <div className="lg:sticky lg:top-24 lg:self-start">
+        <div className="min-w-0 lg:sticky lg:top-24 lg:self-start">
           <AgendarVisita
             propertyId={property.id}
             propertySlug={property.slug}

@@ -21,7 +21,7 @@ export async function generateMetadata(): Promise<Metadata> {
       title: `${t.titulo} | ${siteConfig.name}`,
       description: `${t.tipos} en venta en ${donde}.`.slice(0, 200),
       url: `${siteConfig.url}/inmuebles`,
-      images: ["/hero.jpg"],
+      images: [siteConfig.ogImage],
     },
   };
 }

@@ -11,6 +11,7 @@ import { getPublicInventory, getPublicInventoryOrThrow } from "@/lib/data/public
 import { agruparPorSector, sectorPath, type Sector } from "@/lib/seo/sectores";
 import { titularInventario } from "@/lib/seo/titular";
 import { formatPriceCompact } from "@/lib/utils/format";
+import { ogImageUrl } from "@/lib/utils/image-loader";
 
 // Mismo ritmo que la home: se regenera cada hora aunque el panel no revalide
 // (y `revalidatePublic()` la invalida antes, ver src/lib/actions/admin-properties.ts).
@@ -67,7 +68,12 @@ export async function generateMetadata({ params }: { params: Promise<{ sector: s
     // Con menos de dos disponibles la página duplicaría la ficha (o no vende
     // nada): existe para navegación interna, pero fuera del índice.
     robots: s.indexable ? { index: true, follow: true } : { index: false, follow: true },
-    openGraph: { title: titulo, description, images: portada ? [portada] : ["/hero.jpg"] },
+    openGraph: {
+      title: titulo,
+      description,
+      url: `${siteConfig.url}${sectorPath(s)}`,
+      images: portada ? [{ url: ogImageUrl(portada), width: 1200, height: 630, alt: titulo }] : [siteConfig.ogImage],
+    },
   };
 }
 

@@ -12,7 +12,7 @@ export const metadata: Metadata = {
     title: "Contacto | CIC Inmuebles",
     description: "Resolvemos tus dudas sobre inmuebles en venta, visitas y alianzas con agentes inmobiliarios.",
     url: `${siteConfig.url}/contacto`,
-    images: ["/hero.jpg"],
+    images: [siteConfig.ogImage],
   },
 };
 

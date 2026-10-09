@@ -11,6 +11,9 @@ import type { NextConfig } from "next";
  *  - Unsplash    -> imágenes de ejemplo (seed) mientras no hay Cloudinary
  */
 const nextConfig: NextConfig = {
+  // La foto de una tarjeta viaja hasta la ficha al navegar (React <ViewTransition>); sin soporte del
+  // navegador, la navegación es la de siempre.
+  experimental: { viewTransition: true },
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "res.cloudinary.com" },

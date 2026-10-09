@@ -6,8 +6,8 @@ CIC Inmuebles ayuda a compradores a encontrar apartamentos y casas en venta en C
 
 ## Páginas principales
 
-- [Inicio](https://www.cicinmuebles.com/): portafolio destacado y propuesta de valor
-- [Inmuebles en venta](https://www.cicinmuebles.com/inmuebles): catálogo completo con filtros por ciudad, tipo y precio
+- [Inicio](https://www.cicinmuebles.com/): portafolio destacado, búsqueda por frase y propuesta de valor
+- [Inmuebles en venta](https://www.cicinmuebles.com/inmuebles): catálogo completo; se puede buscar escribiendo lo que se quiere (zona, alcobas, presupuesto) o con filtros por sector, precio y características
 - [Vende tu inmueble](https://www.cicinmuebles.com/vender): servicio para propietarios y preguntas frecuentes
 - [Contacto](https://www.cicinmuebles.com/contacto): WhatsApp, teléfono y correo
 

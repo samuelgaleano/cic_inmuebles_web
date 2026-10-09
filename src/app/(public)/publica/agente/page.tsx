@@ -35,7 +35,7 @@ const METADATA_PLANES: Metadata = {
     title: "Planes para agentes e inmobiliarias | CIC Inmuebles",
     description: "Publicación por inmueble o paquetes de espacios, con pago en línea seguro.",
     url: `${siteConfig.url}/publica/agente`,
-    images: ["/hero.jpg"],
+    images: [siteConfig.ogImage],
   },
 };
 

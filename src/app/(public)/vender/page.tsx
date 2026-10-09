@@ -15,7 +15,7 @@ export const metadata: Metadata = {
     description:
       "Sin costo inicial: nos encargamos de fotos, publicación, visitas y negociación, y solo cobramos una comisión del 3% cuando se cierra la venta.",
     url: `${siteConfig.url}/vender`,
-    images: ["/hero.jpg"],
+    images: [siteConfig.ogImage],
   },
 };
 
@@ -79,7 +79,7 @@ export default function VenderPage() {
         se muestra a la derecha y se queda pegado solo si el viewport es lo
         bastante alto para verlo entero (en portátiles bajos fluye con la página).
       */}
-      <div className="wrap grid gap-14 lg:grid-cols-[minmax(0,1fr)_28rem] lg:items-start lg:gap-20">
+      <div className="wrap grid grid-cols-[minmax(0,1fr)] gap-14 lg:grid-cols-[minmax(0,1fr)_28rem] lg:items-start lg:gap-20">
         <div className="lg:order-2">
           <div
             id="formulario"

@@ -1,3 +1,4 @@
+import { ViewTransition } from "react";
 import Link from "next/link";
 import { SafeImage } from "@/components/ui/safe-image";
 import { cn } from "@/lib/utils/cn";
@@ -57,6 +58,7 @@ export function TarjetaInmueble({
 
   return (
     <article className={cn("group relative flex flex-col", className)}>
+      <ViewTransition name={`foto-${datos.slug}`} share="morph" default="none">
       <div
         className={cn(
           "relative overflow-hidden rounded-[var(--radius-media)] bg-surface",
@@ -88,6 +90,7 @@ export function TarjetaInmueble({
           <BotonFavorito id={datos.slug} titulo={datos.titulo} />
         </div>
       </div>
+      </ViewTransition>
 
       <div className="flex flex-1 flex-col pt-4">
         <p className="text-[13px] text-muted">

@@ -21,7 +21,7 @@ export const metadata: Metadata = {
     description:
       "Alternativas para propietarios y para agentes e inmobiliarias, con comisión compartida y planes de publicación.",
     url: `${siteConfig.url}/publica`,
-    images: ["/hero.jpg"],
+    images: [siteConfig.ogImage],
   },
 };
 

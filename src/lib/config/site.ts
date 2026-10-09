@@ -22,6 +22,8 @@ export const siteConfig = {
   description:
     "Apartamentos en venta en el norte de Bogotá, visitados y verificados por nosotros. Te ayudamos a vender tu inmueble: fotos profesionales, visitas y negociación, con respuesta directa por WhatsApp.",
   url: siteUrl,
+  // Imagen por defecto al compartir un enlace (WhatsApp, redes): 1200×630, 64 KB.
+  ogImage: { url: "/og.jpg", width: 1200, height: 630, alt: "CIC Inmuebles — Apartamentos en venta en Bogotá" },
 
   // Contacto público (número fijo del negocio, igual en toda la página).
   // Mismo correo que la tarjeta del negocio, ADMIN_EMAIL y los avisos de
