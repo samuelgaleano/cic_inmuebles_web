@@ -43,6 +43,18 @@ export const PROPERTY_STATUS_LABELS: Record<PropertyStatus, string> = {
   vendido: "Vendido",
 };
 
+/**
+ * Rótulos para el visitante del sitio. Los de PROPERTY_STATUS_LABELS son el
+ * vocabulario interno (Drive, Sheets, panel: "Listo para vender" habla desde
+ * el punto de vista de quien vende) y NO se pueden cambiar sin romper la
+ * importación; al público se le muestra lo que significa para quien compra.
+ */
+export const PROPERTY_STATUS_PUBLIC_LABELS: Record<PropertyStatus, string> = {
+  disponible: "Disponible",
+  en_proceso: "En negociación",
+  vendido: "Vendido",
+};
+
 /** Moneda única del catálogo (Colombia). */
 export const CURRENCY = "COP";
 
@@ -141,6 +153,7 @@ export type PropertyInput = Omit<
 
 /** Filtros del catálogo. */
 export interface PropertyFilters {
+  /** Búsqueda literal por subcadena (panel admin). El sitio público usa los campos de abajo. */
   q?: string;
   tipo?: PropertyType;
   estado?: PropertyStatus;
@@ -149,6 +162,15 @@ export interface PropertyFilters {
   precioMin?: number;
   precioMax?: number;
   destacado?: boolean;
+  // Búsqueda inteligente (ver src/lib/search): salen de interpretar una frase.
+  banosMin?: number;
+  parqueaderosMin?: number;
+  areaMin?: number;
+  areaMax?: number;
+  /** Cualquiera de estos sectores. */
+  sectores?: string[];
+  /** Palabras que deben aparecer en título, descripción, sector o código. */
+  terminos?: string[];
 }
 
 /** Devuelve la imagen de portada (o la primera disponible). */

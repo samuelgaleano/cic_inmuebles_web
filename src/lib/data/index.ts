@@ -15,6 +15,11 @@ let repository: Repository | null = null;
 
 export function getRepository(): Repository {
   if (repository) return repository;
+  // En producción, un entorno sin base de datos es un error de configuración: caer a los datos de
+  // ejemplo mostraría inmuebles falsos y los leads se perderían en memoria sin que nadie lo note.
+  if (!isSupabaseConfigured() && process.env.VERCEL_ENV === "production") {
+    throw new Error("Supabase no está configurado en producción (NEXT_PUBLIC_SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY).");
+  }
   repository = isSupabaseConfigured() ? createSupabaseRepository() : createMemoryRepository();
   return repository;
 }

@@ -14,6 +14,8 @@ export interface InventarioItem {
   tipo: PropertyType;
   ubicacion: { ciudad: string; sector?: string };
   precio: number;
+  /** Si se informa, el "desde" ignora lo vendido y lo que está en proceso de venta. */
+  estado?: "disponible" | "en_proceso" | "vendido";
 }
 
 export interface Titular {
@@ -64,7 +66,19 @@ export function titularInventario(items: InventarioItem[]): Titular {
   const sectores = [...new Set(items.map((p) => p.ubicacion.sector).filter((s): s is string => Boolean(s)))].sort((a, b) =>
     a.localeCompare(b, "es"),
   );
-  const desde = Math.min(...items.map((p) => p.precio));
+  // "Desde" = el precio de entrada de lo que hoy se puede comprar (no de lo que ya está en negociación).
+  const comprables = items.filter((p) => p.estado === undefined || p.estado === "disponible");
+  const base = comprables.length > 0 ? comprables : items.filter((p) => p.estado !== "vendido");
+  const precios = (base.length > 0 ? base : items).map((p) => p.precio).filter((n) => n > 0);
+  const desde = precios.length > 0 ? Math.min(...precios) : undefined;
 
   return { tipos, lugar, titulo: `${tipos} en venta en ${lugar}`, ciudad, sectores, desde };
+}
+
+/** "Apartamentos" → "apartamento": para frases con cantidad ("1 apartamento en venta"). */
+export function tipoSingular(tipos: string): string {
+  const t = tipos.toLowerCase();
+  if (t === "apartamentos") return "apartamento";
+  if (t === "casas") return "casa";
+  return "inmueble";
 }

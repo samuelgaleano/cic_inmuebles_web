@@ -18,15 +18,21 @@ export function formatPrice(amount: number, currency: string = "COP"): string {
   }).format(amount);
 }
 
-/** Versión compacta para tarjetas: 350000000 -> "$350 M". */
+/** Versión compacta: 405000000 -> "$405 M" · 1420000000 -> "$1.420 M" · 1250000 -> "$1,3 M". */
 export function formatPriceCompact(amount: number): string {
-  if (amount >= 1_000_000_000) {
-    return `$${(amount / 1_000_000_000).toLocaleString("es-CO", { maximumFractionDigits: 1 })} mil M`;
-  }
   if (amount >= 1_000_000) {
-    return `$${(amount / 1_000_000).toLocaleString("es-CO", { maximumFractionDigits: 0 })} M`;
+    const m = amount / 1_000_000;
+    const r = Math.abs(m - Math.round(m)) < 0.05 ? Math.round(m) : Math.round(m * 10) / 10;
+    const entero = String(Math.trunc(r)).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    const decimal = r % 1 === 0 ? "" : `,${Math.round((r % 1) * 10)}`;
+    return `$${entero}${decimal} M`;
   }
   return copFormatter.format(amount);
+}
+
+/** Precio para mostrar: un 0 (dato sin cargar) no se anuncia como "$ 0". */
+export function formatPriceOrConsult(amount: number): string {
+  return amount > 0 ? formatPrice(amount) : "Consultar precio";
 }
 
 /** Formatea un número con separadores de miles. */

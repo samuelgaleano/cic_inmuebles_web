@@ -1,10 +1,12 @@
 "use server";
 
+import { after } from "next/server";
 import { z } from "zod";
 import { getRepository } from "@/lib/data";
 import { sendLeadNotification } from "@/lib/notifications/email";
 import { whatsappLink } from "@/lib/config/site";
 import type { Lead, LeadInput } from "@/lib/domain";
+import { normalizarTelefono } from "@/lib/utils/telefono";
 import { LEAD_INTENT_LABELS } from "@/lib/domain";
 
 /**
@@ -15,22 +17,22 @@ import { LEAD_INTENT_LABELS } from "@/lib/domain";
  * en campos ocultos para concretar en un solo paso.
  */
 
-const phoneRegex = /^[+()0-9\s-]{7,20}$/;
-
 const leadSchema = z.object({
   tipo: z.enum(["comprador", "vendedor"]),
-  nombre: z.string().trim().min(2, "Ingresa tu nombre"),
+  nombre: z.string().trim().min(2, "Ingresa tu nombre").max(120),
+  // Un teléfono de verdad (celular o fijo de Colombia, o internacional con "+"): "-------" ya no pasa.
   telefono: z
     .string()
     .trim()
-    .regex(phoneRegex, "Ingresa un teléfono válido"),
+    .max(24, "Ingresa un teléfono válido")
+    .refine((v) => normalizarTelefono(v) !== null, "Ingresa un celular o teléfono válido, por ejemplo 300 123 4567"),
   email: z
-    .union([z.string().trim().email("Correo inválido"), z.literal("")])
+    .union([z.string().trim().email("Correo inválido").max(160), z.literal("")])
     .optional(),
   mensaje: z.string().trim().max(1000).optional(),
   intencion: z.enum(["visita", "info"]).optional(),
-  propertyId: z.string().optional(),
-  propertySlug: z.string().optional(),
+  propertyId: z.string().max(80).optional(),
+  propertySlug: z.string().max(160).optional(),
   preferencia: z.string().trim().max(200).optional(),
   tipoInmueble: z.string().trim().max(120).optional(),
   ciudad: z.string().trim().max(120).optional(),
@@ -98,6 +100,17 @@ async function buildLeadWhatsappUrl(lead: Lead): Promise<string> {
   return whatsappLink(partes.join(" "));
 }
 
+/** Si la base de datos falla, el visitante igual puede llegar a CIC: WhatsApp con lo que ya escribió. */
+function respaldoWhatsapp(d: z.infer<typeof leadSchema>): string {
+  const detalle = [d.tipoInmueble, d.ciudad].filter(Boolean).join(" en ");
+  const partes = [`Hola, soy ${d.nombre}.`];
+  if (d.tipo === "vendedor") partes.push(`Quiero vender mi inmueble${detalle ? ` (${detalle})` : ""}.`);
+  else partes.push(d.propertySlug ? `Me interesa el inmueble "${d.propertySlug}".` : "Quiero más información.");
+  if (d.preferencia) partes.push(`Preferencia: ${d.preferencia}.`);
+  partes.push(`Mi teléfono: ${d.telefono}.`);
+  return whatsappLink(partes.join(" "));
+}
+
 export async function createLeadAction(
   _prevState: LeadFormState,
   formData: FormData,
@@ -129,7 +142,8 @@ export async function createLeadAction(
   const input: LeadInput = {
     tipo: data.tipo,
     nombre: data.nombre,
-    telefono: data.telefono,
+    // Guardado en forma legible y única ("+57 300 123 4567") para el panel, el correo y los enlaces.
+    telefono: normalizarTelefono(data.telefono)?.legible ?? data.telefono,
     email: data.email || undefined,
     mensaje: data.mensaje || undefined,
     intencion: data.intencion,
@@ -144,15 +158,25 @@ export async function createLeadAction(
   let lead: Lead;
   try {
     lead = await getRepository().leads.create(input);
-    await sendLeadNotification(lead);
   } catch (err) {
     console.error("[leads] Error al crear lead:", err);
     return {
       status: "error",
       message: "No pudimos registrar tu solicitud. Intenta de nuevo o escríbenos por WhatsApp.",
       values: visibleValues(raw),
+      whatsappUrl: respaldoWhatsapp(data),
     };
   }
+
+  // El aviso por correo sale DESPUÉS de responder (hasta 8 s de espera para el visitante) y un
+  // fallo del correo ya no convierte un lead guardado en un error.
+  after(async () => {
+    try {
+      await sendLeadNotification(lead);
+    } catch (err) {
+      console.error("[leads] Error al avisar por correo:", err);
+    }
+  });
 
   return {
     status: "success",

@@ -25,3 +25,15 @@ export function mediaLoader({ src, width }: { src: string; width: number; qualit
   // Externas (YouTube, etc.): sin transformación.
   return src;
 }
+
+/**
+ * Imagen para la vista previa al compartir un enlace (WhatsApp, redes): 1200×630 con recorte
+ * automático hacia lo importante de la foto. Cloudinary la entrega ya recortada; cualquier otra
+ * URL se devuelve igual. (Las fotos verticales de los inmuebles salían tal cual, a 960×1280.)
+ */
+export function ogImageUrl(src: string): string {
+  if (src.includes("res.cloudinary.com") && src.includes("/upload/")) {
+    return src.replace("/upload/", "/upload/c_fill,g_auto,w_1200,h_630,f_jpg,q_auto/");
+  }
+  return src;
+}

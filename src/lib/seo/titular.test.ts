@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { titularInventario } from "./titular";
+import { tipoSingular, titularInventario } from "./titular";
 
 const apto = (sector: string, precio: number, ciudad = "Bogotá") => ({
   tipo: "apartamento" as const,
@@ -32,5 +32,32 @@ describe("titularInventario", () => {
 
   it("sin inventario mantiene el titular genérico", () => {
     expect(titularInventario([]).titulo).toBe("Apartamentos y casas en venta en Colombia");
+  });
+});
+
+describe("titularInventario · precio de entrada", () => {
+  const con = (estado: "disponible" | "en_proceso" | "vendido", precio: number) => ({ ...apto("X", precio), estado });
+
+  it("el 'desde' es lo más barato que hoy se puede comprar, no lo que está en negociación o vendido", () => {
+    const t = titularInventario([con("en_proceso", 405e6), con("vendido", 300e6), con("disponible", 680e6), con("disponible", 850e6)]);
+    expect(t.desde).toBe(680e6);
+  });
+
+  it("si nada está disponible, usa lo que no está vendido; y si todo está vendido, el mínimo general", () => {
+    expect(titularInventario([con("en_proceso", 405e6), con("vendido", 300e6)]).desde).toBe(405e6);
+    expect(titularInventario([con("vendido", 300e6), con("vendido", 500e6)]).desde).toBe(300e6);
+  });
+
+  it("un precio 0 (sin cargar) no es el precio de entrada", () => {
+    expect(titularInventario([con("disponible", 0), con("disponible", 700e6)]).desde).toBe(700e6);
+  });
+});
+
+describe("tipoSingular", () => {
+  it("para frases con cantidad", () => {
+    expect(tipoSingular("Apartamentos")).toBe("apartamento");
+    expect(tipoSingular("Casas")).toBe("casa");
+    expect(tipoSingular("Apartamentos y casas")).toBe("inmueble");
+    expect(tipoSingular("Inmuebles")).toBe("inmueble");
   });
 });

@@ -1,17 +1,30 @@
 import type { Property, PropertyFilters } from "@/lib/domain";
+import { aBuscable, coincide } from "@/lib/search/evaluar";
 
 /** Lógica de filtrado y ordenamiento compartida entre implementaciones del repositorio. */
 
 export function matchesFilters(p: Property, f?: PropertyFilters): boolean {
   if (!f) return true;
-  if (f.tipo && p.tipo !== f.tipo) return false;
   if (f.estado && p.estado !== f.estado) return false;
-  if (f.ciudad && p.ubicacion.ciudad.toLowerCase() !== f.ciudad.toLowerCase()) return false;
   if (f.destacado && !p.destacado) return false;
-  if (f.precioMin != null && p.precio < f.precioMin) return false;
-  if (f.precioMax != null && p.precio > f.precioMax) return false;
-  if (f.habitacionesMin != null && (p.caracteristicas.habitaciones ?? 0) < f.habitacionesMin)
-    return false;
+
+  // Criterios estructurados (los mismos que entiende la búsqueda inteligente).
+  const estructurados = coincide(aBuscable(p), {
+    tipo: f.tipo,
+    ciudad: f.ciudad,
+    sectores: f.sectores,
+    precioMin: f.precioMin,
+    precioMax: f.precioMax,
+    habitacionesMin: f.habitacionesMin,
+    banosMin: f.banosMin,
+    parqueaderosMin: f.parqueaderosMin,
+    areaMin: f.areaMin,
+    areaMax: f.areaMax,
+    terminos: f.terminos,
+  });
+  if (!estructurados) return false;
+
+  // Búsqueda literal (panel admin): la frase completa como subcadena.
   if (f.q) {
     const q = f.q.toLowerCase();
     const haystack = [

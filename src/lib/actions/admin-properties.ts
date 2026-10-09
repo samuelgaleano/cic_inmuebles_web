@@ -23,10 +23,12 @@ function mediaProviderFor(url: string): MediaProvider {
 }
 
 /** Revalida las rutas públicas afectadas para mantener el catálogo sincronizado. */
-function revalidatePublic(slug?: string) {
+function revalidatePublic(...slugs: (string | undefined)[]) {
   revalidatePath("/");
   revalidatePath("/inmuebles");
-  if (slug) revalidatePath(`/inmuebles/${slug}`);
+  // La ficha nueva y la anterior: renombrar un inmueble cambia su URL y la vieja no debe quedar viva.
+  for (const slug of new Set(slugs.filter(Boolean))) revalidatePath(`/inmuebles/${slug}`);
+  revalidatePath("/sitemap.xml");
   // Cambiar sector, ciudad o estado (vendido) mueve el conteo y la
   // indexabilidad de la página de sector; sin esto queda hasta 1h desfasada
   // (su `revalidate = 3600`) y puede seguir enlazando una ficha ya cambiada.
@@ -189,7 +191,9 @@ export async function updatePropertyAction(
   if (!input) return state!;
 
   let slug: string | undefined;
+  let slugAnterior: string | undefined;
   try {
+    slugAnterior = (await getRepository().properties.getById(id))?.slug;
     const updated = await getRepository().properties.update(id, input);
     if (!updated) return { error: "El inmueble no existe." };
     slug = updated.slug;
@@ -199,7 +203,7 @@ export async function updatePropertyAction(
     return { error: "No se pudo actualizar el inmueble." };
   }
 
-  revalidatePublic(slug);
+  revalidatePublic(slug, slugAnterior);
   redirect("/admin/inmuebles");
 }
 
@@ -234,10 +238,11 @@ export async function deletePropertyAction(formData: FormData): Promise<void> {
   const id = str(formData.get("id"));
   if (id) {
     const repo = getRepository();
+    const slug = (await repo.properties.getById(id))?.slug;
     await repo.properties.remove(id);
     // Reescribe el catálogo de Sheets para reflejar la eliminación (best-effort).
     if (isSheetsConfigured()) await syncAllPropertiesToSheet(await repo.properties.list());
-    revalidatePublic();
+    revalidatePublic(slug); // la ficha borrada deja de servirse desde la caché
   }
   redirect("/admin/inmuebles");
 }
