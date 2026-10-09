@@ -1,10 +1,6 @@
 import Link from "next/link";
-import { Lock, Mail, MapPin, Phone } from "lucide-react";
 import { Logo } from "@/components/brand/brand-mark";
 import { siteConfig, whatsappLink } from "@/lib/config/site";
-
-const pillClass =
-  "inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-white transition-colors hover:border-brand-400/50 hover:bg-brand-500/10";
 
 type IconProps = { className?: string };
 
@@ -35,93 +31,78 @@ function TikTokIcon({ className }: IconProps) {
 }
 
 const SOCIALS = [
-  { label: "Facebook", href: siteConfig.social.facebook, Icon: FacebookIcon },
   { label: "Instagram", href: siteConfig.social.instagram, Icon: InstagramIcon },
+  { label: "Facebook", href: siteConfig.social.facebook, Icon: FacebookIcon },
   { label: "TikTok", href: siteConfig.social.tiktok, Icon: TikTokIcon },
 ];
+
+const enlace = "py-1 text-ink-soft transition-colors hover:text-brand-700";
 
 export function SiteFooter() {
   const year = new Date().getFullYear();
 
   return (
-    <footer className="mt-auto bg-ink text-white/70">
-      <div className="bg-aurora">
-        <div className="mx-auto grid max-w-6xl gap-10 px-4 py-16 sm:px-6 md:grid-cols-[1.4fr_1fr_1fr] lg:px-8">
+    <footer className="mt-auto bg-surface text-[14px] leading-relaxed text-muted">
+      <div className="wrap py-14">
+        <div className="grid gap-12 md:grid-cols-[1.4fr_1fr_1fr_1.2fr]">
           <div>
-            <Logo tone="dark" />
-            <p className="mt-5 max-w-xs text-sm leading-relaxed text-white/55">
-              {siteConfig.description}
-            </p>
-            <div className="mt-6 flex flex-wrap gap-2.5">
-              <Link
-                href={whatsappLink(`Hola ${siteConfig.name}, quiero más información.`)}
-                className={pillClass}
-              >
-                <span className="h-1.5 w-1.5 rounded-full bg-brand-400" />
-                Escríbenos por WhatsApp
-              </Link>
-              {SOCIALS.map(({ label, href, Icon }) => (
-                <a
-                  key={label}
-                  href={href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={pillClass}
-                >
-                  <Icon className="h-4 w-4 text-brand-400" />
-                  {label}
-                </a>
-              ))}
-            </div>
+            <Logo />
+            <p className="mt-5 max-w-xs">{siteConfig.description}</p>
           </div>
 
-          <div>
-            <h3 className="font-display text-sm font-semibold text-white">Navegación</h3>
-            <ul className="mt-4 space-y-2.5 text-sm">
-              <li><Link href="/inmuebles" className="transition-colors hover:text-white">Inmuebles</Link></li>
-              <li><Link href="/vender" className="transition-colors hover:text-white">Vender mi inmueble</Link></li>
-              <li><Link href="/publica" className="transition-colors hover:text-white">Publica tu inmueble</Link></li>
-              <li><Link href="/contacto" className="transition-colors hover:text-white">Contacto</Link></li>
+          <nav aria-label="Inmuebles">
+            <h2 className="text-[13px] font-semibold text-ink">Comprar</h2>
+            <ul className="mt-3 flex flex-col">
+              <li><Link href="/inmuebles" className={enlace}>Inmuebles en venta</Link></li>
+              <li><Link href="/favoritos" className={enlace}>Mis favoritos</Link></li>
+              <li><Link href="/comparar" className={enlace}>Comparar inmuebles</Link></li>
             </ul>
-          </div>
+          </nav>
+
+          <nav aria-label="Vender y publicar">
+            <h2 className="text-[13px] font-semibold text-ink">Vender y publicar</h2>
+            <ul className="mt-3 flex flex-col">
+              <li><Link href="/vender" className={enlace}>Vender mi inmueble</Link></li>
+              <li><Link href="/publica" className={enlace}>Publica tu inmueble</Link></li>
+              <li><Link href="/contacto" className={enlace}>Alianza para agentes</Link></li>
+            </ul>
+          </nav>
 
           <div>
-            <h3 className="font-display text-sm font-semibold text-white">Contacto</h3>
-            <ul className="mt-4 space-y-2.5 text-sm">
-              <li className="flex items-center gap-2.5">
-                <Mail className="h-4 w-4 text-brand-400" />
-                <a href={`mailto:${siteConfig.email}`} className="transition-colors hover:text-white">
-                  {siteConfig.email}
+            <h2 className="text-[13px] font-semibold text-ink">Contacto</h2>
+            <ul className="mt-3 flex flex-col">
+              <li>
+                <a href={whatsappLink(`Hola ${siteConfig.name}, quiero más información.`)} target="_blank" rel="noopener noreferrer" className={enlace}>
+                  WhatsApp
                 </a>
               </li>
-              <li className="flex items-center gap-2.5">
-                <Phone className="h-4 w-4 text-brand-400" />
-                <a href={`tel:${siteConfig.phone}`} className="transition-colors hover:text-white">
-                  {siteConfig.phoneDisplay}
-                </a>
-              </li>
-              <li className="flex items-center gap-2.5">
-                <MapPin className="h-4 w-4 text-brand-400" />
-                <span>{siteConfig.city}</span>
-              </li>
+              <li><a href={`mailto:${siteConfig.email}`} className={enlace}>{siteConfig.email}</a></li>
+              <li><a href={`tel:${siteConfig.phone}`} className={`${enlace} tnum`}>{siteConfig.phoneDisplay}</a></li>
+              <li className="py-1">{siteConfig.city}</li>
+            </ul>
+            <ul className="mt-4 flex gap-4">
+              {SOCIALS.map(({ label, href, Icon }) => (
+                <li key={label}>
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={label}
+                    className="flex h-9 w-9 items-center justify-center rounded-full border border-line-strong text-ink-soft transition-colors hover:border-ink hover:text-ink"
+                  >
+                    <Icon className="h-4 w-4" />
+                  </a>
+                </li>
+              ))}
             </ul>
           </div>
         </div>
-      </div>
 
-      <div className="border-t border-white/10">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-2 px-4 py-6 text-xs text-white/40 sm:flex-row sm:px-6 lg:px-8">
+        <div className="mt-12 flex flex-col gap-2 border-t border-line pt-5 text-[12px] sm:flex-row sm:items-center sm:justify-between">
           <p>© {year} {siteConfig.name}. Todos los derechos reservados.</p>
-          <div className="flex items-center gap-4">
-            <p>Hecho con dedicación para tu próximo hogar.</p>
-            {/* Acceso al panel de administración */}
-            <Link
-              href="/admin/login"
-              className="inline-flex items-center gap-1.5 font-medium text-white/45 transition-colors duration-300 hover:text-brand-400"
-            >
-              <Lock className="h-3.5 w-3.5" /> Panel
-            </Link>
-          </div>
+          <Link href="/admin/login" className="transition-colors hover:text-ink">
+            Acceso del equipo
+          </Link>
         </div>
       </div>
     </footer>

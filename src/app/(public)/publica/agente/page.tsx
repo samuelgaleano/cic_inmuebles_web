@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeft, Camera, Check, MessageCircle, Sparkles } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, MessageCircle } from "lucide-react";
 import { PlanCheckout } from "@/components/public/plan-checkout";
 import { PagoResultado, type PagoEstadoVisible } from "@/components/public/pago-resultado";
 import { JsonLd } from "@/components/seo/json-ld";
@@ -31,6 +31,12 @@ const METADATA_PLANES: Metadata = {
     "publicación independiente y paquetes mensuales o anuales para varios inmuebles. " +
     "Pago en línea seguro.",
   alternates: { canonical: "/publica/agente" },
+  openGraph: {
+    title: "Planes para agentes e inmobiliarias | CIC Inmuebles",
+    description: "Publicación por inmueble o paquetes de espacios, con pago en línea seguro.",
+    url: `${siteConfig.url}/publica/agente`,
+    images: ["/hero.jpg"],
+  },
 };
 
 export async function generateMetadata({ searchParams }: { searchParams: SearchParams }): Promise<Metadata> {
@@ -140,14 +146,13 @@ export default async function AgentePlanesPage({ searchParams }: { searchParams:
     const actualUrl = `/publica/agente?pago=procesado${sp.ref ? `&ref=${encodeURIComponent(sp.ref)}` : ""}${sp.id ? `&id=${encodeURIComponent(sp.id)}` : ""}`;
 
     return (
-      <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
-        <Link
-          href="/publica/agente"
-          className="inline-flex items-center gap-1.5 py-2 text-sm font-medium text-muted transition-colors hover:gap-2 hover:text-brand-700"
-        >
-          <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Volver a los planes
-        </Link>
-        <div className="mt-6">
+      <>
+        <div className="wrap pt-8">
+          <Link href="/publica/agente" className="link-arrow py-2 text-[15px]">
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Volver a los planes
+          </Link>
+        </div>
+        <div className="wrap pb-28 pt-8">
           <PagoResultado
             estado={estado}
             plan={plan}
@@ -156,53 +161,43 @@ export default async function AgentePlanesPage({ searchParams }: { searchParams:
             actualUrl={actualUrl}
           />
         </div>
-      </div>
+      </>
     );
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
+    <>
       <JsonLd data={breadcrumbJsonLd} />
       <JsonLd data={faqJsonLd} />
 
-      <Link
-        href="/publica"
-        className="inline-flex items-center gap-1.5 py-2 text-sm font-medium text-muted transition-colors hover:gap-2 hover:text-brand-700"
-      >
-        <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Volver
-      </Link>
+      <div className="wrap pt-8">
+        <Link href="/publica" className="link-arrow py-2 text-[15px]">
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Volver
+        </Link>
+      </div>
 
-      <header className="mt-4 max-w-2xl">
-        <span className="inline-flex items-center gap-2 rounded-full bg-brand-50 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">
-          <Sparkles className="h-3.5 w-3.5" aria-hidden="true" /> Agentes e inmobiliarias
-        </span>
-        <h1 className="mt-5 text-balance text-4xl font-bold tracking-tight text-ink sm:text-5xl">
-          Publica tus inmuebles en CIC
-        </h1>
-        <p className="mt-4 text-lg leading-relaxed text-muted">
-          Primero decide cómo quieres pagar: por cada inmueble o por un paquete de espacios que
-          rotan. Los planes con precio fijo se pagan en línea; el contenido profesional se cotiza
-          según el inmueble.
+      <header className="wrap pb-12 pt-8 sm:pb-16 sm:pt-12">
+        <p className="text-[15px] text-muted">Agentes e inmobiliarias</p>
+        <h1 className="t-display mt-2 max-w-4xl">Publica tus inmuebles en CIC.</h1>
+        <p className="t-lead mt-5 max-w-2xl">
+          Primero decide cómo quieres pagar: por cada inmueble o por un paquete de espacios que rotan. Los planes con precio fijo se pagan en línea; el contenido profesional se cotiza según el inmueble.
         </p>
+        {!wompiOn && (
+          <p className="mt-8 max-w-2xl rounded-[var(--radius-card)] bg-surface px-5 py-4 text-[15px]">
+            El pago en línea se activará en breve. Mientras tanto, escríbenos por WhatsApp y coordinamos la publicación.
+          </p>
+        )}
       </header>
 
-      {!wompiOn && (
-        <p className="mt-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          El pago en línea se activará en breve. Mientras tanto, escríbenos por WhatsApp y coordinamos la publicación.
-        </p>
-      )}
-
-      <div id="planes" className="mt-12 space-y-14 scroll-mt-24">
+      <div id="planes" className="wrap scroll-mt-24 space-y-24">
         {GRUPOS.map((g) => {
           const planes = pagables.filter((p) => p.grupo === g.id);
           if (planes.length === 0) return null;
           return (
-            <section key={g.id} aria-labelledby={`grupo-${g.id}`} className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] lg:gap-10">
+            <section key={g.id} aria-labelledby={`grupo-${g.id}`} className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,2.2fr)] lg:gap-14">
               <div className="lg:pt-2">
-                <h2 id={`grupo-${g.id}`} className="text-2xl font-bold tracking-tight text-ink">
-                  {g.titulo}
-                </h2>
-                <p className="mt-2 max-w-sm text-sm leading-relaxed text-muted">{g.descripcion}</p>
+                <h2 id={`grupo-${g.id}`} className="t-title">{g.titulo}</h2>
+                <p className="mt-3 max-w-xs text-[15px] leading-relaxed text-muted">{g.descripcion}</p>
               </div>
               <div className="grid gap-5 sm:grid-cols-2">
                 {planes.map((plan) => (
@@ -216,70 +211,71 @@ export default async function AgentePlanesPage({ searchParams }: { searchParams:
 
       {/* Contenido profesional: precio variable → banda propia a todo el ancho */}
       {contenido && (
-        <div className="mt-14 grid items-center gap-6 rounded-[1.6rem] border border-line bg-surface p-6 sm:p-8 lg:grid-cols-[1.5fr_1fr]">
-          <div>
-            <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-brand-700">
-              <Camera className="h-3.5 w-3.5" aria-hidden="true" /> Contenido profesional
-            </span>
-            <h2 className="mt-3 text-2xl font-bold tracking-tight text-ink">{contenido.nombre}</h2>
-            <p className="mt-2 text-sm leading-relaxed text-ink-soft">{contenido.resumen}</p>
-            <ul className="mt-4 grid gap-2 sm:grid-cols-2">
-              {contenido.incluye.map((f) => (
-                <li key={f} className="flex items-start gap-2 text-sm text-ink-soft">
-                  <Check className="mt-0.5 h-4 w-4 flex-none text-brand-600" aria-hidden="true" />
-                  <span>{f}</span>
-                </li>
-              ))}
-            </ul>
+        <section className="mt-28 bg-surface" aria-labelledby="contenido-titulo">
+          <div className="wrap section-y grid items-center gap-10 lg:grid-cols-[1.5fr_1fr]">
+            <div>
+              <p className="text-[15px] text-muted">Contenido profesional</p>
+              <h2 id="contenido-titulo" className="t-headline mt-2">{contenido.nombre}</h2>
+              <p className="mt-4 max-w-xl leading-relaxed text-ink-soft">{contenido.resumen}</p>
+              <ul className="mt-6 grid gap-x-8 sm:grid-cols-2">
+                {contenido.incluye.map((f) => (
+                  <li key={f} className="flex items-start gap-2.5 border-t border-line-strong/50 py-3 text-[15px] text-ink-soft">
+                    <Check className="mt-0.5 h-4 w-4 flex-none text-brand-700" aria-hidden="true" />
+                    <span>{f}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="lg:text-right">
+              <p className="text-[15px] text-muted">desde</p>
+              <p className="tnum text-[2.5rem] font-semibold leading-tight tracking-[-0.03em] sm:text-[3rem]">{formatPrice(contenido.precioCOP)}</p>
+              <p className="mt-1 text-[13px] text-muted">El precio final depende del inmueble.</p>
+              <a
+                href={whatsappLink(`Hola ${siteConfig.name}, quiero cotizar el "${contenido.nombre}" para mi inmueble.`)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={buttonVariants({ variant: "outline", size: "lg", className: "mt-6" })}
+              >
+                <MessageCircle className="h-5 w-5" aria-hidden="true" /> Cotizar por WhatsApp
+              </a>
+            </div>
           </div>
-          <div className="text-center lg:text-right">
-            <p className="text-sm text-muted">desde</p>
-            <p className="font-display text-4xl font-extrabold tracking-tight text-ink">{formatPrice(contenido.precioCOP)}</p>
-            <p className="mt-1 text-xs text-muted">El precio final depende del inmueble.</p>
-            <a
-              href={whatsappLink(`Hola ${siteConfig.name}, quiero cotizar el "${contenido.nombre}" para mi inmueble.`)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={buttonVariants({ variant: "outline", size: "md", className: "mt-4 w-full justify-center lg:w-auto" })}
-            >
-              <MessageCircle className="h-4 w-4" aria-hidden="true" /> Cotizar por WhatsApp
-            </a>
-          </div>
-        </div>
+        </section>
       )}
 
       {/* Preguntas frecuentes */}
-      <section className="mt-16 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] lg:gap-10" aria-labelledby="faq-title">
+      <section className="wrap section-y grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,2.2fr)] lg:gap-14" aria-labelledby="faq-title">
         <div>
-          <h2 id="faq-title" className="text-2xl font-bold tracking-tight text-ink">
-            Preguntas frecuentes
-          </h2>
-          <p className="mt-2 max-w-sm text-sm leading-relaxed text-muted">
+          <h2 id="faq-title" className="t-title">Preguntas frecuentes</h2>
+          <p className="mt-3 max-w-xs text-[15px] leading-relaxed text-muted">
             Lo que suelen preguntar los agentes antes de contratar. Si falta la tuya,{" "}
-            <Link href="/contacto" className="font-semibold text-brand-700 hover:underline">
+            <Link href="/contacto" className="font-medium text-brand-700 underline underline-offset-4">
               escríbenos
             </Link>
             .
           </p>
         </div>
-        <div className="space-y-4">
+        <div className="border-b border-line">
           {faqs.map((f) => (
-            <div key={f.q} className="rounded-2xl border border-line bg-white p-5">
-              <h3 className="font-bold text-ink">{f.q}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-muted">{f.a}</p>
-            </div>
+            <details key={f.q} className="group border-t border-line">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-6 py-5 text-[1.0625rem] font-medium tracking-[-0.01em] [&::-webkit-details-marker]:hidden">
+                {f.q}
+                <ChevronDown className="h-5 w-5 shrink-0 text-muted transition-transform duration-300 group-open:rotate-180" aria-hidden />
+              </summary>
+              <p className="max-w-2xl pb-6 leading-relaxed text-muted">{f.a}</p>
+            </details>
           ))}
         </div>
       </section>
 
-      <p className="mt-12 text-center text-sm text-muted">
+      <p className="wrap pb-28 text-[14px] text-muted">
         Todos los planes funcionan mediante espacios activos y se rigen por las{" "}
-        <Link href="/publica/condiciones" className="font-semibold text-brand-700 hover:underline">
+        <Link href="/publica/condiciones" className="font-medium text-brand-700 underline underline-offset-4">
           condiciones de publicación
         </Link>
         .
       </p>
-    </div>
+    </>
   );
 }
 
@@ -288,32 +284,28 @@ function PlanCard({ plan, wompiOn }: { plan: Plan; wompiOn: boolean }) {
   return (
     <article
       className={cn(
-        "relative flex flex-col rounded-[1.6rem] border bg-white p-6 transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-1 hover:shadow-[0_28px_50px_-28px_rgba(11,26,21,0.3)]",
-        plan.destacado ? "border-brand-300 shadow-[0_20px_46px_-30px_rgba(7,162,118,0.5)]" : "border-line",
+        "relative flex flex-col rounded-[var(--radius-card)] border bg-white p-6",
+        plan.destacado ? "border-ink" : "border-line",
       )}
     >
-      {plan.destacado && (
-        <span className="absolute -top-3 left-6 rounded-full bg-brand-700 px-3 py-1 text-xs font-semibold text-white shadow">
-          Más elegido
-        </span>
-      )}
-      <h3 className="text-lg font-bold tracking-tight text-ink">{plan.nombre}</h3>
-      <p className="mt-3 font-display text-3xl font-extrabold tracking-tight text-ink">{formatPrice(plan.precioCOP)}</p>
-      <p className="mt-0.5 text-xs font-medium text-muted">{plan.periodo}</p>
+      {plan.destacado && <p className="mb-3 text-[13px] font-semibold text-brand-700">Más elegido</p>}
+      <h3 className="text-[1.125rem] font-semibold tracking-[-0.01em]">{plan.nombre}</h3>
+      <p className="tnum mt-3 text-[2rem] font-semibold leading-none tracking-[-0.03em]">{formatPrice(plan.precioCOP)}</p>
+      <p className="mt-1.5 text-[13px] text-muted">{plan.periodo}</p>
       {eq && (
-        <p className="mt-2 text-xs leading-relaxed text-ink-soft">
-          ≈ <span className="font-semibold tabular-nums">{formatPrice(eq.porInmuebleMes)}</span> por inmueble al mes
+        <p className="mt-3 text-[13px] leading-relaxed text-ink-soft">
+          ≈ <span className="tnum font-semibold">{formatPrice(eq.porInmuebleMes)}</span> por inmueble al mes
           {eq.mensualAnual != null && (
             <span className="text-muted"> · frente a {formatPrice(eq.mensualAnual)} pagando mes a mes</span>
           )}
         </p>
       )}
-      <p className="mt-3 text-sm leading-relaxed text-ink-soft">{plan.resumen}</p>
+      <p className="mt-4 text-[15px] leading-relaxed text-ink-soft">{plan.resumen}</p>
 
-      <ul className="mt-4 flex-1 space-y-2">
+      <ul className="mt-5 flex-1">
         {plan.incluye.map((f) => (
-          <li key={f} className="flex items-start gap-2 text-sm text-ink-soft">
-            <Check className="mt-0.5 h-4 w-4 flex-none text-brand-600" aria-hidden="true" />
+          <li key={f} className="flex items-start gap-2.5 border-t border-line py-2.5 text-[14px] leading-snug text-ink-soft">
+            <Check className="mt-0.5 h-4 w-4 flex-none text-brand-700" aria-hidden="true" />
             <span>{f}</span>
           </li>
         ))}

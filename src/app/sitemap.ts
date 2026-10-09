@@ -4,20 +4,15 @@ import type { PublicProperty } from "@/lib/domain";
 import { propertyUrl, siteConfig } from "@/lib/config/site";
 import { agruparPorSector, sectorPath } from "@/lib/seo/sectores";
 
-// Si Supabase falla justo durante un build, el sitemap quedaría congelado
-// solo con las rutas estáticas hasta el siguiente deploy; con revalidación
-// horaria se recupera solo.
+// Regeneración horaria; el panel además lo revalida al publicar, editar o borrar.
 export const revalidate = 3600;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // siteConfig.url ya viene normalizada sin barra final.
   const base = siteConfig.url;
-  let properties: PublicProperty[] = [];
-  try {
-    properties = await getRepository().properties.listPublic();
-  } catch (err) {
-    console.error("[sitemap] no se pudo listar inmuebles:", err);
-  }
+  // Sin try/catch a propósito: si la base de datos falla al regenerar, Next sigue sirviendo el sitemap
+  // anterior en vez de cachear uno sin fichas.
+  const properties: PublicProperty[] = await getRepository().properties.listPublic();
 
   // Última modificación real del catálogo: el inmueble editado más reciente.
   // Aplica a la home y al listado, cuyo contenido cambia con el catálogo.

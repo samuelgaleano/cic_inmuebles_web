@@ -1,37 +1,26 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import {
-  ArrowRight,
-  ArrowUpRight,
-  ChevronDown,
-  CalendarCheck,
-  Home as HomeIcon,
-  KeyRound,
-  MapPinned,
-  ShieldCheck,
-  Sparkles,
-  TrendingUp,
-} from "lucide-react";
-import { buttonVariants } from "@/components/ui/button";
 import { BrandMark } from "@/components/brand/brand-mark";
+import { buttonVariants } from "@/components/ui/button";
 import { Reveal } from "@/components/ui/reveal";
+import { Declaracion } from "@/components/public/declaracion";
+import { HeroBuscador } from "@/components/public/hero-buscador";
+import { TiraPortafolio } from "@/components/public/tira-portafolio";
 import { WhatsAppButton } from "@/components/public/whatsapp-button";
-import { HeroPov } from "@/components/public/hero-pov";
-import { HeroSellCta } from "@/components/public/hero-sell-cta";
 import { JsonLd } from "@/components/seo/json-ld";
-import { PortfolioExpand } from "@/components/public/portfolio-expand";
-import { getPublicInventory } from "@/lib/data/public-inventory";
-import { getCoverMedia, PROPERTY_TYPE_LABELS } from "@/lib/domain";
-import { agruparPorSector, sectorPath } from "@/lib/seo/sectores";
-import { titularInventario } from "@/lib/seo/titular";
-import { formatPrice, formatPriceCompact } from "@/lib/utils/format";
+import { getPublicInventoryOrThrow } from "@/lib/data/public-inventory";
+import { PROPERTY_TYPE_LABELS } from "@/lib/domain";
 import { propertyUrl, siteConfig } from "@/lib/config/site";
+import { construirIndice, contextoDe, sugerencias } from "@/lib/search/indice";
+import { agruparPorSector, sectorPath } from "@/lib/seo/sectores";
+import { tipoSingular, titularInventario } from "@/lib/seo/titular";
+import { formatPriceCompact } from "@/lib/utils/format";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/" },
 };
 
-/** "Bella Suiza, Calleja y Gilmar" (máximo `max` nombres, el resto en "y más"). */
+/** "Bella Suiza, Calleja y Gilmar" (máximo `max` nombres, el resto en "más sectores"). */
 function listaSectores(sectores: string[], max = 4): string {
   const vis = sectores.slice(0, max);
   if (vis.length === 0) return "";
@@ -41,51 +30,54 @@ function listaSectores(sectores: string[], max = 4): string {
   return `${primeros.join(", ")} y ${ultimo}`;
 }
 
+/** Titular que entra palabra por palabra desde una máscara (solo CSS). */
+function TitularAnimado({ texto }: { texto: string }) {
+  const palabras = texto.split(" ");
+  return (
+    <>
+      {palabras.map((w, i) => (
+        <span key={i}>
+          <span className="palabra">
+            <span style={{ "--i": i } as React.CSSProperties}>{w}</span>
+          </span>
+          {i < palabras.length - 1 ? " " : ""}
+        </span>
+      ))}
+    </>
+  );
+}
+
 // Red de seguridad: regenera la página cada hora aunque falle la
 // revalidación bajo demanda del panel admin.
 export const revalidate = 3600;
 
 export default async function HomePage() {
-  // Disponibles primero, luego en proceso y vendidos (orden del repositorio).
-  const todos = await getPublicInventory();
+  // Disponibles primero, luego en proceso y vendidos (orden del repositorio). Si la base de datos
+  // falla justo al regenerar, se lanza el error: Next conserva la versión anterior en vez de cachear
+  // una portada vacía durante una hora.
+  const todos = await getPublicInventoryOrThrow();
+  const indice = construirIndice(todos);
+  const ctx = contextoDe(todos);
   const vitrina = todos.slice(0, 12);
-  const total = todos.length;
 
   // El titular sale de lo que hay publicado: hoy "Apartamentos en venta en
   // Bogotá"; si entra una casa o un inmueble de otra ciudad, se ensancha solo.
   const titular = titularInventario(todos);
   const sectores = listaSectores(titular.sectores);
   const sectoresHome = agruparPorSector(todos);
-
-  // Fondo fijo del hero: imagen de marca optimizada (local, sin dependencias).
-  const heroBg = "/hero.jpg";
-
-  const items = vitrina.map((p) => ({
-    id: p.id,
-    slug: p.slug,
-    titulo: p.titulo,
-    precio: formatPrice(p.precio),
-    tipo: PROPERTY_TYPE_LABELS[p.tipo],
-    sector: p.ubicacion.sector,
-    estado: p.estado,
-    cover: getCoverMedia(p)?.url,
-    descripcion: p.descripcion,
-    habitaciones: p.caracteristicas.habitaciones,
-    banos: p.caracteristicas.banos,
-    area: p.caracteristicas.area,
-    parqueaderos: p.caracteristicas.parqueaderos,
-  }));
+  const nSectores = titular.sectores.length;
 
   // Cifras reales del inventario, nada de relleno.
-  const nSectores = titular.sectores.length;
-  const stats = [
-    { value: total > 0 ? `${total}` : "—", label: `${titular.tipos.toLowerCase()} en venta` },
-    nSectores > 0
-      ? { value: `${nSectores}`, label: `${nSectores === 1 ? "sector" : "sectores"} de ${titular.lugar}` }
-      : { value: titular.lugar, label: "cobertura" },
-    { value: titular.desde ? `desde ${formatPriceCompact(titular.desde)}` : "—", label: "precio de entrada" },
-    { value: "WhatsApp", label: "respuesta directa" },
-  ];
+  const resumen = [
+    `${todos.length} ${todos.length === 1 ? tipoSingular(titular.tipos) : titular.tipos.toLowerCase()} en venta`,
+    nSectores > 1 ? `${nSectores} sectores` : nSectores === 1 ? titular.sectores[0] : "",
+    titular.desde ? `desde ${formatPriceCompact(titular.desde)}` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  // La tira solo necesita lo que pinta la tarjeta (no el texto de búsqueda).
+  const tarjetas = indice.slice(0, 12).map(({ texto: _texto, ...resto }) => resto);
 
   // Enriquece el nodo de organización del layout (mismo @id) con el área de
   // servicio real: las ciudades del inventario publicado, además del país.
@@ -119,210 +111,110 @@ export default async function HomePage() {
       <JsonLd data={areaJsonLd} />
       {vitrina.length > 0 && <JsonLd data={vitrinaJsonLd} />}
 
-      {/* ─────────── Hero POV: entras al inmueble al deslizar ─────────── */}
-      <section className="-mt-[4.5rem] text-white">
-        <HeroPov bg={heroBg}>
-          <div className="mx-auto flex max-w-4xl flex-col items-center px-4 text-center sm:px-6">
-            <span className="animate-rise inline-flex items-center gap-2 rounded-full border border-white/20 bg-ink/40 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-brand-300 backdrop-blur">
-              <Sparkles className="h-3.5 w-3.5" /> Inmobiliaria boutique · {siteConfig.city}
-            </span>
+      {/* ─────────────── Portada: titular + buscador por frase ─────────────── */}
+      <section className="relative overflow-hidden">
+        <BrandMark decorativo className="pointer-events-none absolute -right-24 top-4 hidden h-[40rem] w-[40rem] text-surface lg:block" />
+        <div className="wrap relative pb-16 pt-14 sm:pb-24 sm:pt-24">
+          <h1 className="t-display max-w-5xl">
+            <TitularAnimado texto={`${titular.tipos} en venta en ${titular.lugar}`} />
+          </h1>
 
-            <h1
-              className="animate-rise text-balance mt-6 max-w-3xl font-display text-4xl font-extrabold leading-[1.08] tracking-tight [text-shadow:0_2px_28px_rgba(6,20,16,0.55)] sm:text-5xl lg:text-6xl"
-              style={{ animationDelay: "80ms" }}
-            >
-              {titular.tipos} <span className="text-brand-400">en venta</span> en {titular.lugar}
-            </h1>
+          <p className="t-lead anim-sube mt-7 max-w-2xl" style={{ "--d": "520ms" } as React.CSSProperties}>
+            {titular.ciudad && sectores
+              ? `Un portafolio corto en ${titular.ciudad}, en ${sectores}: cada inmueble visitado y verificado por nosotros. ¿Vendes el tuyo? Te acompañamos de principio a fin.`
+              : "Te ayudamos a vender tu inmueble de forma rápida y segura. Encuentra el tuyo en un portafolio corto, visitado y verificado por nosotros."}
+          </p>
 
-            <p
-              className="animate-rise mt-5 max-w-xl text-lg leading-relaxed text-white/80 [text-shadow:0_1px_16px_rgba(6,20,16,0.55)]"
-              style={{ animationDelay: "160ms" }}
-            >
-              {titular.ciudad && sectores ? (
-                <>
-                  Un portafolio corto en {titular.ciudad}, en {sectores}: cada inmueble visitado y
-                  verificado por nosotros. ¿Vendes el tuyo? Te acompañamos de principio a fin.
-                </>
-              ) : (
-                <>
-                  Te ayudamos a vender tu inmueble de forma rápida y segura. Encuentra el tuyo en
-                  un portafolio corto, visitado y verificado por nosotros.
-                </>
-              )}
+          <div className="anim-sube mt-12 max-w-3xl" style={{ "--d": "680ms" } as React.CSSProperties}>
+            <HeroBuscador indice={indice} ctx={ctx} sugerencias={sugerencias(indice)} />
+          </div>
+        </div>
+      </section>
+
+      {/* ─────────────── El portafolio: tira horizontal ─────────────── */}
+      <section aria-labelledby="portafolio" className="pb-8 sm:pb-16">
+        {tarjetas.length > 0 ? (
+          <TiraPortafolio titulo="Pocos inmuebles. Los correctos." descripcion={resumen} items={tarjetas} />
+        ) : (
+          <div className="wrap">
+            <h2 id="portafolio" className="t-headline">Pocos inmuebles. Los correctos.</h2>
+            <p className="t-lead mt-4 max-w-xl">
+              Estamos preparando el portafolio. Escríbenos por WhatsApp y te mostramos lo disponible.
             </p>
+          </div>
+        )}
 
-            <div className="animate-rise mt-8 flex flex-wrap items-center justify-center gap-3" style={{ animationDelay: "240ms" }}>
-              <a href="#portafolio" className={buttonVariants({ variant: "primary", size: "lg" })}>
-                Ver el portafolio
-                <ChevronDown className="h-4 w-4 transition-transform duration-300 group-hover:translate-y-0.5" />
-              </a>
-              <HeroSellCta />
-            </div>
-
-            <div className="animate-rise mt-10 flex flex-wrap items-center justify-center gap-x-10 gap-y-3 text-sm text-white/60" style={{ animationDelay: "320ms" }}>
-              {stats.map((s) => (
-                <span key={s.label}>
-                  <strong className="font-display font-extrabold text-white">{s.value}</strong> {s.label}
-                </span>
+        {sectoresHome.length > 0 && (
+          <nav className="wrap mt-8" aria-label="Sectores">
+            <ul className="flex flex-wrap gap-x-6 gap-y-1">
+              {sectoresHome.map((s) => (
+                <li key={s.slug}>
+                  <Link href={sectorPath(s)} className="link-arrow py-1.5 text-[15px]">
+                    {s.tipos} en {s.nombre} <span className="tnum text-muted">({s.inmuebles.length})</span>
+                  </Link>
+                </li>
               ))}
-            </div>
-
-            <span className="animate-rise mt-12 inline-flex flex-col items-center gap-1 text-xs font-semibold uppercase tracking-[0.2em] text-white/50" style={{ animationDelay: "400ms" }}>
-              Desliza para entrar
-              <ChevronDown className="h-5 w-5 animate-bounce text-brand-300" />
-            </span>
-          </div>
-        </HeroPov>
+            </ul>
+          </nav>
+        )}
       </section>
 
-      {/* ─────────────────── Cómo funciona (secuencia real) ─────────────────── */}
-      <section className="mx-auto max-w-6xl px-4 py-20 sm:px-6 lg:px-8">
-        <Reveal className="max-w-2xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-600">Cómo funciona</p>
-          <h2 className="mt-3 text-3xl font-bold tracking-tight text-ink sm:text-4xl">De la búsqueda a las llaves, en tres pasos.</h2>
-        </Reveal>
-        <div className="mt-12 grid gap-5 md:grid-cols-3">
+      {/* ─────────────── Declaración de principios ─────────────── */}
+      <section className="bg-surface" aria-label="Cómo trabajamos">
+        <div className="wrap section-y">
+          <Declaracion
+            className="max-w-4xl"
+            texto="Un portafolio corto, a propósito. Visitamos y verificamos cada inmueble antes de publicarlo, respondemos directo por WhatsApp y, si vendes, solo cobramos cuando se cierra la venta."
+          />
+        </div>
+      </section>
+
+      {/* ─────────────── Tres pasos, en texto ─────────────── */}
+      <section className="wrap section-y" aria-labelledby="pasos">
+        <h2 id="pasos" className="t-headline max-w-3xl">Del primer mensaje a las llaves.</h2>
+        <ol className="mt-14 grid gap-x-10 gap-y-12 md:grid-cols-3">
           {[
-            { n: "01", icon: MapPinned, title: "Explora", desc: "Filtra por ciudad, precio y características hasta encontrar el inmueble que encaja contigo." },
-            { n: "02", icon: CalendarCheck, title: "Agenda", desc: "Reserva tu visita en segundos. Coordinamos el horario que mejor te funcione." },
-            { n: "03", icon: KeyRound, title: "Cierra", desc: "Te acompañamos en la negociación y el papeleo hasta recibir las llaves." },
-          ].map((step, i) => (
-            <Reveal key={step.n} delay={i * 90}>
-              <div className="group relative h-full rounded-[1.4rem] border border-line bg-white p-7 transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-1 hover:border-brand-200 hover:shadow-[0_28px_50px_-28px_rgba(11,26,21,0.3)]">
-                <span className="font-display text-5xl font-extrabold tracking-tight text-brand-100 transition-colors duration-500 group-hover:text-brand-200">{step.n}</span>
-                <span className="absolute right-6 top-7 flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-50 text-brand-700 transition-transform duration-500 group-hover:scale-110">
-                  <step.icon className="h-5 w-5" />
-                </span>
-                <h3 className="mt-4 text-lg font-bold text-ink">{step.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-muted">{step.desc}</p>
-              </div>
+            {
+              t: "Cuéntanos qué buscas",
+              d: "Escribe una frase con tus palabras: zona, alcobas, presupuesto. El catálogo la entiende y te dice por qué aparece cada inmueble.",
+            },
+            {
+              t: "Elige tu día",
+              d: "Marca el día y la franja que te sirven. Un asesor te confirma la visita por WhatsApp.",
+            },
+            {
+              t: "Te acompañamos hasta las llaves",
+              d: "Negociación y papeleo, de principio a fin, con respuesta directa y sin intermediarios.",
+            },
+          ].map((paso, i) => (
+            <Reveal as="li" key={paso.t} delay={i * 110} className="border-t border-ink pt-6">
+              <h3 className="t-title">{paso.t}</h3>
+              <p className="mt-3 max-w-sm text-muted">{paso.d}</p>
             </Reveal>
           ))}
-        </div>
+        </ol>
       </section>
 
-      {/* ─────────── El portafolio: vertical y desplegable ─────────── */}
-      <section id="portafolio" className="scroll-mt-24 bg-surface py-20">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-          <Reveal>
-            <div className="flex items-end justify-between gap-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-600">El portafolio</p>
-                <h2 className="mt-2 text-3xl font-bold tracking-tight text-ink sm:text-4xl">Pocos inmuebles. Los correctos.</h2>
-                <p className="mt-2 hidden text-sm text-muted lg:block">Pasa el cursor sobre cada inmueble para verlo en grande.</p>
-              </div>
-              <Link href="/inmuebles" className="hidden shrink-0 items-center gap-1 text-sm font-semibold text-brand-700 transition-all hover:gap-2 sm:flex">
-                Ver {titular.tipos.toLowerCase()} con filtros <ArrowRight className="h-4 w-4" />
-              </Link>
-            </div>
-          </Reveal>
-
-          {sectoresHome.length > 0 && (
-            <Reveal>
-              <nav className="mt-6" aria-label="Sectores">
-                <ul className="flex flex-wrap gap-2">
-                  {sectoresHome.map((s) => (
-                    <li key={s.slug}>
-                      <Link
-                        href={sectorPath(s)}
-                        className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3.5 py-1.5 text-sm font-medium text-ink transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-800"
-                      >
-                        {s.tipos} en {s.nombre}
-                        <span className="text-xs text-muted">{s.inmuebles.length}</span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </nav>
-            </Reveal>
-          )}
-
-          <div className="mt-10">
-            {vitrina.length > 0 ? (
-              <PortfolioExpand items={items} />
-            ) : (
-              <p className="rounded-2xl border border-dashed border-line bg-white px-6 py-10 text-center text-muted">
-                Estamos preparando el portafolio. Escríbenos por WhatsApp y te mostramos lo disponible.
-              </p>
-            )}
+      {/* ─────────────── Para propietarios ─────────────── */}
+      <section className="bg-ink text-white" aria-labelledby="vende">
+        <div className="wrap section-y">
+          <h2 id="vende" className="t-display max-w-3xl">¿Vendes tu inmueble?</h2>
+          <p className="mt-6 max-w-xl text-[1.1875rem] leading-snug text-white/75 sm:text-[1.375rem]">
+            Sin costo inicial. Nos encargamos de las fotos, la publicación, las visitas y la negociación, y solo cobramos una comisión del 3% cuando se cierra la venta.
+          </p>
+          <div className="mt-10 flex flex-wrap gap-3">
+            <Link href="/vender" className={buttonVariants({ variant: "inverse", size: "lg" })}>
+              Vender mi inmueble
+            </Link>
+            <WhatsAppButton
+              size="lg"
+              message={`Hola ${siteConfig.name}, tengo un inmueble que quiero vender y me gustaría más información.`}
+              label="Hablar por WhatsApp"
+            />
           </div>
-        </div>
-      </section>
-
-      {/* ─────────────────── Propuesta de valor ─────────────────── */}
-      <section className="mx-auto max-w-6xl px-4 py-20 sm:px-6 lg:px-8">
-        <Reveal className="max-w-2xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-600">Por qué CIC</p>
-          <h2 className="mt-3 text-3xl font-bold tracking-tight text-ink sm:text-4xl">
-            Una inmobiliaria pensada para que decidas con tranquilidad.
-          </h2>
-        </Reveal>
-        <div className="mt-12 grid gap-5 sm:grid-cols-3">
-          {[
-            { icon: ShieldCheck, title: "Inmuebles verificados", desc: "Cada propiedad con información detallada, fotos reales y estado actualizado al día." },
-            { icon: CalendarCheck, title: "Agenda en segundos", desc: "Solicita una visita cuando quieras, sin trámites ni llamadas eternas." },
-            { icon: TrendingUp, title: "Vende sin estrés", desc: "Publicamos, promocionamos y gestionamos la venta de tu inmueble, de principio a fin." },
-          ].map((f, i) => (
-            <Reveal key={f.title} delay={i * 90}>
-              <div className="group h-full rounded-[1.4rem] border border-line bg-white p-1.5 transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-1 hover:shadow-[0_28px_50px_-28px_rgba(11,26,21,0.3)]">
-                <div className="h-full rounded-[1.05rem] bg-surface p-6">
-                  <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-600 text-white shadow-[0_10px_24px_-10px_rgba(7,162,118,0.7)] transition-transform duration-500 group-hover:scale-105">
-                    <f.icon className="h-6 w-6" />
-                  </span>
-                  <h3 className="mt-5 text-lg font-bold text-ink">{f.title}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-muted">{f.desc}</p>
-                </div>
-              </div>
-            </Reveal>
-          ))}
-        </div>
-      </section>
-
-      {/* ─────────────────── CTA Vendedores ─────────────────── */}
-      <section className="px-4 pb-20 sm:px-6 lg:px-8">
-        <div className="relative mx-auto max-w-6xl overflow-hidden rounded-[2rem] bg-ink px-6 py-16 text-white sm:px-12">
-          <div className="absolute inset-0 bg-aurora" />
-          <BrandMark className="pointer-events-none absolute -right-8 -top-10 h-56 w-56 text-brand-500/15" />
-          <div className="relative grid items-center gap-8 lg:grid-cols-[1.4fr_1fr]">
-            <div>
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-brand-300">
-                <HomeIcon className="h-3.5 w-3.5" /> Para propietarios
-              </span>
-              <h2 className="mt-5 max-w-xl text-3xl font-bold tracking-tight sm:text-4xl">
-                ¿Tienes un inmueble para vender?
-              </h2>
-              <p className="mt-4 max-w-lg leading-relaxed text-white/65">
-                Nos encargamos de todo: fotos profesionales, publicación, visitas y negociación.
-                Déjanos tus datos y te contactamos hoy mismo.
-              </p>
-            </div>
-            <div className="flex flex-col gap-3 lg:items-end">
-              <Link
-                href="/vender"
-                className={buttonVariants({ variant: "primary", size: "lg", className: "w-full justify-center sm:w-auto" })}
-              >
-                Publicar mi inmueble
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5">
-                  <ArrowUpRight className="h-3 w-3" />
-                </span>
-              </Link>
-              <WhatsAppButton
-                size="lg"
-                message={`Hola ${siteConfig.name}, tengo un inmueble que quiero vender y me gustaría más información.`}
-                label="Hablar por WhatsApp"
-              />
-            </div>
-          </div>
-
-          {/* Aliados: agentes inmobiliarios */}
-          <p className="relative mt-10 border-t border-white/10 pt-6 text-sm leading-relaxed text-white/60">
-            <strong className="font-semibold text-white">¿Eres agente inmobiliario?</strong>{" "}
-            Aliémonos: tú traes el inmueble, nosotros lo promocionamos y lo movemos, y
-            compartimos la comisión 50/50.{" "}
-            <Link
-              href="/contacto"
-              className="font-semibold text-brand-300 underline-offset-4 transition-colors hover:text-brand-200 hover:underline"
-            >
+          <p className="mt-16 max-w-2xl border-t border-white/15 pt-6 text-[15px] leading-relaxed text-white/70">
+            ¿Eres agente inmobiliario? Aliémonos: tú traes el inmueble, nosotros lo promocionamos y lo movemos, y compartimos la comisión 50/50.{" "}
+            <Link href="/contacto" className="font-medium text-white underline underline-offset-4 transition-colors hover:text-brand-300">
               Hablemos
             </Link>
             .

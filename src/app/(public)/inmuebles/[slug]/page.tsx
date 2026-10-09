@@ -1,10 +1,18 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Bath, BedDouble, Building2, Car, MapPin, Maximize, Receipt } from "lucide-react";
-import { PropertyGallery } from "@/components/public/property-gallery";
-import { PropertyContactCard } from "@/components/public/property-contact-card";
-import { StatusBadge } from "@/components/ui/status-badge";
+import { ArrowLeft } from "lucide-react";
+import { AgendarVisita } from "@/components/public/agendar-visita";
+import { BarraMovil } from "@/components/public/barra-movil";
+import { BotonCompartir } from "@/components/public/boton-compartir";
+import { BotonComparar } from "@/components/public/boton-comparar";
+import { BotonFavorito } from "@/components/public/boton-favorito";
+import { DescripcionFicha } from "@/components/public/descripcion-ficha";
+import { EstadoPublico } from "@/components/public/estado-publico";
+import { Galeria } from "@/components/public/galeria";
+import { RejillaInmuebles } from "@/components/public/rejilla-inmuebles";
+import { SimuladorCuota } from "@/components/public/simulador-cuota";
+import { VideoYoutube } from "@/components/public/video-youtube";
 import { JsonLd } from "@/components/seo/json-ld";
 import { getRepository } from "@/lib/data";
 import {
@@ -12,11 +20,18 @@ import {
   type PropertyMedia,
   type PropertyStatus,
   type PropertyType,
+  type PublicProperty,
 } from "@/lib/domain";
-import { formatArea, formatPrice } from "@/lib/utils/format";
+import { ordenarDescripcion } from "@/lib/ficha/descripcion";
+import { contextoDePrecio, fraseContexto } from "@/lib/ficha/valor";
+import { formatArea, formatPrice, formatPriceOrConsult } from "@/lib/utils/format";
 import { propertyUrl, siteConfig } from "@/lib/config/site";
-import { getPublicInventory } from "@/lib/data/public-inventory";
+import { getPublicInventoryOrThrow } from "@/lib/data/public-inventory";
 import { agruparPorSector, encontrarSector, sectorPath } from "@/lib/seo/sectores";
+import { ogImageUrl } from "@/lib/utils/image-loader";
+
+// La ficha se regenera cada hora aunque el panel no la revalide (antes quedaba semanas en la caché del CDN).
+export const revalidate = 3600;
 
 // Estado del inmueble → disponibilidad schema.org ("en_proceso" NO es InStock).
 const SCHEMA_AVAILABILITY: Record<PropertyStatus, string> = {
@@ -58,7 +73,7 @@ export async function generateStaticParams() {
  * El campo libre `descripcion` es texto operativo (emojis, saltos de línea)
  * y no sirve como snippet de buscador.
  */
-function propertyMeta(p: NonNullable<Awaited<ReturnType<ReturnType<typeof getRepository>["properties"]["getPublicBySlug"]>>>) {
+function propertyMeta(p: PublicProperty) {
   const tipo = PROPERTY_TYPE_LABELS[p.tipo];
   const lugar = [p.ubicacion.sector, p.ubicacion.ciudad].filter(Boolean).join(", ");
   const c = p.caracteristicas;
@@ -106,9 +121,14 @@ export async function generateMetadata({
     openGraph: {
       title: meta.title,
       description: meta.description,
+      url: propertyUrl(property.slug),
       // Si el inmueble no tiene fotos, usamos la imagen de marca del sitio
-      // (este openGraph reemplaza por completo al del layout raíz).
-      images: images.length > 0 ? images.slice(0, 1) : ["/hero.jpg"],
+      // (este openGraph reemplaza por completo al del layout raíz). La foto sale ya
+      // recortada a 1200×630: antes WhatsApp recibía el original vertical.
+      images:
+        images.length > 0
+          ? [{ url: ogImageUrl(images[0]), width: 1200, height: 630, alt: property.titulo }]
+          : ["/hero.jpg"],
     },
   };
 }
@@ -122,6 +142,20 @@ function youtubeId(media: PropertyMedia): string | null {
   return match?.[1] ?? null;
 }
 
+/** Hasta 3 inmuebles parecidos: primero los del mismo sector, luego los de precio más cercano. */
+function similares(actual: PublicProperty, todos: PublicProperty[]): PublicProperty[] {
+  return todos
+    .filter((p) => p.id !== actual.id && p.estado !== "vendido")
+    .map((p) => ({
+      p,
+      mismoSector: p.ubicacion.sector && p.ubicacion.sector === actual.ubicacion.sector ? 0 : 1,
+      distancia: Math.abs(p.precio - actual.precio),
+    }))
+    .sort((a, b) => a.mismoSector - b.mismoSector || a.distancia - b.distancia)
+    .slice(0, 3)
+    .map((x) => x.p);
+}
+
 export default async function PropertyDetailPage({
   params,
 }: {
@@ -131,36 +165,52 @@ export default async function PropertyDetailPage({
   const property = await getRepository().properties.getPublicBySlug(slug);
   if (!property) notFound();
 
+  // Si la base de datos falla al regenerar, Next conserva la versión anterior en vez de cachear una ficha sin contexto.
+  const todos = await getPublicInventoryOrThrow();
   // El grupo de sector exacto de este inmueble (mismo slug, así que sin
   // ambigüedad de nombre ni de ciudad), para enlazar a la URL real que
   // agruparPorSector generó — incluida la desambiguada por colisión.
-  const sector = encontrarSector(agruparPorSector(await getPublicInventory()), property);
+  const sector = encontrarSector(agruparPorSector(todos), property);
 
   const images = property.medios.filter((m) => m.type === "image");
   const video = property.medios.find((m) => m.type === "video");
   const videoId = video ? youtubeId(video) : null;
   const { caracteristicas: c, ubicacion } = property;
 
-  const specs = [
-    c.habitaciones != null && { icon: BedDouble, label: "Habitaciones", value: String(c.habitaciones) },
-    c.banos != null && { icon: Bath, label: "Baños", value: String(c.banos) },
-    c.area != null && { icon: Maximize, label: "Área", value: formatArea(c.area) },
-    c.parqueaderos != null && {
-      icon: Car,
-      label: "Parqueadero",
-      value: c.parqueaderos > 0 ? String(c.parqueaderos) : "No tiene",
-    },
-    property.administracion != null && {
-      icon: Receipt,
-      label: "Administración",
-      value: formatPrice(property.administracion),
-    },
-    ubicacion.conjunto && { icon: Building2, label: "Conjunto", value: ubicacion.conjunto },
-  ].filter(Boolean) as { icon: typeof BedDouble; label: string; value: string }[];
+  const descripcion = ordenarDescripcion(property.descripcion, {
+    precio: property.precio,
+    administracion: property.administracion,
+    area: c.area,
+    habitaciones: c.habitaciones,
+    banos: c.banos,
+    parqueaderos: c.parqueaderos,
+  });
+
+  // Las cifras grandes: solo lo que el inmueble tiene (un 0 no es una cifra que presumir).
+  const cifras = [
+    c.habitaciones != null && { etiqueta: "Habitaciones", valor: String(c.habitaciones), unidad: "" },
+    c.banos != null && { etiqueta: "Baños", valor: String(c.banos), unidad: "" },
+    c.area != null && { etiqueta: "Área", valor: new Intl.NumberFormat("es-CO").format(c.area), unidad: "m²" },
+    c.parqueaderos != null && c.parqueaderos > 0 && { etiqueta: c.parqueaderos === 1 ? "Parqueadero" : "Parqueaderos", valor: String(c.parqueaderos), unidad: "" },
+  ].filter(Boolean) as { etiqueta: string; valor: string; unidad: string }[];
+
+  const contexto = contextoDePrecio(
+    { id: property.id, precio: property.precio, area: c.area, estado: property.estado },
+    todos.map((p) => ({ id: p.id, precio: p.precio, area: p.caracteristicas.area, estado: p.estado })),
+  );
+
+  const datos: { etiqueta: string; valor: string; nota?: string }[] = [
+    { etiqueta: "Código", valor: property.codigo },
+    ...(ubicacion.conjunto ? [{ etiqueta: "Conjunto o edificio", valor: ubicacion.conjunto }] : []),
+    ...(property.administracion != null ? [{ etiqueta: "Administración", valor: `${formatPrice(property.administracion)} al mes` }] : []),
+    ...(c.parqueaderos === 0 ? [{ etiqueta: "Parqueadero", valor: "No tiene" }] : []),
+    ...(contexto ? [{ etiqueta: "Precio por m²", valor: formatPrice(contexto.porM2), nota: fraseContexto(contexto) }] : []),
+    ...descripcion.datos,
+  ];
 
   const ubicacionTexto = [ubicacion.sector, ubicacion.ciudad].filter(Boolean).join(", ");
   const fichaUrl = propertyUrl(property.slug);
-  const whatsappMessage = `Hola ${siteConfig.name}, me interesa el inmueble "${property.titulo}" (${property.codigo}). ${fichaUrl}`;
+  const parecidos = similares(property, todos);
 
   // Datos estructurados (schema.org): la ficha como oferta inmobiliaria
   // (Offer + itemOffered, no Product: Google no admite Product para finca raíz)
@@ -176,8 +226,8 @@ export default async function PropertyDetailPage({
       sku: property.codigo,
       category: PROPERTY_TYPE_LABELS[property.tipo],
       url: fichaUrl,
-      price: property.precio,
-      priceCurrency: "COP",
+      // Un precio sin cargar (0) no se publica como oferta de $0.
+      ...(property.precio > 0 && { price: property.precio, priceCurrency: "COP" }),
       availability: SCHEMA_AVAILABILITY[property.estado],
       seller: { "@id": `${siteConfig.url}/#org` },
       ...(images.length > 0 && { image: images.slice(0, 3).map((m) => m.url) }),
@@ -211,117 +261,130 @@ export default async function PropertyDetailPage({
   ];
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+    <>
       <JsonLd data={jsonLd} />
-      <Link
-        href="/inmuebles"
-        className="inline-flex items-center gap-1.5 text-sm font-medium text-muted transition-colors hover:gap-2 hover:text-brand-700"
-      >
-        <ArrowLeft className="h-4 w-4" /> Volver al catálogo
-      </Link>
 
-      <div className="mt-4 grid gap-8 lg:grid-cols-3">
-        {/* Columna principal */}
-        <div className="lg:col-span-2">
-          <PropertyGallery images={images} title={property.titulo} />
+      <header className="wrap pb-8 pt-8 sm:pb-10">
+        <Link href="/inmuebles" className="link-arrow py-2 text-[15px]">
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Inmuebles
+        </Link>
 
-          {videoId && (
-            <div className="mt-6 aspect-video overflow-hidden rounded-[1.4rem] border border-line">
-              <iframe
-                src={`https://www.youtube.com/embed/${videoId}`}
-                title={`Video de ${property.titulo}`}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                loading="lazy"
-                className="h-full w-full"
-              />
-            </div>
+        <p className="mt-8 text-[15px] text-muted">
+          {PROPERTY_TYPE_LABELS[property.tipo]}
+          {ubicacionTexto && " · "}
+          {sector ? (
+            // Enlace interno a la página del sector: le da a Google el contexto "apartamentos en X".
+            <>
+              <Link href={sectorPath(sector)} className="text-ink-soft underline decoration-line-strong underline-offset-4 transition-colors hover:text-brand-700 hover:decoration-brand-700">
+                {sector.nombre}
+              </Link>
+              {ubicacion.ciudad ? `, ${ubicacion.ciudad}` : ""}
+            </>
+          ) : (
+            ubicacionTexto
           )}
+        </p>
+        <h1 className="t-display mt-2 max-w-4xl">{property.titulo}</h1>
 
-          {/* Encabezado */}
-          <div className="mt-6 flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-full bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-700">
-                  {PROPERTY_TYPE_LABELS[property.tipo]}
-                </span>
-                <StatusBadge status={property.estado} />
-                <span className="text-xs text-muted">Cód. {property.codigo}</span>
-              </div>
-              <h1 className="mt-3 text-2xl font-bold tracking-tight text-ink sm:text-3xl">
-                {property.titulo}
-              </h1>
-              {ubicacionTexto && (
-                <p className="mt-1.5 flex items-center gap-1.5 text-muted">
-                  <MapPin className="h-4 w-4 flex-none text-brand-500" aria-hidden="true" />
-                  {sector ? (
-                    // Un solo nodo de texto: el gap del flex solo separa el icono, no la coma de la ciudad.
-                    <span>
-                      {/* Enlace interno a la página del sector: le da a Google el contexto "apartamentos en X". */}
-                      <Link href={sectorPath(sector)} className="font-medium text-ink-soft underline-offset-4 hover:text-brand-700 hover:underline">
-                        {sector.nombre}
-                      </Link>
-                      {ubicacion.ciudad ? `, ${ubicacion.ciudad}` : ""}
-                    </span>
-                  ) : (
-                    <span>{ubicacionTexto}</span>
-                  )}
-                </p>
-              )}
-            </div>
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-x-8 gap-y-3">
+          <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1">
+            <p className="tnum text-[2rem] font-semibold tracking-[-0.03em] sm:text-[2.5rem]">{formatPriceOrConsult(property.precio)}</p>
+            <EstadoPublico estado={property.estado} />
           </div>
+          <div className="-mx-2 flex flex-wrap items-center gap-1">
+            <BotonFavorito id={property.slug} titulo={property.titulo} variante="plano" />
+            <BotonCompartir url={fichaUrl} titulo={`${property.titulo} · ${siteConfig.name}`} texto={propertyMeta(property).description} />
+            <BotonComparar id={property.slug} titulo={property.titulo} className="mx-2" />
+          </div>
+        </div>
 
-          {/* Especificaciones: lista de definición (par campo-valor legible
-              por buscadores e IAs, no solo divs decorativos) */}
-          {specs.length > 0 && (
-            <dl className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {specs.map((s) => (
-                <div key={s.label} className="rounded-xl border border-line bg-white p-4 transition-colors hover:border-brand-200">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-50 text-brand-700">
-                    <s.icon className="h-5 w-5" />
-                  </span>
-                  <dt className="mt-3 text-xs text-muted">{s.label}</dt>
-                  <dd className="font-semibold text-ink">{s.value}</dd>
+        {property.estado === "vendido" && (
+          <p className="mt-6 max-w-xl rounded-[var(--radius-card)] bg-surface px-5 py-4 text-[15px]">
+            Este inmueble ya fue vendido. Escríbenos y te mostramos opciones similares.
+          </p>
+        )}
+        {property.estado === "en_proceso" && (
+          <p className="mt-6 max-w-xl rounded-[var(--radius-card)] bg-surface px-5 py-4 text-[15px]">
+            Está en proceso de venta. Escríbenos para confirmar si sigue disponible.
+          </p>
+        )}
+      </header>
+
+      <Galeria
+        titulo={property.titulo}
+        fotos={images.map((m) => ({ id: m.id, url: m.url, alt: m.alt }))}
+      />
+
+      <div className="wrap mt-16 grid gap-16 lg:grid-cols-[minmax(0,1fr)_25rem] lg:gap-20">
+        <div className="min-w-0 space-y-20">
+          {cifras.length > 0 && (
+            <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-[var(--radius-card)] bg-line sm:grid-cols-4">
+              {cifras.map((s) => (
+                <div key={s.etiqueta} className="bg-white px-5 py-6">
+                  <dt className="text-[14px] text-muted">{s.etiqueta}</dt>
+                  <dd className="tnum mt-1 text-[2.5rem] font-semibold leading-none tracking-[-0.03em]">
+                    {s.valor}
+                    {s.unidad && <span className="ml-1 text-[1.125rem] font-medium tracking-normal text-muted">{s.unidad}</span>}
+                  </dd>
                 </div>
               ))}
             </dl>
           )}
 
-          {/* Descripción */}
-          {property.descripcion && (
-            <section className="mt-10">
-              <h2 className="text-xl font-bold tracking-tight text-ink">Descripción</h2>
-              <p className="mt-3 whitespace-pre-line leading-relaxed text-ink-soft">
-                {property.descripcion}
-              </p>
+          <DescripcionFicha d={descripcion} />
+
+          {videoId && (
+            <section aria-labelledby="video-titulo">
+              <h2 id="video-titulo" className="t-title mb-6">Recorrido en video</h2>
+              <VideoYoutube id={videoId} titulo={property.titulo} />
             </section>
           )}
+
+          {datos.length > 0 && (
+            <section aria-labelledby="datos-titulo">
+              <h2 id="datos-titulo" className="t-title">Datos del inmueble</h2>
+              <dl className="mt-6">
+                {datos.map((d) => (
+                  <div key={d.etiqueta} className="grid gap-x-6 border-t border-line py-4 sm:grid-cols-[13rem_1fr]">
+                    <dt className="text-[15px] text-muted">{d.etiqueta}</dt>
+                    <dd className="tnum text-[15px] font-medium">
+                      {d.valor}
+                      {d.nota && <span className="mt-1 block text-[13px] font-normal text-muted">{d.nota} Compara solo entre inmuebles de CIC, no con el mercado.</span>}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          )}
+
+          {property.estado !== "vendido" && <SimuladorCuota precio={property.precio} />}
         </div>
 
-        {/* Barra lateral */}
-        <aside className="lg:col-span-1">
-          <div className="lg:sticky lg:top-24 space-y-4">
-            <div className="rounded-[1.4rem] border border-line bg-white p-6 shadow-[0_10px_40px_-28px_rgba(11,26,21,0.35)]">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-600">Precio</p>
-              <p className="mt-1 font-display text-3xl font-extrabold tracking-tight text-ink">
-                {formatPrice(property.precio)}
-              </p>
-              {property.estado === "vendido" && (
-                <p className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700">
-                  Este inmueble ya fue vendido. Escríbenos para ver opciones similares.
-                </p>
-              )}
-            </div>
-
-            <PropertyContactCard
-              propertyId={property.id}
-              propertySlug={property.slug}
-              title={property.titulo}
-              whatsappMessage={whatsappMessage}
-            />
-          </div>
-        </aside>
+        <div className="lg:sticky lg:top-24 lg:self-start">
+          <AgendarVisita
+            propertyId={property.id}
+            propertySlug={property.slug}
+            titulo={property.titulo}
+            codigo={property.codigo}
+            url={fichaUrl}
+            precio={formatPriceOrConsult(property.precio)}
+            vendido={property.estado === "vendido"}
+          />
+        </div>
       </div>
-    </div>
+
+      {parecidos.length > 0 && (
+        <section className="mt-28 bg-surface" aria-labelledby="parecidos-titulo">
+          <div className="wrap section-y">
+            <h2 id="parecidos-titulo" className="t-headline max-w-2xl">Otros inmuebles que podrían interesarte</h2>
+            <div className="mt-12">
+              <RejillaInmuebles inmuebles={parecidos} />
+            </div>
+          </div>
+        </section>
+      )}
+
+      {property.estado !== "vendido" && <BarraMovil titulo={property.titulo} precio={formatPriceOrConsult(property.precio)} />}
+    </>
   );
 }

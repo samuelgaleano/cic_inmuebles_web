@@ -129,21 +129,18 @@ export function PagoResultado({ estado, plan, amountInCents, reference, actualUr
   return (
     <section
       aria-labelledby="pago-titulo"
-      className={cn(
-        "animate-rise mx-auto max-w-2xl rounded-[1.6rem] border bg-white p-6 shadow-[0_24px_60px_-36px_rgba(11,26,21,0.35)] sm:p-8",
-        t.borde,
-      )}
+      className="anim-sube mx-auto max-w-2xl rounded-[var(--radius-tile)] bg-surface p-8 sm:p-10"
     >
       <span className={cn("flex h-14 w-14 items-center justify-center rounded-full", t.anillo, t.icono)}>
         <Icono className="h-7 w-7" aria-hidden="true" />
       </span>
-      <h1 id="pago-titulo" className="mt-5 text-balance text-3xl font-bold tracking-tight text-ink sm:text-4xl">
+      <h1 id="pago-titulo" className="t-headline mt-6">
         {c.titulo}
       </h1>
-      <p className="mt-3 text-lg leading-relaxed text-muted">{c.lead}</p>
+      <p className="mt-4 text-[1.125rem] leading-relaxed text-muted">{c.lead}</p>
 
       {(plan || monto || reference) && (
-        <dl className="mt-6 grid gap-x-6 gap-y-3 rounded-2xl bg-surface px-5 py-4 text-sm sm:grid-cols-[auto_1fr] sm:gap-y-2">
+        <dl className="mt-8 grid gap-x-6 gap-y-3 rounded-[var(--radius-card)] bg-white px-5 py-4 text-[15px] sm:grid-cols-[auto_1fr] sm:gap-y-2">
           {plan && (
             <>
               <dt className="font-medium text-muted">Plan</dt>
@@ -171,7 +168,7 @@ export function PagoResultado({ estado, plan, amountInCents, reference, actualUr
         </dl>
       )}
 
-      <h2 className="mt-8 text-base font-bold tracking-tight text-ink">{c.pasosTitulo}</h2>
+      <h2 className="mt-10 text-[1.0625rem] font-semibold tracking-[-0.01em]">{c.pasosTitulo}</h2>
       <ol className="mt-3 space-y-2.5">
         {c.pasos.map((paso, i) => (
           <li key={paso} className="flex gap-3 text-sm leading-relaxed text-ink-soft">
@@ -184,7 +181,7 @@ export function PagoResultado({ estado, plan, amountInCents, reference, actualUr
             >
               {i + 1}
             </span>
-            <span className="pt-0.5">{paso}</span>
+            <span className="pt-0.5 text-[15px]">{paso}</span>
           </li>
         ))}
       </ol>

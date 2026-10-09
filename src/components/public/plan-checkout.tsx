@@ -18,7 +18,7 @@ const WIDGET_ORIGIN = "https://checkout.wompi.co";
 const WIDGET_SRC = `${WIDGET_ORIGIN}/widget.js`;
 // 16px en móvil: por debajo de eso iOS Safari hace zoom al enfocar el campo.
 const inputClass =
-  "h-11 w-full rounded-xl border border-line bg-surface px-3.5 text-base text-ink transition-colors focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-200 sm:text-sm";
+  "h-12 w-full rounded-[var(--radius-field)] border border-field bg-white px-4 text-base text-ink transition-[border-color,box-shadow] duration-200 focus:border-brand-700 focus:outline-none focus:ring-4 focus:ring-brand-700/15";
 
 type WidgetState = "idle" | "loading" | "ready" | "error";
 
@@ -229,7 +229,7 @@ export function PlanCheckout({
 
       {open && (
         <div
-          className="fixed inset-0 z-[100] flex items-end justify-center bg-ink/50 p-0 backdrop-blur-sm sm:items-center sm:p-4"
+          className="fixed inset-0 z-[100] flex items-end justify-center bg-ink/55 p-0 sm:items-center sm:p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby={titleId}
@@ -237,30 +237,30 @@ export function PlanCheckout({
         >
           <div
             ref={dialogRef}
-            className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-[1.6rem] border border-line bg-white p-6 shadow-2xl sm:rounded-[1.6rem]"
+            className="max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-t-[var(--radius-tile)] bg-white p-6 sm:rounded-[var(--radius-tile)] sm:p-8"
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h3 id={titleId} className="text-lg font-bold tracking-tight text-ink">
+                <h3 id={titleId} className="text-[1.25rem] font-semibold tracking-[-0.02em]">
                   Contratar {planNombre}
                 </h3>
-                <p className="mt-1 font-display text-2xl font-extrabold tracking-tight text-ink">{formatPrice(precioCOP)}</p>
+                <p className="tnum mt-1 text-[1.75rem] font-semibold tracking-[-0.03em]">{formatPrice(precioCOP)}</p>
               </div>
               <button
                 type="button"
                 onClick={close}
                 disabled={loading}
                 aria-label="Cerrar"
-                className="-mr-2 -mt-2 flex h-10 w-10 flex-none items-center justify-center rounded-full text-muted transition-colors hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:opacity-50"
+                className="-mr-2 -mt-2 flex h-10 w-10 flex-none items-center justify-center rounded-full text-muted transition-colors hover:bg-surface hover:text-ink disabled:opacity-50"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            <form onSubmit={pay} className="mt-5 space-y-3">
+            <form onSubmit={pay} className="mt-6 space-y-4">
               {FIELDS.map((f) => (
                 <div key={f.key}>
-                  <label htmlFor={`${uid}-${f.key}`} className="mb-1.5 block text-sm font-medium text-ink-soft">
+                  <label htmlFor={`${uid}-${f.key}`} className="mb-1.5 block text-[14px] font-medium text-ink">
                     {f.label}
                   </label>
                   <input

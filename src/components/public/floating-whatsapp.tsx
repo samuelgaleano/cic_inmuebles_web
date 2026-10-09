@@ -1,23 +1,41 @@
+"use client";
+
 import { MessageCircle } from "lucide-react";
+import { usePathname } from "next/navigation";
 import { siteConfig, whatsappLink } from "@/lib/config/site";
+import { cn } from "@/lib/utils/cn";
+
+/** Lo que el visitante estaba mirando, para que el primer mensaje ya llegue con contexto. */
+function mensajeSegunRuta(pathname: string): string {
+  if (/^\/inmuebles\/[^/]+$/.test(pathname)) {
+    return `Hola ${siteConfig.name}, me interesa este inmueble: ${siteConfig.url}${pathname}`;
+  }
+  if (pathname.startsWith("/vender")) return `Hola ${siteConfig.name}, quiero vender mi inmueble. ¿Me pueden ayudar?`;
+  if (pathname.startsWith("/publica")) return `Hola ${siteConfig.name}, quiero publicar mis inmuebles con ustedes.`;
+  return `Hola ${siteConfig.name}, quiero más información sobre sus inmuebles.`;
+}
 
 /**
  * Botón flotante de WhatsApp presente en todo el sitio público: el contacto
- * con la inmobiliaria queda siempre a un toque, en cualquier página.
+ * con la inmobiliaria queda siempre a un toque. En la ficha, en móvil, lo
+ * reemplaza la barra inferior (precio + "Agendar visita") para no taparla.
  */
 export function FloatingWhatsApp() {
+  const pathname = usePathname();
+  const enFicha = /^\/inmuebles\/[^/]+$/.test(pathname);
+
   return (
     <a
-      href={whatsappLink(`Hola ${siteConfig.name}, quiero más información sobre sus inmuebles.`)}
+      href={whatsappLink(mensajeSegunRuta(pathname))}
       target="_blank"
       rel="noopener noreferrer"
       aria-label="Escríbenos por WhatsApp"
-      className="group fixed bottom-5 right-5 z-40 flex h-14 items-center gap-0 rounded-full bg-[#25D366] pl-[15px] pr-[15px] text-ink shadow-[0_14px_34px_-10px_rgba(37,211,102,0.65)] transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover:pr-5 hover:shadow-[0_18px_40px_-10px_rgba(37,211,102,0.8)] active:scale-95"
+      className={cn(
+        "fixed bottom-5 right-5 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-[#25D366] text-ink shadow-float transition-transform duration-200 hover:scale-105 active:scale-95",
+        enFicha && "max-lg:hidden",
+      )}
     >
-      <MessageCircle className="h-[26px] w-[26px] shrink-0" aria-hidden />
-      <span className="max-w-0 overflow-hidden whitespace-nowrap text-sm font-semibold opacity-0 transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:ml-2.5 group-hover:max-w-[10rem] group-hover:opacity-100">
-        Escríbenos
-      </span>
+      <MessageCircle className="h-6 w-6" aria-hidden />
     </a>
   );
 }

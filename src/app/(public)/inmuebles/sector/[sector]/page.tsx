@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, MapPin } from "lucide-react";
-import { PropertyGrid } from "@/components/public/property-grid";
+import { ArrowLeft } from "lucide-react";
+import { RejillaInmuebles } from "@/components/public/rejilla-inmuebles";
 import { WhatsAppButton } from "@/components/public/whatsapp-button";
 import { JsonLd } from "@/components/seo/json-ld";
 import { propertyUrl, siteConfig } from "@/lib/config/site";
@@ -109,29 +109,26 @@ export default async function SectorPage({ params }: { params: Promise<{ sector:
   ];
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
+    <>
       <JsonLd data={jsonLd} />
 
-      <Link
-        href="/inmuebles"
-        className="inline-flex items-center gap-1.5 py-2 text-sm font-medium text-muted transition-colors hover:gap-2 hover:text-brand-700"
-      >
-        <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Todos los inmuebles
-      </Link>
+      <div className="wrap pt-8">
+        <Link href="/inmuebles" className="link-arrow py-2 text-[15px]">
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Todos los inmuebles
+        </Link>
+      </div>
 
-      <header className="mt-4 max-w-2xl">
-        <p className="inline-flex items-center gap-1.5 text-sm font-medium text-brand-700">
-          <MapPin className="h-4 w-4" aria-hidden="true" /> {s.ciudad}
-        </p>
-        <h1 className="mt-2 text-balance text-3xl font-bold tracking-tight text-ink sm:text-4xl">{titulo}</h1>
-        <p className="mt-3 text-muted">
+      <header className="wrap pb-10 pt-8 sm:pb-14 sm:pt-12">
+        <p className="text-[15px] text-muted">{s.ciudad}</p>
+        <h1 className="t-display mt-2 max-w-4xl">{titulo}</h1>
+        <p className="t-lead mt-5 max-w-2xl">
           {n > 0 ? (
             <>
-              <span className="font-semibold text-ink">{n}</span> {n === 1 ? "inmueble disponible" : "inmuebles disponibles"}
+              {n} {n === 1 ? "inmueble disponible" : "inmuebles disponibles"}
               {rango && (
                 <>
                   {" "}· {n === 1 ? "" : "de "}
-                  <span className="font-semibold text-ink">{rango}</span>
+                  {rango}
                 </>
               )}
               .{" "}
@@ -143,45 +140,40 @@ export default async function SectorPage({ params }: { params: Promise<{ sector:
         </p>
       </header>
 
-      <div className="mt-8">
-        <PropertyGrid properties={s.inmuebles} />
+      <div className="wrap">
+        <h2 className="sr-only">Inmuebles en {s.nombre}</h2>
+        <RejillaInmuebles inmuebles={s.inmuebles} />
       </div>
 
-      <section className="mt-12 rounded-[1.6rem] border border-line bg-surface p-6 sm:p-8" aria-labelledby="sector-cta">
-        <h2 id="sector-cta" className="text-xl font-bold tracking-tight text-ink">
-          ¿Buscas algo distinto en {s.nombre}?
-        </h2>
-        <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted">
-          El catálogo es corto a propósito y cambia seguido. Cuéntanos qué buscas y te avisamos apenas
-          entre un inmueble que encaje.
-        </p>
-        <WhatsAppButton
-          className="mt-5"
-          label="Cuéntanos qué buscas"
-          message={`Hola ${siteConfig.name}, busco un inmueble en ${s.nombre}, ${s.ciudad}. ¿Me ayudan?`}
-        />
-      </section>
+      <section className="mt-24 bg-surface" aria-labelledby="sector-cta">
+        <div className="wrap section-y">
+          <h2 id="sector-cta" className="t-headline max-w-2xl">¿Buscas algo distinto en {s.nombre}?</h2>
+          <p className="t-lead mt-4 max-w-xl">
+            El catálogo es corto a propósito y cambia seguido. Cuéntanos qué buscas y te avisamos apenas entre un inmueble que encaje.
+          </p>
+          <WhatsAppButton
+            className="mt-8"
+            size="lg"
+            label="Cuéntanos qué buscas"
+            message={`Hola ${siteConfig.name}, busco un inmueble en ${s.nombre}, ${s.ciudad}. ¿Me ayudan?`}
+          />
 
-      {otros.length > 0 && (
-        <nav className="mt-10" aria-labelledby="otros-sectores">
-          <h2 id="otros-sectores" className="text-sm font-semibold text-muted">
-            Otros sectores en {s.ciudad}
-          </h2>
-          <ul className="mt-3 flex flex-wrap gap-2">
-            {otros.map((o) => (
-              <li key={o.slug}>
-                <Link
-                  href={sectorPath(o)}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3.5 py-1.5 text-sm font-medium text-ink transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-800"
-                >
-                  {o.nombre}
-                  <span className="text-xs text-muted">{o.inmuebles.length}</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </nav>
-      )}
-    </div>
+          {otros.length > 0 && (
+            <nav className="mt-14 border-t border-line-strong/60 pt-8" aria-labelledby="otros-sectores">
+              <h2 id="otros-sectores" className="text-[15px] font-semibold">Otros sectores en {s.ciudad}</h2>
+              <ul className="mt-4 flex flex-wrap gap-x-6 gap-y-2">
+                {otros.map((o) => (
+                  <li key={o.slug}>
+                    <Link href={sectorPath(o)} className="link-arrow py-1 text-[15px]">
+                      {o.nombre} <span className="tnum text-muted">({o.inmuebles.length})</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          )}
+        </div>
+      </section>
+    </>
   );
 }

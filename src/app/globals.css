@@ -1,11 +1,12 @@
 @import "tailwindcss";
 
 /*
-  Sistema de diseño CIC Inmuebles.
-  Anclado al logo: verde esmeralda vivo (héroe) + "tinta" verde-negro profundo
-  (los bloques isométricos) + off-white. Acento dorado champagne con extrema
-  moderación para el toque premium de finca raíz de alta gama.
-  Tailwind v4: los tokens se exponen como utilidades (bg-brand-600, text-ink, ...).
+  Sistema visual CIC Inmuebles — "Galería".
+  El inmueble es la obra; la interfaz es el muro blanco. Una sola voz de color
+  (esmeralda, solo en lo que se toca), baldosas alternas blanco / surface / tinta,
+  una familia tipográfica, líneas de 1 px en lugar de sombras.
+  Los nombres de token (brand-*, ink, muted, surface, line) se conservan: el panel
+  de administración los usa. Tailwind v4: cada token es una utilidad.
 */
 @theme {
   /* Marca — esmeralda */
@@ -16,75 +17,186 @@
   --color-brand-400: #2dd89b;
   --color-brand-500: #12c08a; /* verde vivo del logo (sobre fondos oscuros) */
   --color-brand-600: #07a276;
-  --color-brand-700: #047d5b; /* botón primario sobre blanco (contraste AA) */
+  --color-brand-700: #047d5b; /* acción sobre blanco (contraste AA) */
   --color-brand-800: #066149;
   --color-brand-900: #06493a;
-  --color-brand-950: #032a22; /* secciones oscuras profundas */
+  --color-brand-950: #032a22;
 
-  /* Acento — dorado champagne (uso mínimo) */
+  /* Dorado: solo lo usa el panel de administración; el sitio público no. */
   --color-accent-400: #f5cf7a;
   --color-accent-500: #e2ad4e;
   --color-accent-600: #c08a2e;
 
   /* Neutros con matiz verde */
-  --color-ink: #0b1a15; /* casi negro de los bloques */
+  --color-ink: #0b1a15;
   --color-ink-soft: #1d2c26;
+  --color-ink-deep: #07120e;
   --color-muted: #5a6b64;
   --color-surface: #f4f7f5;
   --color-line: #e3eae6;
+  --color-line-strong: #c9d3ce;
+  /* Borde de campos de formulario: 3,4:1 sobre blanco (WCAG 1.4.11). */
+  --color-field: #7f8f88;
 
-  --font-display: var(--font-sora), ui-sans-serif, system-ui, sans-serif;
-  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --font-display: var(--font-albert), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sans: var(--font-albert), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
   --ease-fluid: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-exit: cubic-bezier(0.7, 0, 0.84, 0);
+
+  --radius-card: 1.25rem;
+  --radius-tile: 1.75rem;
+  --radius-media: 1rem;
+  --radius-field: 0.875rem;
+
+  /* La única sombra del sitio: bajo el buscador y los elementos flotantes. */
+  --shadow-float: 0 1px 2px rgb(11 26 21 / 0.05), 0 18px 40px -18px rgb(11 26 21 / 0.22);
 }
 
-:root {
-  --background: #ffffff;
-  --foreground: var(--color-ink);
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+    scroll-padding-top: 4.5rem;
+  }
+
+  body {
+    background: #fff;
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: 1.0625rem;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+
+  ::selection {
+    background: var(--color-brand-200);
+    color: var(--color-ink);
+  }
+
+  /* Placeholder legible (5,2:1 sobre surface), caret y controles nativos en esmeralda. */
+  ::placeholder {
+    color: var(--color-muted);
+    opacity: 1;
+  }
+  input,
+  textarea,
+  select {
+    caret-color: var(--color-brand-600);
+    accent-color: var(--color-brand-600);
+  }
+
+  /* Foco visible y único para todo lo que se puede accionar (los campos de texto llevan el suyo). */
+  :where(a, button, summary, [role="button"], [tabindex]:not([tabindex="-1"])):focus-visible {
+    outline: 2px solid var(--color-brand-600);
+    outline-offset: 3px;
+  }
+
+  dialog {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    max-width: none;
+    max-height: none;
+  }
+  dialog::backdrop {
+    background: rgb(7 18 14 / 0.62);
+  }
 }
 
-html {
-  -webkit-text-size-adjust: 100%;
-  scroll-behavior: smooth;
+@layer components {
+  /* ── Tipografía: cinco roles, nada más ── */
+  .t-display {
+    font-size: clamp(2.75rem, 6vw + 0.5rem, 5.5rem);
+    line-height: 1.02;
+    font-weight: 600;
+    letter-spacing: -0.04em;
+    text-wrap: balance;
+  }
+  .t-headline {
+    font-size: clamp(2rem, 3.4vw + 0.5rem, 3.5rem);
+    line-height: 1.06;
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    text-wrap: balance;
+  }
+  .t-title {
+    font-size: clamp(1.375rem, 1.1vw + 1rem, 1.75rem);
+    line-height: 1.15;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+  .t-lead {
+    font-size: clamp(1.1875rem, 0.8vw + 1rem, 1.5rem);
+    line-height: 1.4;
+    letter-spacing: -0.01em;
+    color: var(--color-muted);
+    text-wrap: pretty;
+  }
+  .t-caption {
+    font-size: 0.875rem;
+    line-height: 1.4;
+    color: var(--color-muted);
+  }
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── Estructura ── */
+  .wrap {
+    width: 100%;
+    max-width: 75rem;
+    margin-inline: auto;
+    padding-inline: 1.25rem;
+  }
+  @media (min-width: 640px) {
+    .wrap {
+      padding-inline: 2rem;
+    }
+  }
+  .section-y {
+    padding-block: clamp(4.5rem, 9vw, 8.5rem);
+  }
+
+  /* Tira horizontal que sangra hasta el borde pero arranca alineada con el contenedor. */
+  .pad-tira {
+    padding-inline: max(1.25rem, calc((100% - 75rem) / 2 + 1.25rem));
+    scroll-padding-inline: max(1.25rem, calc((100% - 75rem) / 2 + 1.25rem));
+  }
+  @media (min-width: 640px) {
+    .pad-tira {
+      padding-inline: max(2rem, calc((100% - 75rem) / 2 + 2rem));
+      scroll-padding-inline: max(2rem, calc((100% - 75rem) / 2 + 2rem));
+    }
+  }
+
+  /* Enlace con flecha: "Ver el inmueble ›" */
+  .link-arrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-weight: 500;
+    color: var(--color-brand-700);
+    transition: gap 0.3s var(--ease-fluid), color 0.2s;
+  }
+  .link-arrow:hover {
+    gap: 0.5rem;
+    color: var(--color-brand-800);
+  }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-sans);
-  text-rendering: optimizeLegibility;
-}
-
-/* Encabezados con la display, tracking apretado para presencia editorial */
-h1,
-h2,
-h3 {
-  font-family: var(--font-display);
-  letter-spacing: -0.02em;
-}
-
-::selection {
-  background: var(--color-brand-200);
-  color: var(--color-ink);
-}
-
-/* Superficies del navegador que también llevan la marca: placeholder legible
-   (5.2:1 sobre surface; el default de Tailwind quedaba en 3.4:1), caret y
-   controles nativos en esmeralda. */
-::placeholder {
-  color: var(--color-muted);
-  opacity: 1;
-}
-input,
-textarea,
-select {
-  caret-color: var(--color-brand-600);
-  accent-color: var(--color-brand-600);
-}
-
-/* Línea de recorte para descripciones en tarjetas */
+/* Línea de recorte (también la usa el panel de administración) */
 .line-clamp-2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -97,105 +209,317 @@ select {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-
-/* Equilibrio de líneas en títulos */
 .text-balance {
   text-wrap: balance;
 }
 
-/* ── Reveal al hacer scroll (lo activa el componente Reveal) ── */
-.reveal {
-  opacity: 0;
-  transform: translateY(26px);
-  filter: blur(6px);
-  transition:
-    opacity 0.8s var(--ease-fluid),
-    transform 0.8s var(--ease-fluid),
-    filter 0.8s var(--ease-fluid);
-  will-change: transform, opacity;
+/* Resplandor y grano: solo los usa el panel de administración (login y barra lateral). */
+.bg-aurora {
+  background-image:
+    radial-gradient(60% 55% at 78% 18%, rgba(18, 192, 138, 0.28), transparent 60%),
+    radial-gradient(45% 40% at 12% 88%, rgba(18, 192, 138, 0.16), transparent 60%);
 }
-.reveal-in {
-  opacity: 1;
-  transform: none;
-  filter: none;
+.bg-grain {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
-/* ── Animaciones de entrada (héroe) ── */
-@keyframes rise {
+/* ══════════════════════════ MOVIMIENTO ══════════════════════════
+   Reglas: solo transform y opacity; el contenido es visible por defecto
+   (lo oculto solo se aplica tras hidratar y por debajo del pliegue);
+   las animaciones ligadas al scroll viven dentro de @supports y degradan a
+   estático; prefers-reduced-motion las apaga al final del archivo. */
+
+/* 1 · Titular por palabras: cada palabra sube desde una máscara. */
+@keyframes palabra-sube {
+  from {
+    transform: translateY(108%);
+  }
+  to {
+    transform: none;
+  }
+}
+.palabra {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: bottom;
+  padding-block: 0.1em 0.16em;
+  margin-block: -0.1em -0.16em;
+}
+.palabra > span {
+  display: inline-block;
+  animation: palabra-sube 0.95s var(--ease-fluid) both;
+  animation-delay: calc(var(--i, 0) * 70ms + 120ms);
+}
+
+/* Entrada simple al cargar (subtítulo, buscador). */
+@keyframes sube {
   from {
     opacity: 0;
-    transform: translateY(22px);
+    transform: translateY(18px);
   }
   to {
     opacity: 1;
     transform: none;
   }
 }
-.animate-rise {
-  animation: rise 0.9s var(--ease-fluid) both;
+.anim-sube {
+  animation: sube 0.85s var(--ease-fluid) both;
+  animation-delay: var(--d, 0ms);
 }
 
-@keyframes float-blocks {
-  0%,
+/* 2 · Entrada al hacer scroll (la marca el componente Reveal tras hidratar). */
+[data-reveal] {
+  transition:
+    opacity 0.85s var(--ease-fluid),
+    transform 0.85s var(--ease-fluid);
+  transition-delay: var(--d, 0ms);
+}
+[data-reveal="pendiente"] {
+  opacity: 0;
+  transform: translateY(28px);
+}
+
+/* 3 · Respuestas a la acción. */
+@keyframes latido {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.28);
+  }
   100% {
-    transform: translateY(0) rotate(0deg);
-  }
-  50% {
-    transform: translateY(-10px) rotate(1.5deg);
+    transform: scale(1);
   }
 }
-.animate-float {
-  animation: float-blocks 7s ease-in-out infinite;
+.anim-latido {
+  animation: latido 0.42s var(--ease-fluid);
+}
+@keyframes chip-entra {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.88);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.anim-chip {
+  animation: chip-entra 0.42s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+}
+@keyframes bandeja-sube {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 140%);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+.anim-bandeja {
+  animation: bandeja-sube 0.6s var(--ease-fluid) both;
+}
+@keyframes cifra-cambia {
+  from {
+    opacity: 0;
+    transform: translateY(0.45em);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.anim-fundido {
+  animation: fundido 0.3s ease-out both;
+}
+.anim-cifra {
+  display: inline-block;
+  animation: cifra-cambia 0.4s var(--ease-fluid) both;
 }
 
-/* Brillo diagonal continuo del CTA de venta del héroe */
-@keyframes cta-shine {
-  0%,
-  15% {
-    transform: translateX(-140%) skewX(-12deg);
+/* 4 · Ligado al scroll (sin JS ni listeners). Sin soporte: todo queda estático y legible. */
+@keyframes scrub-linea {
+  from {
+    color: #b9c4be;
   }
-  55%,
-  100% {
-    transform: translateX(340%) skewX(-12deg);
+  to {
+    color: var(--color-ink);
   }
 }
-.animate-cta-shine {
-  animation: cta-shine 3.2s ease-in-out infinite;
+@keyframes parallax-x {
+  from {
+    transform: translate3d(-5%, 0, 0) scale(1.16);
+  }
+  to {
+    transform: translate3d(5%, 0, 0) scale(1.16);
+  }
+}
+@keyframes parallax-y {
+  from {
+    transform: translate3d(0, -4%, 0) scale(1.1);
+  }
+  to {
+    transform: translate3d(0, 4%, 0) scale(1.1);
+  }
+}
+@keyframes borde-aparece {
+  from {
+    border-bottom-color: transparent;
+  }
+  to {
+    border-bottom-color: var(--color-line);
+  }
+}
+@supports (animation-timeline: view()) {
+  .scrub-linea {
+    animation: scrub-linea linear both;
+    animation-timeline: view();
+    animation-range: cover 8% cover 40%;
+  }
+  .parallax-x {
+    animation: parallax-x linear both;
+    animation-timeline: view(inline);
+    animation-range: entry 0% exit 100%;
+  }
+  .parallax-y {
+    animation: parallax-y linear both;
+    animation-timeline: view();
+    animation-range: cover;
+  }
+  .barra-borde {
+    animation: borde-aparece linear both;
+    animation-timeline: scroll(root);
+    animation-range: 0px 72px;
+  }
 }
 
-/* Resplandor radial reutilizable para fondos oscuros */
-.bg-aurora {
-  background-image:
-    radial-gradient(60% 55% at 78% 18%, rgba(18, 192, 138, 0.28), transparent 60%),
-    radial-gradient(45% 40% at 12% 88%, rgba(18, 192, 138, 0.16), transparent 60%);
+/* Hoja lateral de filtros: sube en móvil, entra por la derecha en escritorio. */
+@keyframes hoja-sube {
+  from {
+    transform: translateY(36px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes hoja-entra {
+  from {
+    transform: translateX(36px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes fundido {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+dialog.hoja[open] > * {
+  animation: hoja-sube 0.5s var(--ease-fluid) both;
+}
+dialog.hoja[open]::backdrop {
+  animation: fundido 0.3s ease-out both;
+}
+@media (min-width: 640px) {
+  dialog.hoja[open] > * {
+    animation-name: hoja-entra;
+  }
 }
 
-/* Textura de grano sutil (overlay físico) */
-.bg-grain {
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+/* Control deslizante (simulador de cuota): pista fina con relleno hasta el valor y pulgar blanco. */
+input[type="range"].rango {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 1.5rem;
+  background: transparent;
+  cursor: pointer;
+}
+input[type="range"].rango::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(to right, var(--color-brand-700) var(--p, 0%), var(--color-line-strong) var(--p, 0%));
+}
+input[type="range"].rango::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--color-line-strong);
+}
+input[type="range"].rango::-moz-range-progress {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--color-brand-700);
+}
+input[type="range"].rango::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 24px;
+  height: 24px;
+  margin-top: -10px;
+  border-radius: 999px;
+  background: #fff;
+  border: 2px solid var(--color-brand-700);
+  box-shadow: 0 1px 3px rgb(11 26 21 / 0.25);
+  transition: transform 0.15s ease-out;
+}
+input[type="range"].rango::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: #fff;
+  border: 2px solid var(--color-brand-700);
+  box-shadow: 0 1px 3px rgb(11 26 21 / 0.25);
+}
+input[type="range"].rango:active::-webkit-slider-thumb {
+  transform: scale(1.12);
+}
+input[type="range"].rango:focus-visible {
+  outline: 2px solid var(--color-brand-600);
+  outline-offset: 4px;
+  border-radius: 999px;
+}
+
+/* 5 · Continuidad entre páginas (View Transitions): la foto de la tarjeta viaja a la ficha. */
+::view-transition-group(.morph) {
+  animation-duration: 560ms;
+  animation-timing-function: var(--ease-fluid);
+}
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 240ms;
 }
 
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
   }
-  /* Cubre también las utilidades de Tailwind (hover:-translate-y-1, active:scale…)
-     que el bloque de abajo no alcanza: el cambio ocurre, pero sin animarse. */
   *,
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
   }
-  .reveal,
-  .animate-rise,
-  .animate-float,
-  .animate-cta-shine {
+  [data-reveal="pendiente"] {
+    opacity: 1;
+    transform: none;
+  }
+  .scrub-linea,
+  .parallax-x,
+  .parallax-y {
     animation: none !important;
-    transition: none !important;
-    opacity: 1 !important;
-    transform: none !important;
-    filter: none !important;
+  }
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
   }
 }

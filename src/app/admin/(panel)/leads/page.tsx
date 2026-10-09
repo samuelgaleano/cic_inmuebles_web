@@ -3,12 +3,13 @@ import { getRepository } from "@/lib/data";
 import { deleteLeadAction } from "@/lib/actions/admin-leads";
 import { LeadStatusForm } from "@/components/admin/lead-status-form";
 import { LEAD_INTENT_LABELS } from "@/lib/domain";
+import { enlaceWhatsApp } from "@/lib/utils/telefono";
 
 export const dynamic = "force-dynamic";
 
-function waLink(phone: string): string {
-  const digits = phone.replace(/\D/g, "");
-  return `https://wa.me/${digits}`;
+// Un celular escrito sin el 57 ("300 123 4567") daba wa.me/3001234567: enlace inválido.
+function waLink(phone: string): string | undefined {
+  return enlaceWhatsApp(phone);
 }
 
 function formatDate(iso: string): string {

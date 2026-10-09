@@ -65,47 +65,43 @@ const inicios = secciones.reduce<number[]>((acc, s, i) => {
 
 export default function CondicionesPage() {
   return (
-    <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
-      <Link
-        href="/publica/agente"
-        className="inline-flex items-center gap-1.5 py-2 text-sm font-medium text-muted transition-colors hover:gap-2 hover:text-brand-700"
-      >
-        <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Volver a los planes
-      </Link>
+    <>
+      <div className="wrap pt-8">
+        <Link href="/publica/agente" className="link-arrow py-2 text-[15px]">
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Volver a los planes
+        </Link>
+      </div>
 
-      <h1 className="mt-4 text-balance text-3xl font-bold tracking-tight text-ink sm:text-4xl">
-        Condiciones de publicación
-      </h1>
-      <p className="mt-3 text-muted">
-        Aplican a la publicación de inmuebles en CIC Inmuebles para agentes, inmobiliarias y
-        propietarios.
-      </p>
+      <header className="wrap pb-10 pt-8 sm:pb-14 sm:pt-12">
+        <h1 className="t-display max-w-4xl">Condiciones de publicación.</h1>
+        <p className="t-lead mt-5 max-w-2xl">
+          Aplican a la publicación de inmuebles en CIC Inmuebles para agentes, inmobiliarias y propietarios.
+        </p>
+      </header>
 
-      {secciones.map((s, idx) => {
-        const inicio = inicios[idx];
-        return (
-          <section key={s.titulo} className="mt-10" aria-labelledby={`cond-${inicio}`}>
-            <h2 id={`cond-${inicio}`} className="text-lg font-bold tracking-tight text-ink">
-              {s.titulo}
-            </h2>
-            <ol start={inicio} className="mt-4 space-y-3">
-              {s.condiciones.map((c, i) => (
-                <li key={c} className="flex gap-3 rounded-xl border border-line bg-white p-4 text-sm leading-relaxed text-ink-soft">
-                  <span className="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-brand-50 text-xs font-bold tabular-nums text-brand-700">
-                    {inicio + i}
-                  </span>
-                  <span>{c}</span>
-                </li>
-              ))}
-            </ol>
-          </section>
-        );
-      })}
+      <div className="wrap max-w-[56rem] pb-28">
+        {secciones.map((s, idx) => {
+          const inicio = inicios[idx];
+          return (
+            <section key={s.titulo} className="mt-14 first:mt-0" aria-labelledby={`cond-${inicio}`}>
+              <h2 id={`cond-${inicio}`} className="t-title">{s.titulo}</h2>
+              <ol start={inicio} className="mt-5">
+                {s.condiciones.map((c, i) => (
+                  <li key={c} className="grid grid-cols-[2.75rem_1fr] gap-x-2 border-t border-line py-4 text-[15px] leading-relaxed text-ink-soft">
+                    <span className="tnum text-muted">{inicio + i}.</span>
+                    <span>{c}</span>
+                  </li>
+                ))}
+              </ol>
+            </section>
+          );
+        })}
 
-      <p className="mt-10 text-sm text-muted">
-        ¿Dudas sobre las condiciones?{" "}
-        <Link href="/contacto" className="font-semibold text-brand-700 hover:underline">Escríbenos</Link>.
-      </p>
-    </div>
+        <p className="mt-14 text-[15px] text-muted">
+          ¿Dudas sobre las condiciones?{" "}
+          <Link href="/contacto" className="font-medium text-brand-700 underline underline-offset-4">Escríbenos</Link>.
+        </p>
+      </div>
+    </>
   );
 }

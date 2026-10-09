@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils/cn";
  * dar volumen. Funciona en blanco sobre fondos verdes/oscuros y en esmeralda
  * sobre claro.
  */
-export function BrandMark({ className }: { className?: string }) {
+export function BrandMark({ className, decorativo = false }: { className?: string; decorativo?: boolean }) {
   // Un cubo isométrico con vértice superior en (0,0), arista a=7.
   const cube = (tx: number, ty: number, key: string) => (
     <g key={key} transform={`translate(${tx} ${ty})`}>
@@ -23,8 +23,7 @@ export function BrandMark({ className }: { className?: string }) {
     <svg
       viewBox="0 0 32 32"
       className={cn("h-7 w-7", className)}
-      role="img"
-      aria-label="CIC Inmuebles"
+      {...(decorativo ? { "aria-hidden": true } : { role: "img", "aria-label": "CIC Inmuebles" })}
       fill="none"
     >
       {/* cubo superior (atrás), luego los dos de la base */}
@@ -36,7 +35,7 @@ export function BrandMark({ className }: { className?: string }) {
 }
 
 /**
- * Logotipo completo: marca dentro de una pastilla + tipografía de la marca.
+ * Logotipo: la marca en su recuadro y el nombre en una sola línea, un solo color.
  * `tone` adapta los colores al fondo.
  */
 export function Logo({
@@ -50,31 +49,19 @@ export function Logo({
     <span className={cn("inline-flex items-center gap-2.5", className)}>
       <span
         className={cn(
-          "flex h-9 w-9 items-center justify-center rounded-xl ring-1 transition-colors",
-          tone === "light"
-            ? "bg-brand-600 text-white ring-brand-700/40 shadow-[0_6px_18px_-6px_rgba(7,162,118,0.6)]"
-            : "bg-brand-500/15 text-brand-400 ring-white/15",
+          "flex h-8 w-8 items-center justify-center rounded-[10px]",
+          tone === "light" ? "bg-brand-600 text-white" : "bg-white/10 text-brand-400",
         )}
       >
-        <BrandMark className="h-5 w-5" />
+        <BrandMark decorativo className="h-[18px] w-[18px]" />
       </span>
-      <span className="flex flex-col leading-none">
-        <span
-          className={cn(
-            "font-display text-[15px] font-extrabold tracking-tight",
-            tone === "light" ? "text-ink" : "text-white",
-          )}
-        >
-          CIC<span className={tone === "light" ? "text-brand-600" : "text-brand-400"}> Inmuebles</span>
-        </span>
-        <span
-          className={cn(
-            "mt-0.5 text-[9px] font-semibold uppercase tracking-[0.28em]",
-            tone === "light" ? "text-muted" : "text-white/45",
-          )}
-        >
-          Finca raíz
-        </span>
+      <span
+        className={cn(
+          "text-[17px] tracking-[-0.02em]",
+          tone === "light" ? "text-ink" : "text-white",
+        )}
+      >
+        <span className="font-semibold">CIC</span> <span className="font-normal">Inmuebles</span>
       </span>
     </span>
   );

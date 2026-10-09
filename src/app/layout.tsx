@@ -1,23 +1,15 @@
 import type { Metadata } from "next";
-import { Sora, Plus_Jakarta_Sans, Geist_Mono } from "next/font/google";
+import { Albert_Sans } from "next/font/google";
 import "./globals.css";
 import { JsonLd } from "@/components/seo/json-ld";
 import { siteConfig } from "@/lib/config/site";
 
-const sora = Sora({
-  variable: "--font-sora",
+// Una sola familia variable (400–700): titulares y texto. Sustituye a Sora + Plus Jakarta
+// Sans + Geist Mono (tres archivos) y le da al sitio una voz propia, no la de plantilla.
+const albert = Albert_Sans({
+  variable: "--font-albert",
   subsets: ["latin"],
-  weight: ["500", "600", "700", "800"],
-});
-
-const jakarta = Plus_Jakarta_Sans({
-  variable: "--font-jakarta",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+  display: "swap",
 });
 
 const GOOGLE_SITE_VERIFICATION = "9wOGF6QxQDsYkPkneIlNQL-rvF7H8gkZu2PYkLaVO0w";
@@ -112,13 +104,13 @@ export default function RootLayout({
   return (
     <html
       lang="es-CO"
-      className={`${sora.variable} ${jakarta.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${albert.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col bg-white text-ink">
-        {/* Las fotos de los inmuebles se sirven desde Google Drive: adelantar
-            el handshake reduce el LCP de galerías y tarjetas. React los iza al <head>. */}
-        <link rel="preconnect" href="https://lh3.googleusercontent.com" />
-        <link rel="dns-prefetch" href="https://lh3.googleusercontent.com" />
+        {/* Las fotos de los inmuebles se sirven desde Cloudinary: adelantar el
+            handshake reduce el LCP del catálogo y las fichas. React lo iza al <head>. */}
+        <link rel="preconnect" href="https://res.cloudinary.com" />
+        <link rel="dns-prefetch" href="https://res.cloudinary.com" />
         <JsonLd data={siteJsonLd} />
         {children}
       </body>

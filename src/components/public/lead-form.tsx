@@ -5,12 +5,14 @@ import { CheckCircle2, Loader2, MessageCircle } from "lucide-react";
 import { createLeadAction, type LeadFormState } from "@/lib/actions/leads";
 import { buttonVariants } from "@/components/ui/button";
 import type { LeadIntent, LeadType } from "@/lib/domain";
+import { cn } from "@/lib/utils/cn";
 
 const initialState: LeadFormState = { status: "idle" };
 
-// 16px en móvil: por debajo de eso iOS Safari hace zoom al enfocar el campo.
-const inputClass =
-  "h-11 w-full rounded-xl border border-line bg-surface px-3.5 text-base text-ink transition-colors focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-200 aria-[invalid=true]:border-rose-400 aria-[invalid=true]:bg-rose-50/40 sm:text-sm";
+// 16 px: por debajo de eso iOS Safari hace zoom al enfocar el campo. Borde de 3,4:1 (WCAG 1.4.11).
+const campo =
+  "w-full rounded-[var(--radius-field)] border border-field bg-white px-4 text-base text-ink transition-[border-color,box-shadow] duration-200 focus:border-brand-700 focus:outline-none focus:ring-4 focus:ring-brand-700/15 aria-[invalid=true]:border-rose-600";
+const etiqueta = "mb-1.5 block text-[14px] font-medium text-ink";
 
 interface LeadFormProps {
   tipo: LeadType;
@@ -19,6 +21,11 @@ interface LeadFormProps {
   propertySlug?: string;
   variant?: "comprador" | "vendedor";
   submitLabel?: string;
+  /** Preferencia de visita ya elegida (día y franja): viaja oculta, estructurada. */
+  preferencia?: string;
+  /** El día y la franja se eligen aparte (chips): no mostrar el campo de texto libre. */
+  sinPreferenciaLibre?: boolean;
+  className?: string;
 }
 
 export function LeadForm({
@@ -28,6 +35,9 @@ export function LeadForm({
   propertySlug,
   variant = "comprador",
   submitLabel,
+  preferencia,
+  sinPreferenciaLibre,
+  className,
 }: LeadFormProps) {
   const [state, formAction, isPending] = useActionState(createLeadAction, initialState);
   const formId = useId();
@@ -58,23 +68,21 @@ export function LeadForm({
         ref={successRef}
         tabIndex={-1}
         role="status"
-        className="flex flex-col items-center gap-3 rounded-2xl border border-brand-200 bg-brand-50 p-6 text-center focus:outline-none"
+        className="rounded-[var(--radius-card)] bg-surface p-6 text-center focus:outline-none"
       >
-        <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-brand-700 shadow-[0_10px_24px_-12px_rgba(4,125,91,0.5)]">
-          <CheckCircle2 className="h-7 w-7" />
-        </span>
-        <p className="font-semibold text-brand-900">{state.message}</p>
-        <p className="text-sm text-brand-800">
-          Continúa la conversación por WhatsApp para coordinar más rápido.
+        <CheckCircle2 className="mx-auto h-9 w-9 text-brand-700" aria-hidden />
+        <p className="mt-3 text-[1.125rem] font-semibold tracking-[-0.01em]">{state.message}</p>
+        <p className="mt-1 text-[15px] text-muted">
+          Un asesor te contacta para confirmar. Si quieres, adelanta la conversación por WhatsApp.
         </p>
         {state.whatsappUrl && (
           <a
             href={state.whatsappUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className={buttonVariants({ variant: "whatsapp", size: "lg", className: "mt-1" })}
+            className={buttonVariants({ variant: "whatsapp", size: "lg", className: "mt-5" })}
           >
-            <MessageCircle className="h-5 w-5" /> Continuar en WhatsApp
+            <MessageCircle className="h-5 w-5" aria-hidden /> Continuar en WhatsApp
           </a>
         )}
       </div>
@@ -86,25 +94,23 @@ export function LeadForm({
   const val = (field: keyof NonNullable<LeadFormState["values"]>) => state.values?.[field];
 
   return (
-    <form ref={formRef} action={formAction} className="space-y-3">
+    <form ref={formRef} action={formAction} className={cn("space-y-4", className)}>
       <input type="hidden" name="tipo" value={tipo} />
       <input type="hidden" name="fuente" value="web" />
       {intencion && <input type="hidden" name="intencion" value={intencion} />}
       {propertyId && <input type="hidden" name="propertyId" value={propertyId} />}
       {propertySlug && <input type="hidden" name="propertySlug" value={propertySlug} />}
+      {preferencia && <input type="hidden" name="preferencia" value={preferencia} />}
       {/* Honeypot anti-spam (oculto) */}
       <input type="text" name="website" tabIndex={-1} autoComplete="off" className="hidden" aria-hidden="true" />
 
       <div>
-        <label htmlFor={`${formId}-nombre`} className="mb-1.5 block text-sm font-medium text-ink-soft">
-          Nombre <span className="text-rose-600">*</span>
-        </label>
+        <label htmlFor={`${formId}-nombre`} className={etiqueta}>Nombre</label>
         <input
           id={`${formId}-nombre`}
           name="nombre"
           autoComplete="name"
-          placeholder="Tu nombre"
-          className={inputClass}
+          className={cn(campo, "h-12")}
           required
           maxLength={120}
           defaultValue={val("nombre")}
@@ -112,23 +118,21 @@ export function LeadForm({
           aria-describedby={err("nombre") ? `${formId}-nombre-err` : undefined}
         />
         {err("nombre") && (
-          <p id={`${formId}-nombre-err`} className="mt-1 text-xs font-medium text-rose-700">{err("nombre")}</p>
+          <p id={`${formId}-nombre-err`} className="mt-1.5 text-[13px] font-medium text-rose-700">{err("nombre")}</p>
         )}
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label htmlFor={`${formId}-tel`} className="mb-1.5 block text-sm font-medium text-ink-soft">
-            WhatsApp / teléfono <span className="text-rose-600">*</span>
-          </label>
+          <label htmlFor={`${formId}-tel`} className={etiqueta}>WhatsApp o teléfono</label>
           <input
             id={`${formId}-tel`}
             name="telefono"
             type="tel"
             inputMode="tel"
             autoComplete="tel"
-            placeholder="Ej. 300 123 4567"
-            className={inputClass}
+            placeholder="300 123 4567"
+            className={cn(campo, "tnum h-12")}
             required
             maxLength={20}
             defaultValue={val("telefono")}
@@ -136,52 +140,50 @@ export function LeadForm({
             aria-describedby={err("telefono") ? `${formId}-tel-err` : undefined}
           />
           {err("telefono") && (
-            <p id={`${formId}-tel-err`} className="mt-1 text-xs font-medium text-rose-700">{err("telefono")}</p>
+            <p id={`${formId}-tel-err`} className="mt-1.5 text-[13px] font-medium text-rose-700">{err("telefono")}</p>
           )}
         </div>
         <div>
-          <label htmlFor={`${formId}-email`} className="mb-1.5 block text-sm font-medium text-ink-soft">
-            Correo (opcional)
+          <label htmlFor={`${formId}-email`} className={etiqueta}>
+            Correo <span className="font-normal text-muted">(opcional)</span>
           </label>
           <input
             id={`${formId}-email`}
             name="email"
             type="email"
             autoComplete="email"
-            placeholder="tucorreo@ejemplo.com"
-            className={inputClass}
+            className={cn(campo, "h-12")}
             maxLength={160}
             defaultValue={val("email")}
             aria-invalid={Boolean(err("email"))}
             aria-describedby={err("email") ? `${formId}-email-err` : undefined}
           />
           {err("email") && (
-            <p id={`${formId}-email-err`} className="mt-1 text-xs font-medium text-rose-700">{err("email")}</p>
+            <p id={`${formId}-email-err`} className="mt-1.5 text-[13px] font-medium text-rose-700">{err("email")}</p>
           )}
         </div>
       </div>
 
       {isSeller && (
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label htmlFor={`${formId}-ciudad`} className="mb-1.5 block text-sm font-medium text-ink-soft">Ciudad del inmueble</label>
+            <label htmlFor={`${formId}-ciudad`} className={etiqueta}>Ciudad del inmueble</label>
             <input
               id={`${formId}-ciudad`}
               name="ciudad"
               autoComplete="address-level2"
-              placeholder="Ciudad"
-              className={inputClass}
+              className={cn(campo, "h-12")}
               maxLength={120}
               defaultValue={val("ciudad")}
             />
           </div>
           <div>
-            <label htmlFor={`${formId}-tipoInmueble`} className="mb-1.5 block text-sm font-medium text-ink-soft">Tipo de inmueble</label>
+            <label htmlFor={`${formId}-tipoInmueble`} className={etiqueta}>Tipo de inmueble</label>
             <input
               id={`${formId}-tipoInmueble`}
               name="tipoInmueble"
-              placeholder="Apto, casa, lote..."
-              className={inputClass}
+              placeholder="Apartamento, casa, lote…"
+              className={cn(campo, "h-12")}
               maxLength={120}
               defaultValue={val("tipoInmueble")}
             />
@@ -189,16 +191,16 @@ export function LeadForm({
         </div>
       )}
 
-      {!isSeller && intencion === "visita" && (
+      {!isSeller && intencion === "visita" && !preferencia && !sinPreferenciaLibre && (
         <div>
-          <label htmlFor={`${formId}-pref`} className="mb-1.5 block text-sm font-medium text-ink-soft">
-            ¿Qué día/hora te gustaría visitarlo? (opcional)
+          <label htmlFor={`${formId}-pref`} className={etiqueta}>
+            ¿Qué día y hora te gustaría visitarlo? <span className="font-normal text-muted">(opcional)</span>
           </label>
           <input
             id={`${formId}-pref`}
             name="preferencia"
             placeholder="Ej. sábado en la mañana"
-            className={inputClass}
+            className={cn(campo, "h-12")}
             maxLength={200}
             defaultValue={val("preferencia")}
           />
@@ -206,8 +208,8 @@ export function LeadForm({
       )}
 
       <div>
-        <label htmlFor={`${formId}-msg`} className="mb-1.5 block text-sm font-medium text-ink-soft">
-          Mensaje (opcional)
+        <label htmlFor={`${formId}-msg`} className={etiqueta}>
+          Mensaje <span className="font-normal text-muted">(opcional)</span>
         </label>
         <textarea
           id={`${formId}-msg`}
@@ -216,15 +218,26 @@ export function LeadForm({
           maxLength={1000}
           defaultValue={val("mensaje")}
           placeholder={isSeller ? "Cuéntanos sobre tu inmueble" : "¿En qué te ayudamos?"}
-          className="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-base text-ink transition-colors focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-200 sm:text-sm"
+          className={cn(campo, "py-3")}
         />
       </div>
 
       <p id={`${formId}-status`} aria-live="polite" className="min-h-0">
         {state.status === "error" && state.message && (
-          <span className="text-sm font-medium text-rose-700">{state.message}</span>
+          <span className="text-[14px] font-medium text-rose-700">{state.message}</span>
         )}
       </p>
+      {/* Si lo que falló fue guardar la solicitud, el visitante no se queda sin salida. */}
+      {state.status === "error" && state.whatsappUrl && (
+        <a
+          href={state.whatsappUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={buttonVariants({ variant: "whatsapp", size: "md", className: "w-full" })}
+        >
+          <MessageCircle className="h-5 w-5" aria-hidden /> Escribir por WhatsApp
+        </a>
+      )}
 
       <button
         type="submit"
@@ -235,7 +248,7 @@ export function LeadForm({
         {isPending && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
         {isPending ? "Enviando…" : (submitLabel ?? (isSeller ? "Quiero vender mi inmueble" : "Enviar y abrir WhatsApp"))}
       </button>
-      <p className="text-center text-xs text-muted">
+      <p className="text-center text-[13px] leading-snug text-muted">
         Al enviar, registramos tu solicitud y abrimos WhatsApp para contactarte. No compartimos tus datos.
       </p>
     </form>
