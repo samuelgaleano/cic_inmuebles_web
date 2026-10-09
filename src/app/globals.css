@@ -341,7 +341,8 @@
 /* 4 · Ligado al scroll (sin JS ni listeners). Sin soporte: todo queda estático y legible. */
 @keyframes scrub-linea {
   from {
-    color: #b9c4be;
+    /* Parte de un gris que ya cumple 3:1 sobre blanco/surface (texto grande): nunca queda ilegible. */
+    color: var(--color-field);
   }
   to {
     color: var(--color-ink);
