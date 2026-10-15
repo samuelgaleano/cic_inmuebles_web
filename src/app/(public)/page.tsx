@@ -48,6 +48,10 @@ function TitularAnimado({ texto }: { texto: string }) {
   );
 }
 
+// Fichas cuyas fotos llevan una marca de agua ajena (Metrocuadrado.com): se quedan en el catálogo, pero
+// no se usan en las fotos grandes de la portada hasta que CIC las reemplace.
+const SIN_FOTO_GRANDE = ["puente-largo-alhambra"];
+
 // Red de seguridad: regenera la página cada hora aunque falle la
 // revalidación bajo demanda del panel admin.
 export const revalidate = 3600;
@@ -79,6 +83,7 @@ export default async function HomePage() {
 
   // La tira solo necesita lo que pinta la tarjeta (no el texto de búsqueda).
   const tarjetas = indice.slice(0, 12).map(({ texto: _texto, ...resto }) => resto);
+  const fotosGrandes = tarjetas.filter((t) => !SIN_FOTO_GRANDE.includes(t.slug));
 
   // Enriquece el nodo de organización del layout (mismo @id) con el área de
   // servicio real: las ciudades del inventario publicado, además del país.
@@ -140,7 +145,7 @@ export default async function HomePage() {
           </div>
 
           <div className="anim-sube min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1" style={{ "--d": "380ms" } as React.CSSProperties}>
-            <HeroVitrina items={tarjetas} resumen={resumen || undefined} className="mt-2 lg:mt-3" />
+            <HeroVitrina items={fotosGrandes} resumen={resumen || undefined} className="mt-2 lg:mt-3" />
           </div>
 
           <div className="anim-sube min-w-0 lg:col-start-1 lg:row-start-2" style={{ "--d": "760ms" } as React.CSSProperties}>
@@ -189,7 +194,7 @@ export default async function HomePage() {
       {/* ─────────────── Declaración de principios, con sus pruebas ─────────────── */}
       <section className="bg-surface" aria-labelledby="corto">
         <div className="wrap section-y">
-          <PruebaPortafolio items={tarjetas} total={todos.length} />
+          <PruebaPortafolio items={fotosGrandes} total={todos.length} />
         </div>
       </section>
 
