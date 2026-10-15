@@ -3,7 +3,9 @@
 import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Heart, Menu, X } from "lucide-react";
+import { Heart, Menu, MessageCircle, X } from "lucide-react";
+import { buttonVariants } from "@/components/ui/button";
+import { whatsappLink } from "@/lib/config/site";
 import { Logo } from "@/components/brand/brand-mark";
 import { useFavoritos } from "@/lib/cliente/almacenes";
 import { bloquearScroll } from "@/lib/cliente/scroll";
@@ -15,6 +17,9 @@ const navItems = [
   { href: "/publica", label: "Publica tu inmueble" },
   { href: "/contacto", label: "Contacto" },
 ];
+
+// «Vender» sale de la lista y pasa a ser el botón principal de la barra.
+const navEscritorio = navItems.filter((i) => i.href !== "/vender");
 
 export function SiteHeader() {
   const pathname = usePathname();
@@ -49,20 +54,20 @@ export function SiteHeader() {
 
   return (
     <header className="barra-borde sticky top-0 z-50 border-b border-line bg-white/80 backdrop-blur-xl">
-      <div className="wrap flex h-[52px] items-center justify-between gap-6">
+      <div className="wrap flex h-[64px] items-center justify-between gap-4 sm:gap-6">
         <Link href="/" aria-label="CIC Inmuebles — inicio" className="rounded-lg">
           <Logo />
         </Link>
 
         <nav aria-label="Principal" className="hidden items-center gap-1 md:flex">
-          {navItems.map((item) => (
+          {navEscritorio.map((item) => (
             <Link
               key={item.href}
               href={item.href}
               aria-current={isActive(item.href) ? "page" : undefined}
               className={cn(
-                "rounded-full px-3.5 py-1.5 text-[14px] transition-colors duration-200",
-                isActive(item.href) ? "font-medium text-ink" : "text-muted hover:text-ink",
+                "rounded-full px-4 py-2 text-[15px] font-medium transition-colors duration-200",
+                isActive(item.href) ? "bg-ink/[0.07] text-ink" : "text-ink-soft hover:bg-ink/[0.05] hover:text-ink",
               )}
             >
               {item.label}
@@ -70,7 +75,19 @@ export function SiteHeader() {
           ))}
         </nav>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <a
+            href={whatsappLink("Hola CIC Inmuebles, quiero hablar con un asesor.")}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={cn(buttonVariants({ variant: "whatsapp", size: "sm" }), "hidden lg:inline-flex")}
+          >
+            <MessageCircle className="h-4 w-4" aria-hidden />
+            WhatsApp
+          </a>
+          <Link href="/vender" className={buttonVariants({ variant: "primary", size: "sm" })}>
+            <span>Vender<span className="hidden sm:inline"> mi inmueble</span></span>
+          </Link>
           <Link
             href="/favoritos"
             aria-label={favoritos.length > 0 ? `Mis favoritos (${favoritos.length})` : "Mis favoritos"}
@@ -95,7 +112,7 @@ export function SiteHeader() {
       </div>
 
       <dialog ref={menu} aria-label="Menú" className="h-dvh w-screen bg-white md:hidden">
-        <div className="wrap flex h-[52px] items-center justify-between">
+        <div className="wrap flex h-[64px] items-center justify-between">
           <Logo />
           <button
             type="button"

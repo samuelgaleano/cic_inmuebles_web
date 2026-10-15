@@ -524,3 +524,117 @@ input[type="range"].rango:focus-visible {
     animation: none !important;
   }
 }
+
+/* ── Portada visual: titular de dos columnas, vitrina de fotos y recorrido de pasos ── */
+@layer components {
+  .t-hero {
+    font-size: clamp(2.5rem, 2.4vw + 1.7rem, 4.5rem);
+    line-height: 1.02;
+    font-weight: 600;
+    letter-spacing: -0.04em;
+    text-wrap: balance;
+  }
+}
+
+/* Vitrina: fotos reales del portafolio que se relevan con un fundido lento. Se detiene al pasar el cursor o al enfocar. */
+.vitrina-foto {
+  opacity: 0;
+}
+.vitrina-foto:first-child {
+  opacity: 1;
+}
+.vitrina:hover .vitrina-foto,
+.vitrina:hover .vitrina-img,
+.vitrina:focus-within .vitrina-foto,
+.vitrina:focus-within .vitrina-img {
+  animation-play-state: paused;
+}
+.vitrina .vitrina-foto:focus-within {
+  opacity: 1;
+  z-index: 2;
+}
+@keyframes vitrina-3 {
+  0% { opacity: 0; }
+  5.3% { opacity: 1; }
+  33.3% { opacity: 1; }
+  38.7% { opacity: 0; }
+  100% { opacity: 0; }
+}
+@keyframes vitrina-4 {
+  0% { opacity: 0; }
+  4% { opacity: 1; }
+  25% { opacity: 1; }
+  29% { opacity: 0; }
+  100% { opacity: 0; }
+}
+@keyframes vitrina-zoom-3 {
+  0% { transform: scale(1); }
+  38.7% { transform: scale(1.07); }
+  100% { transform: scale(1.07); }
+}
+@keyframes vitrina-zoom-4 {
+  0% { transform: scale(1); }
+  29% { transform: scale(1.07); }
+  100% { transform: scale(1.07); }
+}
+.vitrina-3 .vitrina-foto {
+  animation: vitrina-3 15s linear infinite;
+  animation-delay: calc(var(--i) * 5s - 1s);
+}
+.vitrina-3 .vitrina-img {
+  animation: vitrina-zoom-3 15s linear infinite;
+  animation-delay: calc(var(--i) * 5s - 1s);
+}
+.vitrina-4 .vitrina-foto {
+  animation: vitrina-4 20s linear infinite;
+  animation-delay: calc(var(--i) * 5s - 1s);
+}
+.vitrina-4 .vitrina-img {
+  animation: vitrina-zoom-4 20s linear infinite;
+  animation-delay: calc(var(--i) * 5s - 1s);
+}
+
+/* Recorrido de pasos: barra de progreso que avanza sola y panel que entra al cambiar. */
+@keyframes paso-progreso {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+.paso-progreso {
+  transform-origin: left;
+  animation: paso-progreso var(--dur, 7000ms) linear both;
+}
+.pasos:hover .paso-progreso,
+.pasos:focus-within .paso-progreso {
+  animation-play-state: paused;
+}
+@keyframes panel-entra {
+  from { opacity: 0; transform: translateY(14px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+.anim-panel {
+  animation: panel-entra 0.6s var(--ease-fluid) both;
+}
+@keyframes hito-entra {
+  from { opacity: 0; transform: translateX(-12px); }
+  to { opacity: 1; transform: none; }
+}
+.anim-hito {
+  animation: hito-entra 0.6s var(--ease-fluid) both;
+  animation-delay: var(--d, 0ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  .vitrina-foto,
+  .vitrina-img,
+  .paso-progreso {
+    animation: none !important;
+  }
+  .vitrina-foto {
+    opacity: 0;
+  }
+  .vitrina-foto:first-child {
+    opacity: 1;
+  }
+  .paso-progreso {
+    transform: scaleX(1);
+  }
+}

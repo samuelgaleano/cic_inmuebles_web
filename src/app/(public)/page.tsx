@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { BrandMark } from "@/components/brand/brand-mark";
+import { ArrowRight, Check } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
-import { Reveal } from "@/components/ui/reveal";
-import { Declaracion } from "@/components/public/declaracion";
 import { HeroBuscador } from "@/components/public/hero-buscador";
+import { HeroVitrina } from "@/components/public/hero-vitrina";
+import { PasosInteractivos } from "@/components/public/pasos-interactivos";
+import { PruebaPortafolio } from "@/components/public/prueba-portafolio";
 import { TiraPortafolio } from "@/components/public/tira-portafolio";
 import { WhatsAppButton } from "@/components/public/whatsapp-button";
 import { JsonLd } from "@/components/seo/json-ld";
@@ -111,22 +112,48 @@ export default async function HomePage() {
       <JsonLd data={areaJsonLd} />
       {vitrina.length > 0 && <JsonLd data={vitrinaJsonLd} />}
 
-      {/* ─────────────── Portada: titular + buscador por frase ─────────────── */}
-      <section className="relative overflow-hidden">
-        <BrandMark decorativo className="pointer-events-none absolute -right-24 top-4 hidden h-[40rem] w-[40rem] text-surface lg:block" />
-        <div className="wrap relative pb-16 pt-14 sm:pb-24 sm:pt-24">
-          <h1 className="t-display max-w-5xl">
-            <TitularAnimado texto={`${titular.tipos} en venta en ${titular.lugar}`} />
-          </h1>
+      {/* ─────────────── Portada: titular, acciones, vitrina de fotos reales y buscador ─────────────── */}
+      <section className="relative overflow-hidden" aria-label="Portada">
+        <div className="wrap relative grid items-start gap-x-14 gap-y-9 pb-14 pt-8 sm:pt-14 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:gap-y-8 lg:pb-24 lg:pt-12">
+          <div className="min-w-0 lg:col-start-1 lg:row-start-1">
+            <h1 className="t-hero max-w-3xl">
+              <TitularAnimado texto={`${titular.tipos} en venta en ${titular.lugar}`} />
+            </h1>
 
-          <p className="t-lead anim-sube mt-7 max-w-2xl" style={{ "--d": "520ms" } as React.CSSProperties}>
-            {titular.ciudad && sectores
-              ? `Un portafolio corto en ${titular.ciudad}, en ${sectores}: cada inmueble visitado y verificado por nosotros. ¿Vendes el tuyo? Te acompañamos de principio a fin.`
-              : "Te ayudamos a vender tu inmueble de forma rápida y segura. Encuentra el tuyo en un portafolio corto, visitado y verificado por nosotros."}
-          </p>
+            <p className="t-lead anim-sube mt-6 max-w-xl" style={{ "--d": "520ms" } as React.CSSProperties}>
+              {titular.ciudad && sectores
+                ? `Un portafolio corto en ${titular.ciudad}, en ${sectores}: cada inmueble visitado y verificado por nosotros. ¿Vendes el tuyo? Te acompañamos de principio a fin.`
+                : "Te ayudamos a vender tu inmueble de forma rápida y segura. Encuentra el tuyo en un portafolio corto, visitado y verificado por nosotros."}
+            </p>
 
-          <div className="anim-sube mt-12 max-w-3xl" style={{ "--d": "680ms" } as React.CSSProperties}>
+            <div className="anim-sube mt-8 flex flex-wrap gap-3" style={{ "--d": "640ms" } as React.CSSProperties}>
+              <Link href="/inmuebles" className={buttonVariants({ variant: "primary", size: "lg" })}>
+                {todos.length > 0 ? `Ver los ${todos.length} inmuebles` : "Ver los inmuebles"}
+                <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" aria-hidden />
+              </Link>
+              <WhatsAppButton
+                size="lg"
+                label="Hablar con un asesor"
+                message={`Hola ${siteConfig.name}, quiero ver inmuebles y me gustaría hablar con un asesor.`}
+              />
+            </div>
+          </div>
+
+          <div className="anim-sube min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1" style={{ "--d": "380ms" } as React.CSSProperties}>
+            <HeroVitrina items={tarjetas} resumen={resumen || undefined} className="mt-2 lg:mt-3" />
+          </div>
+
+          <div className="anim-sube min-w-0 lg:col-start-1 lg:row-start-2" style={{ "--d": "760ms" } as React.CSSProperties}>
+            <p className="mb-3 text-[15px] font-medium text-ink-soft">O cuéntanos qué buscas, con tus palabras:</p>
             <HeroBuscador indice={indice} ctx={ctx} sugerencias={sugerencias(indice)} />
+            <ul className="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-[14px] text-ink-soft">
+              {["Cada inmueble, visitado y verificado", "Respuesta directa por WhatsApp", "Si vendes, 3 % solo al cerrar"].map((t) => (
+                <li key={t} className="flex items-center gap-2">
+                  <Check className="h-4 w-4 text-brand-700" aria-hidden />
+                  {t}
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
       </section>
@@ -159,40 +186,17 @@ export default async function HomePage() {
         )}
       </section>
 
-      {/* ─────────────── Declaración de principios ─────────────── */}
-      <section className="bg-surface" aria-label="Cómo trabajamos">
+      {/* ─────────────── Declaración de principios, con sus pruebas ─────────────── */}
+      <section className="bg-surface" aria-labelledby="corto">
         <div className="wrap section-y">
-          <Declaracion
-            className="max-w-4xl"
-            texto="Un portafolio corto, a propósito. Visitamos y verificamos cada inmueble antes de publicarlo, respondemos directo por WhatsApp y, si vendes, solo cobramos cuando se cierra la venta."
-          />
+          <PruebaPortafolio items={tarjetas} total={todos.length} />
         </div>
       </section>
 
-      {/* ─────────────── Tres pasos, en texto ─────────────── */}
+      {/* ─────────────── Del primer mensaje a las llaves: recorrido interactivo ─────────────── */}
       <section className="wrap section-y" aria-labelledby="pasos">
         <h2 id="pasos" className="t-headline max-w-3xl">Del primer mensaje a las llaves.</h2>
-        <ol className="mt-14 grid gap-x-10 gap-y-12 md:grid-cols-3">
-          {[
-            {
-              t: "Cuéntanos qué buscas",
-              d: "Escribe una frase con tus palabras: zona, alcobas, presupuesto. El catálogo la entiende y te dice por qué aparece cada inmueble.",
-            },
-            {
-              t: "Elige tu día",
-              d: "Marca el día y la franja que te sirven. Un asesor te confirma la visita por WhatsApp.",
-            },
-            {
-              t: "Te acompañamos hasta las llaves",
-              d: "Negociación y papeleo, de principio a fin, con respuesta directa y sin intermediarios.",
-            },
-          ].map((paso, i) => (
-            <Reveal as="li" key={paso.t} delay={i * 110} className="border-t border-ink pt-6">
-              <h3 className="t-title">{paso.t}</h3>
-              <p className="mt-3 max-w-sm text-muted">{paso.d}</p>
-            </Reveal>
-          ))}
-        </ol>
+        <PasosInteractivos indice={indice} ctx={ctx} sugerencias={sugerencias(indice)} />
       </section>
 
       {/* ─────────────── Para propietarios ─────────────── */}
