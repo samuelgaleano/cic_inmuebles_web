@@ -119,15 +119,17 @@ export default function PublicaPage() {
               ))}
             </ul>
 
-            <span
-              className={cn(
-                "relative mt-auto inline-flex h-[52px] w-fit items-center gap-2 rounded-full px-7 pt-0 text-base font-medium transition-colors duration-200",
-                o.boton,
-              )}
-            >
-              {o.cta}
-              <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" aria-hidden />
-            </span>
+            <div className="relative mt-auto pt-8">
+              <span
+                className={cn(
+                  "inline-flex h-[52px] w-fit items-center gap-2 rounded-full px-7 text-base font-medium transition-colors duration-200",
+                  o.boton,
+                )}
+              >
+                {o.cta}
+                <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" aria-hidden />
+              </span>
+            </div>
           </Link>
         ))}
       </div>

@@ -12,7 +12,7 @@ import { titularInventario } from "@/lib/seo/titular";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = titularInventario(await getPublicInventory());
-  const donde = t.sectores.length > 0 ? `${t.lugar}: ${t.sectores.slice(0, 5).join(", ")}` : t.lugar;
+  const donde = t.sectores.length > 0 ? `${t.lugar}: ${t.sectores.slice(0, 3).join(", ")}` : t.lugar;
   return {
     title: t.titulo,
     description: `${t.tipos} en venta en ${donde}. Describe lo que buscas, filtra por precio y características y agenda tu visita con ${siteConfig.name}.`.slice(0, 160),

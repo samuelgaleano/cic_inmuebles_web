@@ -319,7 +319,11 @@ export default async function PropertyDetailPage({
       <div className="wrap mt-16 grid grid-cols-[minmax(0,1fr)] gap-16 lg:grid-cols-[minmax(0,1fr)_25rem] lg:gap-20">
         <div className="min-w-0 space-y-20">
           {cifras.length > 0 && (
-            <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-[var(--radius-card)] bg-line sm:grid-cols-4">
+            <dl
+              className={`grid grid-cols-2 gap-px overflow-hidden rounded-[var(--radius-card)] bg-line [&>*:last-child:nth-child(odd)]:col-span-2 sm:[&>*:last-child:nth-child(odd)]:col-span-1 ${
+                cifras.length >= 4 ? "sm:grid-cols-4" : cifras.length === 3 ? "sm:grid-cols-3" : "sm:grid-cols-2"
+              }`}
+            >
               {cifras.map((s) => (
                 <div key={s.etiqueta} className="bg-white px-5 py-6">
                   <dt className="text-[14px] text-muted">{s.etiqueta}</dt>

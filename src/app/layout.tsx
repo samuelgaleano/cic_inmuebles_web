@@ -83,7 +83,10 @@ const siteJsonLd = {
       "@type": "RealEstateAgent",
       "@id": ORG_ID,
       name: siteConfig.name,
-      description: siteConfig.description,
+      alternateName: ["CIC Inmobiliaria", "CIC"],
+      description:
+        "Inmobiliaria en Bogotá. Venta de apartamentos y casas y gestión de inmuebles en Colombia, con portafolio corto, visitado y verificado.",
+      knowsAbout: ["Venta de apartamentos", "Venta de casas", "Gestión de inmuebles", "Inmuebles en Bogotá"],
       url: siteConfig.url,
       telephone: siteConfig.phone,
       email: siteConfig.email,

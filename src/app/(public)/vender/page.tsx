@@ -8,7 +8,7 @@ import { siteConfig } from "@/lib/config/site";
 export const metadata: Metadata = {
   title: "Vende tu inmueble",
   description:
-    "Publica tu apartamento o casa con CIC Inmuebles y véndelo de forma rápida y segura en toda Colombia. Nos encargamos de fotos, visitas y negociación.",
+    "Vende tu apartamento o casa con CIC Inmuebles: fotos, visitas y negociación a cargo nuestro. Comisión del 3 % solo al cerrar la venta.",
   alternates: { canonical: "/vender" },
   openGraph: {
     title: "Vende tu inmueble | CIC Inmuebles",

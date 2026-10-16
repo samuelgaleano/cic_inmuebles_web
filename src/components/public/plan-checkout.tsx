@@ -67,6 +67,31 @@ function useWompiWidget(wanted: boolean, attempt: number): [WidgetState, () => v
   return [wanted && state === "idle" ? "loading" : state, reset];
 }
 
+type DatosPago = {
+  currency: string;
+  amountInCents: number;
+  reference: string;
+  publicKey: string;
+  signature: string;
+  redirectUrl: string;
+};
+
+// Web Checkout de Wompi (página completa, https://docs.wompi.co/docs/colombia/widget-checkout-web/):
+// mismos datos y misma firma de integridad que ya entrega el servidor, sin ventana flotante.
+function urlPaginaCompleta(d: DatosPago, f: { nombre: string; email: string }): string {
+  const q = new URLSearchParams({
+    "public-key": d.publicKey,
+    currency: d.currency,
+    "amount-in-cents": String(d.amountInCents),
+    reference: d.reference,
+    "signature:integrity": d.signature,
+    "redirect-url": d.redirectUrl,
+    "customer-data:email": f.email,
+    "customer-data:full-name": f.nombre,
+  });
+  return `https://checkout.wompi.co/p/?${q.toString()}`;
+}
+
 const FIELDS = [
   { key: "nombre", label: "Nombre completo", type: "text", autoComplete: "name", placeholder: "Como aparece en tu documento" },
   { key: "email", label: "Correo electrónico", type: "email", autoComplete: "email", placeholder: "Recibirás ahí el comprobante" },
@@ -168,9 +193,11 @@ export function PlanCheckout({
     return () => clearTimeout(id);
   }, [loading]);
 
-  const pay = async (e: React.FormEvent) => {
+  const formRef = useRef<HTMLFormElement>(null);
+
+  const pay = async (e: React.FormEvent, modo: "ventana" | "pagina" = "ventana") => {
     e.preventDefault();
-    if (widget !== "ready" || !window.WidgetCheckout) return;
+    if (modo === "ventana" && (widget !== "ready" || !window.WidgetCheckout)) return;
     setLoadingState(true);
     setError(null);
     setNotice(null);
@@ -186,7 +213,11 @@ export function PlanCheckout({
         setLoadingState(false);
         return;
       }
-      const checkout = new window.WidgetCheckout({
+      if (modo === "pagina") {
+        window.location.assign(urlPaginaCompleta(data as DatosPago, form));
+        return;
+      }
+      const checkout = new window.WidgetCheckout!({
         currency: data.currency,
         amountInCents: data.amountInCents,
         reference: data.reference,
@@ -269,7 +300,7 @@ export function PlanCheckout({
               </button>
             </div>
 
-            <form onSubmit={pay} className="mt-6 space-y-4">
+            <form ref={formRef} onSubmit={(e) => pay(e, "ventana")} className="mt-6 space-y-4">
               {FIELDS.map((f) => (
                 <div key={f.key}>
                   <label htmlFor={`${uid}-${f.key}`} className="mb-1.5 block text-[14px] font-medium text-ink">
@@ -348,6 +379,20 @@ export function PlanCheckout({
                       ? "Pasarela no disponible"
                       : "Cargando pasarela…"}
               </button>
+              <p className="text-center text-xs leading-relaxed text-muted">
+                ¿La ventana de pago se ve cortada o no te deja bajar?{" "}
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={(e) => {
+                    if (formRef.current?.reportValidity()) void pay(e, "pagina");
+                  }}
+                  className="font-semibold text-brand-700 underline underline-offset-2 hover:text-brand-800 disabled:opacity-50"
+                >
+                  Abrir el pago en pantalla completa
+                </button>
+                .
+              </p>
               <p className="flex items-start justify-center gap-1.5 text-center text-xs leading-relaxed text-muted">
                 <ShieldCheck className="mt-0.5 h-3.5 w-3.5 flex-none text-brand-700" aria-hidden="true" />
                 <span>

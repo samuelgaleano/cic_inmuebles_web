@@ -18,12 +18,12 @@ export const siteConfig = {
   // de Bogotá), no "toda Colombia". Alimenta el <title> por defecto, Open
   // Graph y el JSON-LD. El H1 de la home y del catálogo se deriva del
   // inventario real (src/lib/seo/titular.ts); esto es la voz fija de la marca.
-  tagline: "Apartamentos en venta en Bogotá",
+  tagline: "Venta de apartamentos y casas en Bogotá",
   description:
-    "Apartamentos en venta en el norte de Bogotá, visitados y verificados por nosotros. Te ayudamos a vender tu inmueble: fotos profesionales, visitas y negociación, con respuesta directa por WhatsApp.",
+    "Venta de apartamentos y casas y gestión de inmuebles en Colombia. Portafolio corto en Bogotá, visitado y verificado. Respuesta directa por WhatsApp.",
   url: siteUrl,
   // Imagen por defecto al compartir un enlace (WhatsApp, redes): 1200×630, 64 KB.
-  ogImage: { url: "/og.jpg", width: 1200, height: 630, alt: "CIC Inmuebles — Apartamentos en venta en Bogotá" },
+  ogImage: { url: "/og.jpg", width: 1200, height: 630, alt: "CIC Inmuebles — Venta de apartamentos y casas en Bogotá" },
 
   // Contacto público (número fijo del negocio, igual en toda la página).
   // Mismo correo que la tarjeta del negocio, ADMIN_EMAIL y los avisos de

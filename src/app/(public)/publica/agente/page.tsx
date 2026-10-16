@@ -288,7 +288,7 @@ function PlanCard({ plan, wompiOn }: { plan: Plan; wompiOn: boolean }) {
         plan.destacado ? "border-ink" : "border-line",
       )}
     >
-      {plan.destacado && <p className="mb-3 text-[13px] font-semibold text-brand-700">Más elegido</p>}
+      {plan.destacado && <p className="mb-3 text-[13px] font-semibold text-brand-700">Recomendado</p>}
       <h3 className="text-[1.125rem] font-semibold tracking-[-0.01em]">{plan.nombre}</h3>
       <p className="tnum mt-3 text-[2rem] font-semibold leading-none tracking-[-0.03em]">{formatPrice(plan.precioCOP)}</p>
       <p className="mt-1.5 text-[13px] text-muted">{plan.periodo}</p>

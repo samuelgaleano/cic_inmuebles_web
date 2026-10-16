@@ -121,13 +121,14 @@ export default async function HomePage() {
       <section className="relative overflow-hidden" aria-label="Portada">
         <div className="wrap relative grid items-start gap-x-14 gap-y-9 pb-14 pt-8 sm:pt-14 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:gap-y-8 lg:pb-24 lg:pt-12">
           <div className="min-w-0 lg:col-start-1 lg:row-start-1">
+            <p className="mb-4 text-[15px] font-medium text-brand-700">Venta de apartamentos y casas · Gestión de inmuebles en Colombia</p>
             <h1 className="t-hero max-w-3xl">
               <TitularAnimado texto={`${titular.tipos} en venta en ${titular.lugar}`} />
             </h1>
 
             <p className="t-lead anim-sube mt-6 max-w-xl" style={{ "--d": "520ms" } as React.CSSProperties}>
               {titular.ciudad && sectores
-                ? `Un portafolio corto en ${titular.ciudad}, en ${sectores}: cada inmueble visitado y verificado por nosotros. ¿Vendes el tuyo? Te acompañamos de principio a fin.`
+                ? `Vendemos apartamentos y casas y gestionamos inmuebles en Colombia. Hoy el portafolio está en ${titular.ciudad}, en ${sectores}: cada inmueble, visitado y verificado por nosotros. ¿Vendes el tuyo? Te acompañamos de principio a fin.`
                 : "Te ayudamos a vender tu inmueble de forma rápida y segura. Encuentra el tuyo en un portafolio corto, visitado y verificado por nosotros."}
             </p>
 
