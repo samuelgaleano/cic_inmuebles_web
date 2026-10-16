@@ -39,4 +39,15 @@ describe("calcularCuota", () => {
     expect(calcularCuota({ precio: 800_000_000, inicialPct: 40, plazoAnios: 15, tasaEA: 12 }).cuota).toBeLessThan(base.cuota);
     expect(calcularCuota({ precio: 800_000_000, inicialPct: 30, plazoAnios: 20, tasaEA: 12 }).cuota).toBeLessThan(base.cuota);
   });
+
+  it("avisa cuando la tasa estaba fuera de rango", () => {
+    const fuera = calcularCuota({ precio: 400_000_000, inicialPct: 30, plazoAnios: 15, tasaEA: 55 });
+    expect(fuera.tasaAjustada).toBe(true);
+    expect(fuera.tasaEA).toBe(LIMITES.tasaEA.max);
+    expect(calcularCuota({ precio: 400_000_000, inicialPct: 30, plazoAnios: 15, tasaEA: 12 }).tasaAjustada).toBe(false);
+  });
+
+  it("sin precio la cuota es cero (la sección no se muestra)", () => {
+    expect(calcularCuota({ precio: 0, inicialPct: 30, plazoAnios: 15, tasaEA: 12 }).cuota).toBe(0);
+  });
 });

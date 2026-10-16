@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   BarChart3,
   Building2,
+  CalendarClock,
   CalendarDays,
   ExternalLink,
   FileText,
@@ -20,6 +21,7 @@ const nav = [
   { href: "/admin", label: "Dashboard", icon: Home, exact: true },
   { href: "/admin/inmuebles", label: "Inmuebles", icon: Building2 },
   { href: "/admin/leads", label: "Leads", icon: Inbox },
+  { href: "/admin/vigencias", label: "Vigencias", icon: CalendarClock },
   { href: "/admin/agenda", label: "Agenda", icon: CalendarDays },
   { href: "/admin/plantillas", label: "Plantillas", icon: FileText },
   { href: "/admin/reportes", label: "Reportes", icon: BarChart3 },

@@ -154,4 +154,23 @@ describe("ordenarDescripcion", () => {
     expect(todo).toContain("Línea rara 123 xyz");
     expect(todo).toContain("Otra cosa única");
   });
+
+  it("reconoce «baños» con eñe y no repite el dato que la ficha ya muestra", () => {
+    const d = ordenarDescripcion("Apartamento amplio\n\n3 baños\n1 baño", { banos: 3 });
+    expect(JSON.stringify(d)).not.toContain("3 baños");
+    expect(d.conflictos).toContain("baños");
+  });
+
+  it("descarta una línea de puros símbolos (raya triple, guiones)", () => {
+    const d = ordenarDescripcion("Sala comedor\n⸻\n---\nCocina integral", {});
+    expect(JSON.stringify(d)).not.toContain("⸻");
+    expect(JSON.stringify(d)).toContain("Cocina integral");
+  });
+
+  it("concuerda «Parqueadero» o «Parqueaderos» con la cantidad", () => {
+    const uno = ordenarDescripcion("Parqueadero: 1 cubierto", { parqueaderos: 1 });
+    expect(uno.grupos.flatMap((g) => g.items)).toContain("Parqueadero cubierto");
+    const dos = ordenarDescripcion("Parqueaderos: 2 en línea", { parqueaderos: 2 });
+    expect(dos.grupos.flatMap((g) => g.items)).toContain("Parqueaderos en línea");
+  });
 });

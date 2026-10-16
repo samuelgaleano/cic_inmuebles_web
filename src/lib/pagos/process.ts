@@ -7,6 +7,7 @@ import {
   type WompiTransaction,
 } from "@/lib/integrations/wompi";
 import { sendPagosAlert as sendPagosAlertReal, sendPaymentNotification as sendPaymentNotificationReal, type PaymentNotice } from "@/lib/notifications/payment";
+import { registrarServicioDePago } from "@/lib/servicios/procesar";
 import { getPagosStore, type PagoEstado, type PagoSource, type PagosStore } from "./store";
 
 export interface ProcessDeps {
@@ -15,6 +16,8 @@ export interface ProcessDeps {
   fetchTransactionsByReference: (reference: string) => Promise<WompiTransaction[] | null>;
   sendPaymentNotification: (p: PaymentNotice) => Promise<boolean>;
   sendPagosAlert: (subject: string, text: string) => Promise<boolean>;
+  /** Crea el servicio de publicación (vigencia y avisos) de un pago aprobado. Opcional: nunca debe romper el pago. */
+  registrarServicio?: (tx: WompiTransaction, plan: Plan) => Promise<void>;
 }
 
 export type ProcessOutcome = PagoEstado | "dedup" | "store_error";
@@ -46,6 +49,7 @@ export function defaultDeps(): ProcessDeps {
     fetchTransactionsByReference: fetchTransactionsByReferenceFromApi,
     sendPaymentNotification: sendPaymentNotificationReal,
     sendPagosAlert: sendPagosAlertReal,
+    registrarServicio: (tx, plan) => registrarServicioDePago(tx, plan),
   };
 }
 
@@ -129,6 +133,15 @@ export async function processTransaction(
   }
 
   const notified = tx.status === "APPROVED" ? await notifyOnce(tx, c, deps) : false;
+
+  // Un pago aprobado y por el monto correcto abre su servicio (idempotente por transacción).
+  if (tx.status === "APPROVED" && c.estado === "ok") {
+    try {
+      await deps.registrarServicio?.(tx, c.plan);
+    } catch (err) {
+      console.error(`[pago] no se pudo registrar el servicio de ${tx.id}:`, describe(err));
+    }
+  }
 
   if (c.estado === "revisar" && nuevo) {
     await deps.sendPagosAlert(

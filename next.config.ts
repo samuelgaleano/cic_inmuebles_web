@@ -38,11 +38,6 @@ const nextConfig: NextConfig = {
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
         ],
       },
-      {
-        // Assets del hero: nombres versionados (hero-960/hero-1920), caché larga.
-        source: "/:hero(hero.*)",
-        headers: [{ key: "Cache-Control", value: "public, max-age=86400, stale-while-revalidate=604800" }],
-      },
     ];
   },
 };

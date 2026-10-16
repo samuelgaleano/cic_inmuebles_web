@@ -52,6 +52,12 @@ const baseSchema = z.object({
   estado: z.enum(PROPERTY_STATUSES),
   precio: z.number().nonnegative("El precio debe ser un número válido"),
   ciudad: z.string().trim().min(2, "La ciudad es obligatoria"),
+  // Cantidades: vacías están bien; negativas no (antes se guardó «-3 parqueaderos»).
+  administracion: z.number().nonnegative("No puede ser negativo").optional(),
+  habitaciones: z.number().nonnegative("No puede ser negativo").optional(),
+  banos: z.number().nonnegative("No puede ser negativo").optional(),
+  area: z.number().nonnegative("No puede ser negativo").optional(),
+  parqueaderos: z.number().nonnegative("No puede ser negativo").optional(),
 });
 
 export interface PropertyFormState {
@@ -67,6 +73,11 @@ function buildInput(formData: FormData): { input?: PropertyInput; state?: Proper
     estado: str(formData.get("estado")),
     precio: num(formData.get("precio")) ?? -1,
     ciudad: str(formData.get("ciudad")),
+    administracion: num(formData.get("administracion")),
+    habitaciones: num(formData.get("habitaciones")),
+    banos: num(formData.get("banos")),
+    area: num(formData.get("area")),
+    parqueaderos: num(formData.get("parqueaderos")),
   });
 
   if (!parsed.success) {

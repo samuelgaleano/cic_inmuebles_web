@@ -36,7 +36,7 @@ const SOCIALS = [
   { label: "TikTok", href: siteConfig.social.tiktok, Icon: TikTokIcon },
 ];
 
-const enlace = "py-1 text-ink-soft transition-colors hover:text-brand-700";
+const enlace = "inline-block py-1.5 text-ink-soft transition-colors hover:text-brand-700";
 
 export function SiteFooter() {
   const year = new Date().getFullYear();
@@ -101,9 +101,14 @@ export function SiteFooter() {
 
         <div className="mt-12 flex flex-col gap-2 border-t border-line pt-5 text-[12px] sm:flex-row sm:items-center sm:justify-between">
           <p>© {year} {siteConfig.name}. Todos los derechos reservados.</p>
-          <Link href="/admin/login" className="transition-colors hover:text-ink">
-            Acceso del equipo
-          </Link>
+          <div className="flex flex-wrap items-center gap-x-5">
+            <Link href="/privacidad" className="inline-block py-1.5 transition-colors hover:text-ink">
+              Política de tratamiento de datos
+            </Link>
+            <Link href="/admin/login" className="inline-block py-1.5 transition-colors hover:text-ink">
+              Acceso del equipo
+            </Link>
+          </div>
         </div>
       </div>
     </footer>

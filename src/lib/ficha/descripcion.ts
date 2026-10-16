@@ -43,7 +43,8 @@ function limpiar(linea: string): string {
     .trim();
 }
 
-const esSeparador = (l: string) => /^[\s⸻_\-–—=·•.]{3,}$/.test(l);
+// Una línea sin ninguna letra ni número (raya triple, guiones, símbolos) no dice nada.
+const esSeparador = (l: string) => !/[\p{L}\p{N}]/u.test(l);
 
 function norm(s: string): string {
   return s
@@ -72,7 +73,10 @@ const CLAVES: { campo: Campo; re: RegExp; dinero: boolean }[] = [
   { campo: "parqueaderos", re: /^(parqueadero|parqueaderos|garaje|garajes)$/, dinero: false },
 ];
 
-const CONTEO = /^(\d+)\s+(habitaciones?|alcobas?|cuartos?|dormitorios?|banos?|parqueaderos?|garajes?)\b[,;]?\s*(.*)$/i;
+const CONTEO = /^(\d+)\s+(habitaci[oó]n(?:es)?|alcobas?|cuartos?|dormitorios?|ba[nñ]os?|parqueaderos?|garajes?)(?=[\s,;.]|$)[,;]?\s*(.*)$/i;
+
+/** «Parqueadero cubierto» con un espacio, «Parqueaderos cubiertos» con varios. */
+const parqueaderosCon = (n: number | undefined, detalle: string) => `${n === 1 ? "Parqueadero" : "Parqueaderos"} ${detalle}`.trim();
 
 function campoDeSustantivo(s: string): Campo {
   const n = norm(s);
@@ -161,12 +165,12 @@ export function ordenarDescripcion(texto: string | undefined | null, d: DatosEst
         const enFicha = valorFicha(clave.campo, d);
         if (enFicha === undefined || enTexto === undefined) {
           // La ficha no lo muestra: se conserva como dato (o, si es un conteo con detalle, como característica).
-          if (clave.campo === "parqueaderos" && /[a-z]{3,}/i.test(valor.replace(/\d+/g, ""))) item(`Parqueaderos ${valor.replace(/^\d+\s*/, "")}`.trim());
+          if (clave.campo === "parqueaderos" && /[a-z]{3,}/i.test(valor.replace(/\d+/g, ""))) item(parqueaderosCon(enTexto, valor.replace(/^\d+\s*/, "")));
           else dato(etiqueta, valor);
         } else {
           if (!acuerdo(clave.campo, enTexto, enFicha)) conflicto(clave.campo);
           const detalle = valor.replace(/^[\d.,\s$]+(m2|m²)?/i, "").trim();
-          if (clave.campo === "parqueaderos" && detalle) item(`Parqueaderos ${detalle}`);
+          if (clave.campo === "parqueaderos" && detalle) item(parqueaderosCon(enTexto, detalle));
         }
         continue;
       }

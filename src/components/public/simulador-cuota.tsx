@@ -56,6 +56,9 @@ export function SimuladorCuota({ precio }: { precio: number }) {
 
   const r = calcularCuota({ precio, inicialPct, plazoAnios, tasaEA });
 
+  // Sin precio publicado («Consultar precio») no hay nada que simular.
+  if (!(precio > 0)) return null;
+
   return (
     <section aria-labelledby="cuota-titulo">
       <h2 id="cuota-titulo" className="t-title">Cuota mensual estimada</h2>
@@ -120,6 +123,11 @@ export function SimuladorCuota({ precio }: { precio: number }) {
               />
               <span className="text-[15px] text-muted">% E.A.</span>
             </div>
+            {r.tasaAjustada && (
+              <p role="alert" className="mt-2 text-[13px] font-medium text-rose-700">
+                El simulador acepta tasas entre {LIMITES.tasaEA.min} % y {LIMITES.tasaEA.max} % E.A.; para el cálculo usó {r.tasaEA} %.
+              </p>
+            )}
           </div>
         </div>
       </div>

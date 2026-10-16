@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getRepository } from "@/lib/data";
+import { desdeHoraBogota } from "@/lib/utils/hora-bogota";
 import {
   AGENT_ROLES,
   APPOINTMENT_STATUSES,
@@ -62,6 +63,9 @@ export async function createAppointmentAction(formData: FormData): Promise<void>
   const clienteTelefono = str(formData.get("clienteTelefono"));
   const inicioEn = str(formData.get("inicioEn"));
   if (!propertyId || !clienteNombre || !clienteTelefono || !inicioEn) return;
+  // El campo es de hora de Bogotá; el servidor corre en UTC.
+  const inicioUtc = desdeHoraBogota(inicioEn);
+  if (!inicioUtc) return;
 
   await getRepository().appointments.create({
     propertyId,
@@ -70,7 +74,7 @@ export async function createAppointmentAction(formData: FormData): Promise<void>
     clienteNombre,
     clienteTelefono,
     clienteEmail: str(formData.get("clienteEmail")) || undefined,
-    inicioEn: new Date(inicioEn).toISOString(),
+    inicioEn: inicioUtc,
     duracionMin: Number(str(formData.get("duracionMin"))) || 60,
     notas: str(formData.get("notas")) || undefined,
     estado: "confirmada",

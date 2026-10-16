@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { startTransition, useActionState, useState } from "react";
 import Link from "next/link";
 import { Loader2, Save } from "lucide-react";
 import { CloudinaryUploader } from "./cloudinary-uploader";
@@ -29,6 +29,8 @@ function Field({
   required,
   placeholder,
   error,
+  min,
+  step,
 }: {
   name: string;
   label: string;
@@ -37,6 +39,8 @@ function Field({
   required?: boolean;
   placeholder?: string;
   error?: string;
+  min?: number;
+  step?: number | "any";
 }) {
   return (
     <div>
@@ -51,6 +55,8 @@ function Field({
         placeholder={placeholder}
         className={input}
         required={required}
+        min={min}
+        step={step}
       />
       {error && <p className="mt-1 text-xs text-rose-600">{error}</p>}
     </div>
@@ -76,7 +82,15 @@ export function PropertyForm({
     setImagenes((prev) => [prev.trim(), ...urls].filter(Boolean).join("\n"));
 
   return (
-    <form action={formAction} className="space-y-8">
+    <form
+      // React 19 vacía los campos no controlados al terminar una acción: con un error de validación se perdía todo lo escrito.
+      onSubmit={(e) => {
+        e.preventDefault();
+        const datos = new FormData(e.currentTarget, (e.nativeEvent as SubmitEvent).submitter);
+        startTransition(() => formAction(datos));
+      }}
+      className="space-y-8"
+    >
       {state.error && (
         <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
           {state.error}
@@ -112,8 +126,8 @@ export function PropertyForm({
               ))}
             </select>
           </div>
-          <Field name="precio" label="Precio de venta (COP)" type="number" defaultValue={property?.precio} required error={state.errors?.precio} />
-          <Field name="administracion" label="Administración (COP)" type="number" defaultValue={property?.administracion} />
+          <Field name="precio" label="Precio de venta (COP)" type="number" min={0} defaultValue={property?.precio} required error={state.errors?.precio} />
+          <Field name="administracion" label="Administración (COP)" type="number" min={0} defaultValue={property?.administracion} error={state.errors?.administracion} />
         </div>
       </section>
 
@@ -132,10 +146,10 @@ export function PropertyForm({
       <section className="rounded-2xl border border-line bg-white p-6">
         <h2 className="mb-4 text-lg font-bold tracking-tight text-ink">Especificaciones</h2>
         <div className="grid gap-4 sm:grid-cols-4">
-          <Field name="habitaciones" label="Habitaciones" type="number" defaultValue={c?.habitaciones} />
-          <Field name="banos" label="Baños" type="number" defaultValue={c?.banos} />
-          <Field name="area" label="Área (m²)" type="number" defaultValue={c?.area} />
-          <Field name="parqueaderos" label="Parqueaderos" type="number" defaultValue={c?.parqueaderos} />
+          <Field name="habitaciones" label="Habitaciones" type="number" min={0} defaultValue={c?.habitaciones} error={state.errors?.habitaciones} />
+          <Field name="banos" label="Baños" type="number" min={0} defaultValue={c?.banos} error={state.errors?.banos} />
+          <Field name="area" label="Área (m²)" type="number" min={0} step="any" defaultValue={c?.area} error={state.errors?.area} />
+          <Field name="parqueaderos" label="Parqueaderos" type="number" min={0} defaultValue={c?.parqueaderos} error={state.errors?.parqueaderos} />
         </div>
       </section>
 

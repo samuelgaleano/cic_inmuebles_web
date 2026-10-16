@@ -46,6 +46,9 @@ export interface WompiTransaction {
   amountInCents: number | undefined;
   currency: string | undefined;
   customerEmail: string | null;
+  /** Datos que la persona escribió en nuestro formulario y viajan como customerData; pueden faltar. */
+  customerName?: string | null;
+  customerPhone?: string | null;
 }
 
 /** Los ids de Wompi tienen la forma "1292-1602113476-10985". */
@@ -60,6 +63,7 @@ type ApiTransaction = {
   amount_in_cents?: number;
   currency?: string;
   customer_email?: string | null;
+  customer_data?: { full_name?: string | null; phone_number?: string | null } | null;
 };
 
 function toTransaction(d: ApiTransaction | undefined): WompiTransaction | null {
@@ -71,6 +75,8 @@ function toTransaction(d: ApiTransaction | undefined): WompiTransaction | null {
     amountInCents: typeof d.amount_in_cents === "number" ? d.amount_in_cents : undefined,
     currency: d.currency,
     customerEmail: d.customer_email ?? null,
+    customerName: d.customer_data?.full_name ?? null,
+    customerPhone: d.customer_data?.phone_number ?? null,
   };
 }
 

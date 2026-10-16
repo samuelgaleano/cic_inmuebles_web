@@ -30,6 +30,8 @@ export interface ResultadoCuota {
   cuota: number;
   totalPagado: number;
   totalIntereses: number;
+  /** true cuando la tasa escrita estaba fuera de rango y se usó el límite más cercano. */
+  tasaAjustada: boolean;
 }
 
 const limitar = (v: number, { min, max }: { min: number; max: number }) =>
@@ -39,9 +41,10 @@ export function calcularCuota(e: EntradaCuota): ResultadoCuota {
   const inicialPct = limitar(e.inicialPct, LIMITES.inicialPct);
   const plazoAnios = limitar(e.plazoAnios, LIMITES.plazoAnios);
   const tasaEA = limitar(e.tasaEA, LIMITES.tasaEA);
+  const tasaAjustada = tasaEA !== e.tasaEA;
 
   if (!Number.isFinite(e.precio) || e.precio <= 0) {
-    return { inicialPct, plazoAnios, tasaEA, inicial: 0, prestamo: 0, cuota: 0, totalPagado: 0, totalIntereses: 0 };
+    return { inicialPct, plazoAnios, tasaEA, inicial: 0, prestamo: 0, cuota: 0, totalPagado: 0, totalIntereses: 0, tasaAjustada };
   }
 
   const inicial = Math.round((e.precio * inicialPct) / 100);
@@ -54,5 +57,5 @@ export function calcularCuota(e: EntradaCuota): ResultadoCuota {
   const totalPagado = cuota * meses;
   const totalIntereses = i === 0 ? 0 : Math.max(0, totalPagado - prestamo);
 
-  return { inicialPct, plazoAnios, tasaEA, inicial, prestamo, cuota, totalPagado, totalIntereses };
+  return { inicialPct, plazoAnios, tasaEA, inicial, prestamo, cuota, totalPagado, totalIntereses, tasaAjustada };
 }

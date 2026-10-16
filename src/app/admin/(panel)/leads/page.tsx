@@ -14,6 +14,7 @@ function waLink(phone: string): string | undefined {
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleString("es-CO", {
+    timeZone: "America/Bogota",
     day: "2-digit",
     month: "short",
     hour: "2-digit",

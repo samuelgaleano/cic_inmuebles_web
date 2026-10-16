@@ -1,5 +1,6 @@
 import { CalendarPlus, Clock, Trash2, UserPlus } from "lucide-react";
 import { getRepository } from "@/lib/data";
+import { formatoBogota } from "@/lib/utils/hora-bogota";
 import {
   AGENT_ROLES,
   AGENT_ROLE_LABELS,
@@ -56,15 +57,7 @@ function AvailabilityEditor({
   );
 }
 
-function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString("es-CO", {
-    weekday: "short",
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+const formatDateTime = formatoBogota;
 
 export default async function AdminAgendaPage() {
   const repo = getRepository();

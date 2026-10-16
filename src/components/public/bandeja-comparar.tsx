@@ -18,12 +18,14 @@ export function BandejaComparar() {
   if (ids.length === 0 || !enContextoDeCompra) return null;
 
   const listo = ids.length >= 2;
+  // En la ficha, en móvil, hay una barra fija con «Agendar visita» abajo: la bandeja se sube para no quedar debajo.
+  const hayBarraFija = /^\/inmuebles\/[^/]+$/.test(pathname);
 
   return (
     <div
       role="region"
       aria-label="Comparación de inmuebles"
-      className="anim-bandeja fixed bottom-5 left-1/2 z-40 flex max-w-[calc(100vw-6.5rem)] items-center gap-1 rounded-full bg-ink py-1.5 pl-5 pr-1.5 text-white shadow-float sm:max-w-none"
+      className={`anim-bandeja fixed ${hayBarraFija ? "bottom-[5.5rem] lg:bottom-5" : "bottom-5"} left-1/2 z-40 flex max-w-[calc(100vw-6.5rem)] items-center gap-1 rounded-full bg-ink py-1.5 pl-5 pr-1.5 text-white shadow-float sm:max-w-none`}
     >
       <p className="mr-2 truncate text-sm">
         <span className="tnum font-semibold">{ids.length}</span>{" "}

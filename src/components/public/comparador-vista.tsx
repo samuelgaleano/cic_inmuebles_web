@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { X } from "lucide-react";
@@ -79,9 +79,12 @@ export function ComparadorVista({ indice }: { indice: ItemIndice[] }) {
   const slugsEnlace = useMemo(() => leerSlugs(params.get("s"), validos, MAX_COMPARAR), [params, validos]);
   const claveEnlace = slugsEnlace.join(",");
   const claveLista = ids.filter((id) => validos.has(id)).join(",");
+  // Enlace ya adoptado como selección propia: desde ahí, quitar un inmueble reescribe la URL.
+  const enlaceAdoptado = useRef("");
 
   useEffect(() => {
     if (claveEnlace && claveEnlace !== claveLista) reemplazar(slugsEnlace);
+    enlaceAdoptado.current = claveEnlace;
     // Solo cuando llega un enlace distinto; los cambios de la lista los refleja el efecto de abajo.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [claveEnlace]);
@@ -89,7 +92,7 @@ export function ComparadorVista({ indice }: { indice: ItemIndice[] }) {
   // Mantiene la URL al día con la selección (enlace compartible), sin pisar un enlace que aún no se adoptó.
   useEffect(() => {
     if (!hidratado) return;
-    if (claveEnlace && claveEnlace !== claveLista) return;
+    if (claveEnlace && claveEnlace !== claveLista && enlaceAdoptado.current !== claveEnlace) return;
     const deseada = claveLista ? `?s=${claveLista}` : "";
     if (window.location.search !== deseada) window.history.replaceState(null, "", `/comparar${deseada}`);
   }, [claveLista, claveEnlace, hidratado]);

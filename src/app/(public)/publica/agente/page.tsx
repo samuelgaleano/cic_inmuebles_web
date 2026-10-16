@@ -8,12 +8,22 @@ import { getPlan, PLANS, type Plan, type PlanGrupo } from "@/lib/config/plans";
 import { isWompiConfigured, planIdFromReference } from "@/lib/integrations/wompi";
 import { confirmFromRedirect } from "@/lib/pagos/process";
 import { isPagosStoreConfigured } from "@/lib/pagos/store";
+import { getServiciosStore } from "@/lib/servicios/store";
+import { servicioDeToken } from "@/lib/servicios/token";
 import { buttonVariants } from "@/components/ui/button";
 import { formatPrice } from "@/lib/utils/format";
 import { siteConfig, whatsappLink } from "@/lib/config/site";
 import { cn } from "@/lib/utils/cn";
 
-type SearchParams = Promise<{ pago?: string; ref?: string; id?: string }>;
+type SearchParams = Promise<{ pago?: string; ref?: string; id?: string; renovar?: string }>;
+
+/** Datos del servicio que se renueva, tomados del enlace firmado del correo. */
+interface Renovacion {
+  planId: string;
+  nombre: string;
+  email: string;
+  telefono: string;
+}
 
 const ESTADOS_VISIBLES = new Set<string>(["APPROVED", "PENDING", "DECLINED", "VOIDED", "ERROR"]);
 const esEstadoVisible = (s: string): s is PagoEstadoVisible => ESTADOS_VISIBLES.has(s);
@@ -165,6 +175,22 @@ export default async function AgentePlanesPage({ searchParams }: { searchParams:
     );
   }
 
+  // Enlace de renovación del correo: abre el plan que vence con los datos precargados.
+  let renovacion: Renovacion | null = null;
+  if (typeof sp.renovar === "string") {
+    const servicioId = servicioDeToken(sp.renovar);
+    if (servicioId) {
+      try {
+        const s = await getServiciosStore().obtener(servicioId);
+        if (s && getPlan(s.planId)?.mode === "pago") {
+          renovacion = { planId: s.planId, nombre: s.clienteNombre ?? "", email: s.clienteEmail ?? "", telefono: s.clienteTelefono ?? "" };
+        }
+      } catch {
+        renovacion = null; // sin la tabla o sin red, la página de planes funciona igual
+      }
+    }
+  }
+
   return (
     <>
       <JsonLd data={breadcrumbJsonLd} />
@@ -182,6 +208,11 @@ export default async function AgentePlanesPage({ searchParams }: { searchParams:
         <p className="t-lead mt-5 max-w-2xl">
           Primero decide cómo quieres pagar: por cada inmueble o por un paquete de espacios que rotan. Los planes con precio fijo se pagan en línea; el contenido profesional se cotiza según el inmueble.
         </p>
+        {renovacion && wompiOn && (
+          <p className="mt-8 max-w-2xl rounded-[var(--radius-card)] bg-brand-50 px-5 py-4 text-[15px] text-brand-900">
+            Renueva tu publicación: abrimos el plan «{getPlan(renovacion.planId)?.nombre}» con tus datos para que pagues en un paso.
+          </p>
+        )}
         {!wompiOn && (
           <p className="mt-8 max-w-2xl rounded-[var(--radius-card)] bg-surface px-5 py-4 text-[15px]">
             El pago en línea se activará en breve. Mientras tanto, escríbenos por WhatsApp y coordinamos la publicación.
@@ -201,7 +232,7 @@ export default async function AgentePlanesPage({ searchParams }: { searchParams:
               </div>
               <div className="grid gap-5 sm:grid-cols-2">
                 {planes.map((plan) => (
-                  <PlanCard key={plan.id} plan={plan} wompiOn={wompiOn} />
+                  <PlanCard key={plan.id} plan={plan} wompiOn={wompiOn} renovacion={renovacion?.planId === plan.id ? renovacion : null} />
                 ))}
               </div>
             </section>
@@ -279,7 +310,7 @@ export default async function AgentePlanesPage({ searchParams }: { searchParams:
   );
 }
 
-function PlanCard({ plan, wompiOn }: { plan: Plan; wompiOn: boolean }) {
+function PlanCard({ plan, wompiOn, renovacion }: { plan: Plan; wompiOn: boolean; renovacion: Renovacion | null }) {
   const eq = equivalencia(plan);
   return (
     <article
@@ -313,7 +344,12 @@ function PlanCard({ plan, wompiOn }: { plan: Plan; wompiOn: boolean }) {
 
       <div className="mt-6">
         {wompiOn ? (
-          <PlanCheckout planId={plan.id} planNombre={plan.nombre} precioCOP={plan.precioCOP} />
+          <PlanCheckout
+            planId={plan.id}
+            planNombre={plan.nombre}
+            precioCOP={plan.precioCOP}
+            renovacion={renovacion ? { nombre: renovacion.nombre, email: renovacion.email, telefono: renovacion.telefono } : undefined}
+          />
         ) : (
           <a
             href={whatsappLink(`Hola ${siteConfig.name}, me interesa el plan "${plan.nombre}" (${formatPrice(plan.precioCOP)}). ¿Cómo lo contrato?`)}

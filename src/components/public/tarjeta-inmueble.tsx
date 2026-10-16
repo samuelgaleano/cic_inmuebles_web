@@ -61,7 +61,10 @@ export function TarjetaInmueble({
       <ViewTransition name={`foto-${datos.slug}`} share="morph" default="none">
       <div
         className={cn(
-          "relative overflow-hidden rounded-[var(--radius-media)] bg-surface",
+          // Con parallax el marco recorta con `overflow-clip`: `overflow-hidden` lo vuelve contenedor de scroll
+          // y la animación (view-timeline) deja de seguir a la tira horizontal.
+          "relative rounded-[var(--radius-media)] bg-surface",
+          parallax ? "overflow-clip" : "overflow-hidden",
           proporcion === "4/5" ? "aspect-[4/5]" : "aspect-[5/4]",
         )}
       >

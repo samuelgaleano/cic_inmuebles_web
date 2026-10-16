@@ -102,12 +102,15 @@ export function PlanCheckout({
   planId,
   planNombre,
   precioCOP,
+  renovacion,
 }: {
   planId: string;
   planNombre: string;
   precioCOP: number;
+  /** Viene del enlace de renovación del correo: abre el pago con los datos ya escritos. */
+  renovacion?: { nombre: string; email: string; telefono: string };
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(Boolean(renovacion));
   const [wanted, setWanted] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [widget, resetWidget] = useWompiWidget(wanted || open, attempt);
@@ -115,7 +118,7 @@ export function PlanCheckout({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [lenta, setLenta] = useState(false);
-  const [form, setForm] = useState({ nombre: "", email: "", telefono: "" });
+  const [form, setForm] = useState({ nombre: renovacion?.nombre ?? "", email: renovacion?.email ?? "", telefono: renovacion?.telefono ?? "" });
   const dialogRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const loadingRef = useRef(false);
@@ -321,7 +324,8 @@ export function PlanCheckout({
                 </div>
               ))}
               <p className="text-xs leading-relaxed text-muted">
-                Con estos datos prellenamos la pasarela y te contactamos después del pago.
+                Con estos datos prellenamos la pasarela, te contactamos después del pago y te avisamos por correo antes de que venza tu publicación. Más detalles en la{" "}
+                <a href="/privacidad" target="_blank" rel="noopener" className="underline underline-offset-2">política de datos</a>.
               </p>
 
               {error && (

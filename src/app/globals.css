@@ -383,7 +383,8 @@
   .scrub-linea {
     animation: scrub-linea linear both;
     animation-timeline: view();
-    animation-range: cover 8% cover 40%;
+    /* Cada palabra arranca un poco después de la anterior (--k = su posición): se encienden en cascada. */
+    animation-range: cover calc(2% + var(--k, 0) * 1.2%) cover calc(14% + var(--k, 0) * 1.2%);
   }
   .parallax-x {
     animation: parallax-x linear both;

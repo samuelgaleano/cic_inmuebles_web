@@ -28,6 +28,8 @@ export interface Plan {
   periodo: string;
   /** Espacios activos (inmuebles publicados a la vez) que incluye un paquete. */
   espacios?: number;
+  /** Vigencia del plan en días, contada desde que CIC publica el inmueble (no desde el pago). */
+  dias?: number;
   /** true cuando el precio es un mínimo ("desde"). */
   desde?: boolean;
   resumen: string;
@@ -45,6 +47,7 @@ export const PLANS: Plan[] = [
     nombre: "Alianza por resultados",
     precioCOP: 10000,
     periodo: "por inmueble · 90 días",
+    dias: 90,
     resumen:
       "Tarifa administrativa para publicar; CIC gestiona los clientes y se comparte la comisión 50/50 cuando CIC consigue el negocio.",
     incluye: [
@@ -63,6 +66,7 @@ export const PLANS: Plan[] = [
     nombre: "Publicación independiente",
     precioCOP: 20000,
     periodo: "por inmueble · 30 días",
+    dias: 30,
     resumen:
       "Publicas tu inmueble en CIC como vitrina digital, pero atiendes tú a los interesados y conservas tu comisión.",
     incluye: [
@@ -80,6 +84,7 @@ export const PLANS: Plan[] = [
     nombre: "Paquete Mensual 5",
     precioCOP: 75000,
     periodo: "hasta 5 inmuebles · mes",
+    dias: 30,
     espacios: 5,
     resumen:
       "Cinco inmuebles publicados a la vez, atendidos por ti. Si vendes o retiras uno, lo reemplazas por otro sin pagar de nuevo.",
@@ -99,6 +104,7 @@ export const PLANS: Plan[] = [
     nombre: "Paquete Mensual 10",
     precioCOP: 150000,
     periodo: "hasta 10 inmuebles · mes",
+    dias: 30,
     espacios: 10,
     resumen:
       "Diez inmuebles publicados a la vez, atendidos por ti. Si vendes o retiras uno, lo reemplazas por otro sin pagar de nuevo.",
@@ -118,6 +124,7 @@ export const PLANS: Plan[] = [
     nombre: "Anual Aliado 5",
     precioCOP: 239900,
     periodo: "hasta 5 inmuebles · año",
+    dias: 365,
     espacios: 5,
     resumen:
       "Cinco espacios activos durante 12 meses, con rotación y atención prioritaria. Precio especial de lanzamiento.",
@@ -136,6 +143,7 @@ export const PLANS: Plan[] = [
     nombre: "Anual Aliado 10",
     precioCOP: 399900,
     periodo: "hasta 10 inmuebles · año",
+    dias: 365,
     espacios: 10,
     resumen:
       "Diez espacios activos durante 12 meses, con rotación y atención prioritaria. Precio especial de lanzamiento.",
@@ -193,4 +201,9 @@ export function wompiAmountInCents(plan: Plan): number {
 export function amountMatchesPlan(plan: Plan, amountInCents: number | undefined): boolean {
   if (amountInCents == null) return true;
   return amountInCents === wompiAmountInCents(plan);
+}
+
+/** Vigencia en días de un plan de pago (undefined si no aplica). */
+export function diasDePlan(id: string): number | undefined {
+  return getPlan(id)?.dias;
 }

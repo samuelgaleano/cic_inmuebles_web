@@ -179,9 +179,24 @@ export function getCoverMedia(p: Pick<Property, "medios">): PropertyMedia | unde
   return images.find((m) => m.isCover) ?? images[0] ?? p.medios[0];
 }
 
-/** Convierte un inmueble en su versión pública (sin datos privados). */
+/** Cantidades que no pueden ser negativas: un valor así es un error de carga y se trata como «sin dato». */
+const sinNegativo = (n: number | undefined): number | undefined => (typeof n === "number" && Number.isFinite(n) && n >= 0 ? n : undefined);
+
+/** Convierte un inmueble en su versión pública (sin datos privados ni cifras imposibles). */
 export function toPublicProperty(p: Property): PublicProperty {
   const { propietario: _propietario, notasInternas: _notasInternas, ubicacion, ...rest } = p;
   const { direccion: _direccion, ...ubicacionPublica } = ubicacion;
-  return { ...rest, ubicacion: ubicacionPublica };
+  const c = rest.caracteristicas;
+  return {
+    ...rest,
+    administracion: sinNegativo(rest.administracion),
+    caracteristicas: {
+      ...c,
+      habitaciones: sinNegativo(c.habitaciones),
+      banos: sinNegativo(c.banos),
+      area: sinNegativo(c.area),
+      parqueaderos: sinNegativo(c.parqueaderos),
+    },
+    ubicacion: ubicacionPublica,
+  };
 }

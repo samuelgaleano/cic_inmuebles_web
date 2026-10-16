@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useId, useRef } from "react";
 import { CheckCircle2, Loader2, MessageCircle } from "lucide-react";
+import Link from "next/link";
 import { createLeadAction, type LeadFormState } from "@/lib/actions/leads";
 import { buttonVariants } from "@/components/ui/button";
 import type { LeadIntent, LeadType } from "@/lib/domain";
@@ -249,7 +250,11 @@ export function LeadForm({
         {isPending ? "Enviando…" : (submitLabel ?? (isSeller ? "Quiero vender mi inmueble" : "Enviar y abrir WhatsApp"))}
       </button>
       <p className="text-center text-[13px] leading-snug text-muted">
-        Al enviar, registramos tu solicitud y abrimos WhatsApp para contactarte. No compartimos tus datos.
+        Al enviar, registramos tu solicitud y abrimos WhatsApp para contactarte. Al enviar aceptas la{" "}
+        <Link href="/privacidad" className="font-medium text-ink-soft underline underline-offset-2 hover:text-brand-700">
+          política de tratamiento de datos
+        </Link>
+        .
       </p>
     </form>
   );

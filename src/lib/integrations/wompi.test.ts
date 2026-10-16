@@ -214,11 +214,17 @@ describe("fetchTransaction (la API de Wompi es la fuente de verdad)", () => {
     fetchMock.mockResolvedValue({
       ok: true,
       json: async () => ({
-        data: { id: ID, status: "APPROVED", reference: "CIC-alianza-90-1-2", amount_in_cents: 1_000_000, currency: "COP", customer_email: "c@x.co" },
+        data: {
+          id: ID, status: "APPROVED", reference: "CIC-alianza-90-1-2", amount_in_cents: 1_000_000, currency: "COP", customer_email: "c@x.co",
+          customer_data: { full_name: "Marta Pérez", phone_number: "3001234567" },
+        },
       }),
     });
     const tx = await fetchTransaction(ID);
-    expect(tx).toEqual({ id: ID, status: "APPROVED", reference: "CIC-alianza-90-1-2", amountInCents: 1_000_000, currency: "COP", customerEmail: "c@x.co" });
+    expect(tx).toEqual({
+      id: ID, status: "APPROVED", reference: "CIC-alianza-90-1-2", amountInCents: 1_000_000, currency: "COP", customerEmail: "c@x.co",
+      customerName: "Marta Pérez", customerPhone: "3001234567",
+    });
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe(`https://production.wompi.co/v1/transactions/${ID}`);
     expect(init.headers.Authorization).toBe("Bearer prv_prod_b");
