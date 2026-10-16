@@ -49,7 +49,7 @@ export function PruebaPortafolio({ items, total }: { items: DatosTarjeta[]; tota
       <div>
         <h2 id="corto" className="t-headline">Un portafolio corto, a propósito.</h2>
         <Declaracion
-          className="mt-6 max-w-xl text-[1.1875rem] font-medium leading-snug tracking-[-0.015em] sm:text-[1.375rem]"
+          className="mt-6 max-w-xl font-sans text-[1.1875rem] font-medium leading-snug tracking-[-0.01em] sm:text-[1.375rem]"
           texto="Visitamos y verificamos cada inmueble antes de publicarlo, respondemos directo por WhatsApp y, si vendes, solo cobramos cuando se cierra la venta."
         />
         <div className="mt-9 flex flex-wrap gap-3">
@@ -68,14 +68,14 @@ export function PruebaPortafolio({ items, total }: { items: DatosTarjeta[]; tota
         <div className="flex aspect-[4/5] flex-col justify-between rounded-[var(--radius-card)] bg-brand-700 p-5 text-white sm:p-6">
           <p className="text-[13px] text-white/80">Si vendes con CIC</p>
           <div>
-            <p className="tnum text-[3.25rem] font-semibold leading-none tracking-[-0.04em] sm:text-[4rem]">3&nbsp;%</p>
+            <p className="tnum font-display text-[3.25rem] font-medium leading-none tracking-[-0.03em] sm:text-[4rem]">3&nbsp;%</p>
             <p className="mt-2 text-[15px] leading-snug text-white/90">solo cuando se cierra la venta. Sin costo inicial.</p>
           </div>
         </div>
         <div className="flex aspect-[4/5] flex-col justify-between rounded-[var(--radius-card)] bg-ink p-5 text-white sm:p-6">
           <p className="text-[13px] text-white/70">Portafolio</p>
           <div>
-            <p className="tnum text-[3.25rem] font-semibold leading-none tracking-[-0.04em] text-brand-400 sm:text-[4rem]">{total}</p>
+            <p className="tnum font-display text-[3.25rem] font-medium leading-none tracking-[-0.03em] text-brand-400 sm:text-[4rem]">{total}</p>
             <p className="mt-2 text-[15px] leading-snug text-white/85">
               {total === 1 ? "inmueble visitado y verificado" : "inmuebles visitados y verificados"} por CIC.
             </p>

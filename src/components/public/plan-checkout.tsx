@@ -89,6 +89,7 @@ export function PlanCheckout({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [lenta, setLenta] = useState(false);
   const [form, setForm] = useState({ nombre: "", email: "", telefono: "" });
   const dialogRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -104,6 +105,9 @@ export function PlanCheckout({
   };
 
   const close = () => {
+    loadingRef.current = false;
+    setLoading(false);
+    setLenta(false);
     setOpen(false);
     setError(null);
     setNotice(null);
@@ -119,12 +123,13 @@ export function PlanCheckout({
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        // Con la pasarela abriéndose no se cierra: evita dejar un pago a medias sin aviso.
-        if (!loadingRef.current) {
-          setOpen(false);
-          setError(null);
-          setNotice(null);
-        }
+        // Salir siempre se puede: cerrar esta ventana no genera ningún cobro.
+        loadingRef.current = false;
+        setLoading(false);
+        setLenta(false);
+        setOpen(false);
+        setError(null);
+        setNotice(null);
         return;
       }
       if (e.key !== "Tab") return;
@@ -153,7 +158,15 @@ export function PlanCheckout({
   const setLoadingState = (v: boolean) => {
     loadingRef.current = v;
     setLoading(v);
+    if (!v) setLenta(false);
   };
+
+  // Si la pasarela tarda en abrir, la persona no se queda esperando sin saber qué hacer.
+  useEffect(() => {
+    if (!loading) return;
+    const id = setTimeout(() => setLenta(true), 10000);
+    return () => clearTimeout(id);
+  }, [loading]);
 
   const pay = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -233,7 +246,7 @@ export function PlanCheckout({
           role="dialog"
           aria-modal="true"
           aria-labelledby={titleId}
-          onClick={(e) => e.target === e.currentTarget && !loading && close()}
+          onClick={(e) => e.target === e.currentTarget && close()}
         >
           <div
             ref={dialogRef}
@@ -249,9 +262,8 @@ export function PlanCheckout({
               <button
                 type="button"
                 onClick={close}
-                disabled={loading}
                 aria-label="Cerrar"
-                className="-mr-2 -mt-2 flex h-10 w-10 flex-none items-center justify-center rounded-full text-muted transition-colors hover:bg-surface hover:text-ink disabled:opacity-50"
+                className="-mr-2 -mt-2 flex h-10 w-10 flex-none items-center justify-center rounded-full text-muted transition-colors hover:bg-surface hover:text-ink"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -289,6 +301,15 @@ export function PlanCheckout({
               {notice && (
                 <p role="status" className="rounded-xl bg-amber-50 px-3.5 py-2.5 text-sm text-amber-900">
                   {notice}
+                </p>
+              )}
+              {loading && lenta && (
+                <p role="status" className="rounded-xl bg-amber-50 px-3.5 py-2.5 text-sm text-amber-900">
+                  <span className="font-medium">La pasarela está tardando en abrir.</span> No se ha cobrado nada. Puedes esperar un poco más o{" "}
+                  <button type="button" onClick={close} className="font-semibold underline underline-offset-2 hover:text-amber-950">
+                    cancelar y volver a intentarlo
+                  </button>
+                  .
                 </p>
               )}
               {widget === "error" && (

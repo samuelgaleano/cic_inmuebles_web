@@ -104,7 +104,7 @@ export default function PublicaPage() {
             <p className="relative mt-4 max-w-md leading-relaxed text-white/80">{o.desc}</p>
 
             <div className="relative mt-8">
-              <p className={cn("tnum text-[3.5rem] font-semibold leading-none tracking-[-0.04em] sm:text-[4.5rem]", o.cifraColor)}>
+              <p className={cn("tnum font-display text-[3.5rem] font-medium leading-none tracking-[-0.03em] sm:text-[4.5rem]", o.cifraColor)}>
                 {o.cifra}
               </p>
               <p className="mt-2 text-[15px] text-white/80">{o.cifraTexto}</p>

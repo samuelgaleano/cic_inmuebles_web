@@ -1,13 +1,19 @@
 import type { Metadata } from "next";
-import { Albert_Sans } from "next/font/google";
+import { Fraunces, Hanken_Grotesk } from "next/font/google";
 import "./globals.css";
 import { JsonLd } from "@/components/seo/json-ld";
 import { siteConfig } from "@/lib/config/site";
 
-// Una sola familia variable (400–700): titulares y texto. Sustituye a Sora + Plus Jakarta
-// Sans + Geist Mono (tres archivos) y le da al sitio una voz propia, no la de plantilla.
-const albert = Albert_Sans({
-  variable: "--font-albert",
+// Dos voces: Fraunces (serif de edición, variable) para titulares y cifras grandes, que dan
+// aire de firma establecida, y Hanken Grotesk para el texto y la interfaz, legible y neutra.
+const fraunces = Fraunces({
+  variable: "--font-fraunces",
+  subsets: ["latin"],
+  axes: ["opsz"],
+  display: "swap",
+});
+const hanken = Hanken_Grotesk({
+  variable: "--font-hanken",
   subsets: ["latin"],
   display: "swap",
 });
@@ -97,7 +103,7 @@ export default function RootLayout({
   return (
     <html
       lang="es-CO"
-      className={`${albert.variable} h-full antialiased`}
+      className={`${fraunces.variable} ${hanken.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col bg-white text-ink">
         {/* Las fotos de los inmuebles se sirven desde Cloudinary: adelantar el
