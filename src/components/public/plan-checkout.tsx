@@ -110,7 +110,9 @@ function acompanarVentanaWompi(volverA: number): () => void {
   let tocada = false; // si la persona ya desplazó por su cuenta, no se le mueve la página
   const ajustes: number[] = [];
   const ir = (top: number) => window.scrollTo({ top: Math.max(0, top), behavior: "instant" });
-  const abierta = (m: HTMLElement) => m.isConnected && m.classList.contains("waybox-display-block");
+  // Al cerrar, Wompi no quita «waybox-display-block»: añade «waybox-modal-final-close», sube la página
+  // al inicio y un segundo después oculta la ventana con `hidden` (sin sacarla del documento).
+  const abierta = (m: HTMLElement) => m.isConnected && !m.hidden && !m.classList.contains("waybox-modal-final-close");
   const alInicio = () => {
     if (!modal || tocada || !abierta(modal)) return;
     const top = modal.getBoundingClientRect().top;
@@ -130,7 +132,8 @@ function acompanarVentanaWompi(volverA: number): () => void {
   };
   eventos.forEach((e) => window.addEventListener(e, marcar, { capture: true, passive: true }));
   const buscar = window.setInterval(() => {
-    const m = document.querySelector<HTMLElement>(".waybox-modal.waybox-display-block");
+    // Puede quedar la ventana oculta de un intento anterior: se toma la que está abierta y visible.
+    const m = [...document.querySelectorAll<HTMLElement>(".waybox-modal")].find((x) => abierta(x) && x.getBoundingClientRect().height > 0);
     if (!m) return;
     window.clearInterval(buscar);
     window.clearTimeout(rendirse); // ya apareció: se vigila hasta que se cierre, tarde lo que tarde
@@ -139,10 +142,9 @@ function acompanarVentanaWompi(volverA: number): () => void {
     // Wompi enfoca su primer campo y el navegador puede volver a mover la página: se corrige un rato.
     for (const ms of [150, 400, 800, 1500]) ajustes.push(window.setTimeout(alInicio, ms));
     observador = new MutationObserver(() => {
-      if (modal && !abierta(modal)) {
-        fin();
-        ir(volverA);
-      }
+      if (!modal || abierta(modal)) return;
+      ir(volverA); // en el cierre y otra vez al ocultarse, por si Wompi movió la página entre medias
+      if (modal.hidden || !modal.isConnected) fin();
     });
     observador.observe(m, { attributes: true, attributeFilter: ["class", "style"] });
     observador.observe(document.body, { childList: true });
