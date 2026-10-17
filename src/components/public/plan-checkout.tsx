@@ -98,6 +98,59 @@ function urlPaginaCompleta(d: DatosPago, f: { nombre: string; email: string; tel
   return `https://checkout.wompi.co/p/?${q.toString()}`;
 }
 
+/**
+ * La ventana de Wompi se monta en posición absoluta al inicio del documento, no de la pantalla:
+ * si la persona pulsó «Contratar» con la página bajada, se abría fuera de la vista. Esto lleva la
+ * página hasta la ventana en cuanto aparece y, cuando se cierra sin pagar, devuelve a la persona
+ * al plan donde estaba. Devuelve una función para dejar de vigilar.
+ */
+function acompanarVentanaWompi(volverA: number): () => void {
+  let modal: HTMLElement | null = null;
+  let observador: MutationObserver | null = null;
+  let tocada = false; // si la persona ya desplazó por su cuenta, no se le mueve la página
+  const ajustes: number[] = [];
+  const ir = (top: number) => window.scrollTo({ top: Math.max(0, top), behavior: "instant" });
+  const abierta = (m: HTMLElement) => m.isConnected && m.classList.contains("waybox-display-block");
+  const alInicio = () => {
+    if (!modal || tocada || !abierta(modal)) return;
+    const top = modal.getBoundingClientRect().top;
+    if (top < 0 || top > 40) ir(top + window.scrollY - 12);
+  };
+  const marcar = () => {
+    tocada = true;
+  };
+  const eventos = ["wheel", "touchmove", "keydown"] as const;
+
+  const fin = () => {
+    window.clearInterval(buscar);
+    window.clearTimeout(rendirse);
+    ajustes.forEach((t) => window.clearTimeout(t));
+    eventos.forEach((e) => window.removeEventListener(e, marcar, true));
+    observador?.disconnect();
+  };
+  eventos.forEach((e) => window.addEventListener(e, marcar, { capture: true, passive: true }));
+  const buscar = window.setInterval(() => {
+    const m = document.querySelector<HTMLElement>(".waybox-modal.waybox-display-block");
+    if (!m) return;
+    window.clearInterval(buscar);
+    window.clearTimeout(rendirse); // ya apareció: se vigila hasta que se cierre, tarde lo que tarde
+    modal = m;
+    alInicio();
+    // Wompi enfoca su primer campo y el navegador puede volver a mover la página: se corrige un rato.
+    for (const ms of [150, 400, 800, 1500]) ajustes.push(window.setTimeout(alInicio, ms));
+    observador = new MutationObserver(() => {
+      if (modal && !abierta(modal)) {
+        fin();
+        ir(volverA);
+      }
+    });
+    observador.observe(m, { attributes: true, attributeFilter: ["class", "style"] });
+    observador.observe(document.body, { childList: true });
+  }, 100);
+  const rendirse = window.setTimeout(fin, 20000); // si Wompi nunca abre, no se vigila para siempre
+  return fin;
+}
+
 const FIELDS = [
   { key: "nombre", label: "Nombre completo", type: "text", autoComplete: "name", placeholder: "Como aparece en tu documento" },
   { key: "email", label: "Correo electrónico", type: "email", autoComplete: "email", placeholder: "Recibirás ahí el comprobante" },
@@ -246,6 +299,10 @@ export function PlanCheckout({
       // se cierra antes de abrirla: su bloqueo de desplazamiento y su trampa de foco lo impedían.
       setLoadingState(false);
       setOpen(false);
+      const volverA = window.scrollY;
+      // Un cuadro de espera para que se libere el bloqueo de desplazamiento antes de que Wompi se coloque.
+      await new Promise((r) => requestAnimationFrame(() => r(null)));
+      acompanarVentanaWompi(volverA);
       checkout.open((result) => {
         setLoadingState(false);
         const txId = result?.transaction?.id;
