@@ -78,7 +78,8 @@ type DatosPago = {
 
 // Web Checkout de Wompi (página completa, https://docs.wompi.co/docs/colombia/widget-checkout-web/):
 // mismos datos y misma firma de integridad que ya entrega el servidor, sin ventana flotante.
-function urlPaginaCompleta(d: DatosPago, f: { nombre: string; email: string }): string {
+function urlPaginaCompleta(d: DatosPago, f: { nombre: string; email: string; telefono: string }): string {
+  const telefono = f.telefono.replace(/\D/g, "");
   const q = new URLSearchParams({
     "public-key": d.publicKey,
     currency: d.currency,
@@ -89,6 +90,11 @@ function urlPaginaCompleta(d: DatosPago, f: { nombre: string; email: string }): 
     "customer-data:email": f.email,
     "customer-data:full-name": f.nombre,
   });
+  // Sin teléfono el servicio quedaba sin WhatsApp de contacto en el panel de vigencias.
+  if (telefono) {
+    q.set("customer-data:phone-number", telefono);
+    q.set("customer-data:phone-number-prefix", "+57");
+  }
   return `https://checkout.wompi.co/p/?${q.toString()}`;
 }
 
@@ -179,7 +185,8 @@ export function PlanCheckout({
     return () => {
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = prevOverflow;
-      trigger?.focus();
+      // Sin desplazar la página: si el foco la mueve, la ventana de Wompi (posición absoluta) queda fuera de la vista.
+      trigger?.focus({ preventScroll: true });
     };
   }, [open]);
 
@@ -234,6 +241,11 @@ export function PlanCheckout({
           phoneNumberPrefix: "+57",
         },
       });
+      // La ventana de Wompi va en posición absoluta dentro de la página: cuando su contenido es más
+      // alto que la pantalla, se llega al botón «Continuar» desplazando la página. Por eso este modal
+      // se cierra antes de abrirla: su bloqueo de desplazamiento y su trampa de foco lo impedían.
+      setLoadingState(false);
+      setOpen(false);
       checkout.open((result) => {
         setLoadingState(false);
         const txId = result?.transaction?.id;
@@ -244,6 +256,7 @@ export function PlanCheckout({
           return;
         }
         setNotice("Cerraste la pasarela sin completar el pago. No se hizo ningún cobro; puedes intentarlo cuando quieras.");
+        setOpen(true);
       });
     } catch {
       setError("No pudimos conectar con la pasarela. Revisa tu conexión e inténtalo de nuevo.");

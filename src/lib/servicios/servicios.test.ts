@@ -297,4 +297,11 @@ describe("correcciones de la revisión", () => {
     expect(c.text).not.toMatch(/mañana/i);
     expect(c.text).not.toMatch(/responde a este correo|dejamos de enviarlos/);
   });
+
+  it("si falla el correo de confirmación de pago, CIC recibe un aviso para contactar al comprador", async () => {
+    const d = deps({ enviarCorreo: vi.fn(async () => false) });
+    await registrarServicioDePago(TX, getPlan("alianza-90")!, d);
+    expect(d.alertar).toHaveBeenCalledTimes(1);
+    expect((d.alertar as ReturnType<typeof vi.fn>).mock.calls[0][1]).toContain("agente@ejemplo.co");
+  });
 });

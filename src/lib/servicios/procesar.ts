@@ -55,6 +55,13 @@ export async function registrarServicioDePago(
     const correo = correoPagoRecibido(servicio);
     if (correo && !(await deps.enviarCorreo(correo))) {
       console.error(`[vigencias] no se pudo enviar la confirmación del servicio ${servicio.id}`);
+      // No hay reintento automático de este correo: CIC recibe el aviso y contacta al comprador.
+      await deps
+        .alertar(
+          "No llegó la confirmación de pago al comprador",
+          [`Plan: ${plan.nombre}`, `Cliente: ${[servicio.clienteNombre, servicio.clienteEmail, servicio.clienteTelefono].filter(Boolean).join(" · ")}`, "", "Escríbele para confirmarle el pago y los siguientes pasos."].join("\n"),
+        )
+        .catch(() => false);
     }
   } catch (err) {
     const pendiente = err instanceof ServiciosNoDisponibleError;
