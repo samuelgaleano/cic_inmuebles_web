@@ -4,10 +4,10 @@ import { ArrowLeft, Check, ChevronDown, MessageCircle } from "lucide-react";
 import { PlanCheckout } from "@/components/public/plan-checkout";
 import { PagoResultado, type PagoEstadoVisible } from "@/components/public/pago-resultado";
 import { JsonLd } from "@/components/seo/json-ld";
-import { getPlan, PLANS, type Plan, type PlanGrupo } from "@/lib/config/plans";
+import { COMERCIO_EN_PASARELA, getPlan, PLANS, type Plan, type PlanGrupo } from "@/lib/config/plans";
 import { isWompiConfigured, planIdFromReference } from "@/lib/integrations/wompi";
 import { confirmFromRedirect } from "@/lib/pagos/process";
-import { isPagosStoreConfigured } from "@/lib/pagos/store";
+import { getPagosStore, isPagosStoreConfigured } from "@/lib/pagos/store";
 import { getServiciosStore } from "@/lib/servicios/store";
 import { servicioDeToken } from "@/lib/servicios/token";
 import { buttonVariants } from "@/components/ui/button";
@@ -23,6 +23,8 @@ interface Renovacion {
   nombre: string;
   email: string;
   telefono: string;
+  /** El mismo token del correo: liga el pago al servicio que se renueva. */
+  token: string;
 }
 
 const ESTADOS_VISIBLES = new Set<string>(["APPROVED", "PENDING", "DECLINED", "VOIDED", "ERROR"]);
@@ -83,38 +85,49 @@ const GRUPOS: { id: PlanGrupo; titulo: string; descripcion: string }[] = [
 
 // Preguntas que frenan la contratación. Las respuestas salen de las condiciones
 // de publicación y del flujo real de pago; formato citable por buscadores e IAs.
-const faqs = [
-  {
-    q: "¿Qué es un espacio activo?",
-    a: "Es un inmueble publicado a la vez. Cada plan incluye un número de espacios: uno en los planes por inmueble, cinco o diez en los paquetes. En los paquetes, si vendes o retiras un inmueble, publicas otro en su lugar sin pagar de nuevo mientras el plan esté vigente.",
-  },
-  {
-    q: "¿Cuál es la diferencia entre la alianza y la publicación independiente?",
-    a: "En la alianza por resultados CIC atiende a los interesados, coordina las visitas y acompaña el cierre; la comisión se comparte 50/50 según acuerdo previo. En la publicación independiente tú atiendes a los interesados y conservas tu comisión completa.",
-  },
-  {
-    q: "¿Qué pasa después de pagar?",
-    a: "Te contactamos al correo o teléfono que dejaste en la pasarela para pedirte las fotos y los datos del inmueble. Creamos la ficha, la activamos y te enviamos el enlace publicado.",
-  },
-  {
-    q: "¿Cómo puedo pagar?",
-    a: "En línea con Wompi: tarjetas de crédito y débito, PSE, Nequi y los demás medios disponibles en la pasarela. Al terminar vuelves a esta página con el resultado del pago.",
-  },
-  {
-    q: "¿Los pagos son reembolsables?",
-    a: "Los pagos de publicación no son reembolsables una vez creada y activada la ficha. Si pagaste y todavía no hemos creado la ficha, escríbenos y lo revisamos.",
-  },
-];
+// Lo de los avisos de vencimiento solo se afirma cuando ese registro funciona.
+function preguntas(avisosActivos: boolean) {
+  return [
+    {
+      q: "¿Qué es un espacio activo?",
+      a: "Es un inmueble publicado a la vez. Cada plan incluye un número de espacios: uno en los planes por inmueble, cinco o diez en los paquetes. En los paquetes, si vendes o retiras un inmueble, publicas otro en su lugar sin pagar de nuevo mientras el plan esté vigente.",
+    },
+    {
+      q: "¿Cuál es la diferencia entre la alianza y la publicación independiente?",
+      a: "En la alianza por resultados CIC atiende a los interesados, coordina las visitas y acompaña el cierre; la comisión se comparte 50/50 según acuerdo previo. En la publicación independiente tú atiendes a los interesados y conservas tu comisión completa.",
+    },
+    {
+      q: "¿Qué pasa después de pagar?",
+      a: "Te contactamos al correo o teléfono que dejaste en la pasarela para pedirte las fotos y los datos del inmueble. Creamos la ficha, la activamos y te enviamos el enlace publicado. La vigencia del plan empieza el día en que publicamos tu inmueble, no el día del pago.",
+    },
+    {
+      q: "¿El plan se renueva o se cobra solo?",
+      a: avisosActivos
+        ? "No. Cada pago es único: no guardamos tu tarjeta ni hacemos cobros automáticos. Te escribimos por correo 7 días y 1 día antes del vencimiento con un enlace para renovar en un paso; si no renuevas, la publicación se desactiva al vencer."
+        : "No. Cada pago es único: no guardamos tu tarjeta ni hacemos cobros automáticos. Para seguir publicado al terminar la vigencia, vuelves a pagar el plan.",
+    },
+    {
+      q: "¿Cómo puedo pagar?",
+      a: `En línea con Wompi: tarjetas de crédito y débito, PSE, Nequi y los demás medios disponibles en la pasarela. En la pasarela verás el comercio «${COMERCIO_EN_PASARELA}», la cuenta con la que CIC Inmuebles recibe sus pagos. Al terminar vuelves a esta página con el resultado del pago.`,
+    },
+    {
+      q: "¿Los pagos son reembolsables?",
+      a: "Los pagos de publicación no son reembolsables una vez creada y activada la ficha. Si pagaste y todavía no hemos creado la ficha, escríbenos y lo revisamos.",
+    },
+  ];
+}
 
-const faqJsonLd = {
-  "@context": "https://schema.org",
-  "@type": "FAQPage",
-  mainEntity: faqs.map((f) => ({
-    "@type": "Question",
-    name: f.q,
-    acceptedAnswer: { "@type": "Answer", text: f.a },
-  })),
-};
+function faqJsonLd(faqs: { q: string; a: string }[]) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faqs.map((f) => ({
+      "@type": "Question",
+      name: f.q,
+      acceptedAnswer: { "@type": "Answer", text: f.a },
+    })),
+  };
+}
 
 const breadcrumbJsonLd = {
   "@context": "https://schema.org",
@@ -127,10 +140,16 @@ const breadcrumbJsonLd = {
 };
 
 /** Costo por inmueble al mes, derivado del precio: la ayuda real para comparar paquetes. */
-function equivalencia(plan: Plan): { porInmuebleMes: number; mensualAnual?: number } | null {
+function equivalencia(plan: Plan): { porInmuebleMes: number; mensualAnual?: number; anual?: { precio: number; porInmuebleMes: number } } | null {
   if (!plan.espacios || !plan.grupo || plan.grupo === "inmueble") return null;
   const aCentenas = (n: number) => Math.round(n / 100) * 100; // "≈ $ 4.000", no "$ 3.998"
-  if (plan.grupo === "mensual") return { porInmuebleMes: aCentenas(plan.precioCOP / plan.espacios) };
+  if (plan.grupo === "mensual") {
+    const anual = pagables.find((p) => p.grupo === "anual" && p.espacios === plan.espacios);
+    return {
+      porInmuebleMes: aCentenas(plan.precioCOP / plan.espacios),
+      anual: anual ? { precio: anual.precioCOP, porInmuebleMes: aCentenas(anual.precioCOP / plan.espacios / 12) } : undefined,
+    };
+  }
   const mensual = pagables.find((p) => p.grupo === "mensual" && p.espacios === plan.espacios);
   return {
     porInmuebleMes: aCentenas(plan.precioCOP / plan.espacios / 12),
@@ -154,6 +173,15 @@ export default async function AgentePlanesPage({ searchParams }: { searchParams:
     const planId = reference ? planIdFromReference(reference) : undefined;
     const plan = planId ? getPlan(planId) : undefined;
     const actualUrl = `/publica/agente?pago=procesado${sp.ref ? `&ref=${encodeURIComponent(sp.ref)}` : ""}${sp.id ? `&id=${encodeURIComponent(sp.id)}` : ""}`;
+    // Una renovación pagada desde el correo no vuelve a pedir fotos ni datos: su vigencia solo se extiende.
+    let esRenovacion = false;
+    if (retorno?.found && isPagosStoreConfigured()) {
+      try {
+        esRenovacion = Boolean((await getPagosStore().getReference(retorno.reference))?.renuevaServicioId);
+      } catch {
+        esRenovacion = false;
+      }
+    }
 
     return (
       <>
@@ -169,6 +197,7 @@ export default async function AgentePlanesPage({ searchParams }: { searchParams:
             amountInCents={retorno?.found ? retorno.amountInCents : undefined}
             reference={reference}
             actualUrl={actualUrl}
+            esRenovacion={esRenovacion}
           />
         </div>
       </>
@@ -183,7 +212,7 @@ export default async function AgentePlanesPage({ searchParams }: { searchParams:
       try {
         const s = await getServiciosStore().obtener(servicioId);
         if (s && getPlan(s.planId)?.mode === "pago") {
-          renovacion = { planId: s.planId, nombre: s.clienteNombre ?? "", email: s.clienteEmail ?? "", telefono: s.clienteTelefono ?? "" };
+          renovacion = { planId: s.planId, nombre: s.clienteNombre ?? "", email: s.clienteEmail ?? "", telefono: s.clienteTelefono ?? "", token: sp.renovar };
         }
       } catch {
         renovacion = null; // sin la tabla o sin red, la página de planes funciona igual
@@ -191,10 +220,14 @@ export default async function AgentePlanesPage({ searchParams }: { searchParams:
     }
   }
 
+  // Los avisos de vencimiento solo se prometen si el registro de vigencias funciona (migración 0004).
+  const avisosActivos = isPagosStoreConfigured() && (await getServiciosStore().disponible());
+  const faqs = preguntas(avisosActivos);
+
   return (
     <>
       <JsonLd data={breadcrumbJsonLd} />
-      <JsonLd data={faqJsonLd} />
+      <JsonLd data={faqJsonLd(faqs)} />
 
       <div className="wrap pt-8">
         <Link href="/publica" className="link-arrow py-2 text-[15px]">
@@ -206,8 +239,19 @@ export default async function AgentePlanesPage({ searchParams }: { searchParams:
         <p className="text-[15px] text-muted">Agentes e inmobiliarias</p>
         <h1 className="t-display mt-2 max-w-4xl">Publica tus inmuebles en CIC.</h1>
         <p className="t-lead mt-5 max-w-2xl">
-          Primero decide cómo quieres pagar: por cada inmueble o por un paquete de espacios que rotan. Los planes con precio fijo se pagan en línea; el contenido profesional se cotiza según el inmueble.
+          Elige cómo pagar: por cada inmueble o por un paquete de espacios que rotan. Pagas en línea una sola vez por periodo, sin cobros automáticos, y la vigencia empieza cuando publicamos tu inmueble. El contenido profesional se cotiza según el inmueble.
         </p>
+        <nav aria-label="Tipos de plan" className="mt-8 flex flex-wrap gap-2">
+          {GRUPOS.filter((g) => pagables.some((p) => p.grupo === g.id)).map((g) => (
+            <a
+              key={g.id}
+              href={`#plan-${g.id}`}
+              className="rounded-full border border-line bg-white px-4 py-2 text-[14px] font-medium text-ink-soft transition-colors hover:border-ink hover:text-ink"
+            >
+              {g.titulo}
+            </a>
+          ))}
+        </nav>
         {renovacion && wompiOn && (
           <p className="mt-8 max-w-2xl rounded-[var(--radius-card)] bg-brand-50 px-5 py-4 text-[15px] text-brand-900">
             Renueva tu publicación: abrimos el plan «{getPlan(renovacion.planId)?.nombre}» con tus datos para que pagues en un paso.
@@ -225,14 +269,20 @@ export default async function AgentePlanesPage({ searchParams }: { searchParams:
           const planes = pagables.filter((p) => p.grupo === g.id);
           if (planes.length === 0) return null;
           return (
-            <section key={g.id} aria-labelledby={`grupo-${g.id}`} className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,2.2fr)] lg:gap-14">
+            <section key={g.id} id={`plan-${g.id}`} aria-labelledby={`grupo-${g.id}`} className="grid scroll-mt-24 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,2.2fr)] lg:gap-14">
               <div className="lg:pt-2">
                 <h2 id={`grupo-${g.id}`} className="t-title">{g.titulo}</h2>
                 <p className="mt-3 max-w-xs text-[15px] leading-relaxed text-muted">{g.descripcion}</p>
               </div>
               <div className="grid gap-5 sm:grid-cols-2">
                 {planes.map((plan) => (
-                  <PlanCard key={plan.id} plan={plan} wompiOn={wompiOn} renovacion={renovacion?.planId === plan.id ? renovacion : null} />
+                  <PlanCard
+                    key={plan.id}
+                    plan={plan}
+                    wompiOn={wompiOn}
+                    avisosActivos={avisosActivos}
+                    renovacion={renovacion?.planId === plan.id ? renovacion : null}
+                  />
                 ))}
               </div>
             </section>
@@ -310,7 +360,17 @@ export default async function AgentePlanesPage({ searchParams }: { searchParams:
   );
 }
 
-function PlanCard({ plan, wompiOn, renovacion }: { plan: Plan; wompiOn: boolean; renovacion: Renovacion | null }) {
+function PlanCard({
+  plan,
+  wompiOn,
+  avisosActivos,
+  renovacion,
+}: {
+  plan: Plan;
+  wompiOn: boolean;
+  avisosActivos: boolean;
+  renovacion: Renovacion | null;
+}) {
   const eq = equivalencia(plan);
   return (
     <article
@@ -331,6 +391,15 @@ function PlanCard({ plan, wompiOn, renovacion }: { plan: Plan; wompiOn: boolean;
           )}
         </p>
       )}
+      {eq?.anual && (
+        <p className="mt-1.5 text-[13px] leading-relaxed text-muted">
+          o{" "}
+          <a href="#plan-anual" className="font-medium text-brand-700 underline underline-offset-2">
+            {formatPrice(eq.anual.precio)} al año
+          </a>{" "}
+          (≈ <span className="tnum">{formatPrice(eq.anual.porInmuebleMes)}</span> por inmueble al mes)
+        </p>
+      )}
       <p className="mt-4 text-[15px] leading-relaxed text-ink-soft">{plan.resumen}</p>
 
       <ul className="mt-5 flex-1">
@@ -348,7 +417,8 @@ function PlanCard({ plan, wompiOn, renovacion }: { plan: Plan; wompiOn: boolean;
             planId={plan.id}
             planNombre={plan.nombre}
             precioCOP={plan.precioCOP}
-            renovacion={renovacion ? { nombre: renovacion.nombre, email: renovacion.email, telefono: renovacion.telefono } : undefined}
+            avisosActivos={avisosActivos}
+            renovacion={renovacion ? { nombre: renovacion.nombre, email: renovacion.email, telefono: renovacion.telefono, token: renovacion.token } : undefined}
           />
         ) : (
           <a

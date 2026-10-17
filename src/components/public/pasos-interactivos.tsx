@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Check, MessageCircle } from "lucide-react";
@@ -50,6 +50,10 @@ export function PasosInteractivos({
   const [activo, setActivo] = useState(0);
   const [auto, setAuto] = useState(true);
   const botones = useRef<(HTMLButtonElement | null)[]>([]);
+  // Ids únicos por instancia (useId): dos recorridos en la misma página no chocarían.
+  const base = useId();
+  const idPaso = (i: number) => `${base}-paso-${i}`;
+  const idPanel = `${base}-panel`;
 
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
@@ -90,9 +94,9 @@ export function PasosInteractivos({
               }}
               type="button"
               role="tab"
-              id={`paso-${i}`}
+              id={idPaso(i)}
               aria-selected={sel}
-              aria-controls="panel-paso"
+              aria-controls={idPanel}
               tabIndex={sel ? 0 : -1}
               onClick={() => elegir(i)}
               onKeyDown={(e) => alTeclear(e, i)}
@@ -144,8 +148,8 @@ export function PasosInteractivos({
 
       <div
         role="tabpanel"
-        id="panel-paso"
-        aria-labelledby={`paso-${activo}`}
+        id={idPanel}
+        aria-labelledby={idPaso(activo)}
         onPointerDown={() => setAuto(false)}
         onKeyDown={() => setAuto(false)}
         className="min-h-[26rem] min-w-0 overflow-hidden rounded-[var(--radius-tile)] bg-ink p-6 text-white sm:p-9"
@@ -163,8 +167,16 @@ export function PasosInteractivos({
 /* ───────────── Paso 1: escribir una frase y ver lo que entiende el catálogo ───────────── */
 function PasoBuscar({ indice, ctx, sugerencias }: { indice: ItemIndice[]; ctx: ContextoBusqueda; sugerencias: string[] }) {
   const router = useRouter();
+  const idFrase = useId();
   const [texto, setTexto] = useState("");
   const tocado = useRef(false);
+  // El texto que se escribe solo cambia los resultados letra por letra: si eso se anunciara, el lector de
+  // pantalla recitaría la demostración sin que nadie la pidiera. Solo se anuncia tras la primera interacción.
+  const [interactuo, setInteractuo] = useState(false);
+  const tocar = () => {
+    tocado.current = true;
+    setInteractuo(true);
+  };
 
   // Escribe sola la primera sugerencia (hasta que la persona toque el campo).
   useEffect(() => {
@@ -198,17 +210,19 @@ function PasoBuscar({ indice, ctx, sugerencias }: { indice: ItemIndice[]; ctx: C
           if (hay) router.push(destino);
         }}
       >
-        <label htmlFor="paso-frase" className="sr-only">
+        <label htmlFor={idFrase} className="sr-only">
           Tu búsqueda
         </label>
         <input
-          id="paso-frase"
+          id={idFrase}
           value={texto}
           onChange={(e) => {
-            tocado.current = true;
+            tocar();
             setTexto(e.target.value);
           }}
-          onFocus={() => (tocado.current = true)}
+          onFocus={() => {
+            tocado.current = true; // detiene la demostración, pero no activa los anuncios hasta que escriba
+          }}
           placeholder="3 alcobas en Bella Suiza hasta 900 millones"
           autoComplete="off"
           className="min-w-0 flex-1 bg-transparent py-2.5 text-[16px] text-ink outline-none placeholder:text-muted"
@@ -230,7 +244,7 @@ function PasoBuscar({ indice, ctx, sugerencias }: { indice: ItemIndice[]; ctx: C
               key={s}
               type="button"
               onClick={() => {
-                tocado.current = true;
+                tocar();
                 setTexto(s);
               }}
               className="rounded-full bg-white/10 px-3.5 py-1.5 text-[14px] text-white transition-colors hover:bg-white/20"
@@ -241,7 +255,18 @@ function PasoBuscar({ indice, ctx, sugerencias }: { indice: ItemIndice[]; ctx: C
         </div>
       )}
 
-      <div className="mt-6 min-h-[9.5rem]" aria-live="polite">
+      {/* Región viva aparte y siempre montada (vacía hasta que la persona interactúa), para que el primer
+          cambio tras interactuar sí se anuncie. */}
+      <p className="sr-only" aria-live="polite">
+        {interactuo && hay
+          ? b.resultados.length > 0
+            ? `${b.resultados.length === 1 ? "1 resultado" : `${b.resultados.length} resultados`}${
+                b.interpretacion.chips.length > 0 ? `. Entendí: ${b.interpretacion.chips.map((c) => c.etiqueta).join(", ")}` : ""
+              }.`
+            : "Con esa frase no hay coincidencias exactas."
+          : ""}
+      </p>
+      <div className="mt-6 min-h-[9.5rem]">
         {hay && b.interpretacion.chips.length > 0 && (
           <>
             <p className="text-[13px] text-white/60">Esto es lo que entendí</p>

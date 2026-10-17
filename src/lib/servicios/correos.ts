@@ -7,6 +7,8 @@ export interface CorreoSaliente {
   to: string;
   subject: string;
   text: string;
+  /** Las respuestas del cliente llegan a CIC (el remitente automático no tiene buzón). */
+  replyTo?: string;
 }
 
 function saludo(s: Servicio): string {
@@ -16,7 +18,7 @@ function saludo(s: Servicio): string {
 
 function pie(): string {
   return [
-    "Si tienes dudas, escríbenos por WhatsApp:",
+    "Si tienes dudas, responde este correo o escríbenos por WhatsApp:",
     whatsappLink(`Hola ${siteConfig.name}, tengo una duda sobre mi publicación.`),
     "",
     `${siteConfig.name} · ${siteConfig.email} · ${siteConfig.phoneDisplay}`,
@@ -25,12 +27,17 @@ function pie(): string {
 
 /** Enlace que abre los planes con el plan y los datos precargados. */
 export function enlaceDeRenovacion(s: Servicio): string {
-  const token = tokenDeRenovacion(s.id);
+  const token = tokenDeRenovacion(s.id, { venceAt: s.venceAt });
   return token ? `${siteConfig.url}/publica/agente?renovar=${token}` : `${siteConfig.url}/publica/agente`;
 }
 
 function nombreDePlan(s: Servicio): string {
   return getPlan(s.planId)?.nombre ?? "tu plan de publicación";
+}
+
+/** Un paquete no tiene una ficha enlazada que se apague sola: sus correos no deben decir que se desactivó. */
+function esPaquete(s: Servicio): boolean {
+  return !s.propertySlug && Boolean(getPlan(s.planId)?.espacios);
 }
 
 /** Confirmación al comprador: cómo sigue y desde cuándo corre la vigencia. */
@@ -52,6 +59,7 @@ export function correoPagoRecibido(s: Servicio): CorreoSaliente | null {
       "",
       pie(),
     ].join("\n"),
+    replyTo: siteConfig.email,
   };
 }
 
@@ -74,6 +82,7 @@ export function correoPublicacionActiva(s: Servicio): CorreoSaliente | null {
     ]
       .filter((l): l is string => l !== null)
       .join("\n"),
+    replyTo: siteConfig.email,
   };
 }
 
@@ -122,10 +131,41 @@ export function correoDeAviso(s: Servicio, tipo: TipoAviso): CorreoSaliente | nu
     },
   };
 
+  if (esPaquete(s)) {
+    cuerpo["7d"].lineas[cuerpo["7d"].lineas.length - 1] = "Si no lo renuevas, al vencer los inmuebles del paquete dejan de estar cubiertos por el plan y te escribimos para coordinar.";
+    cuerpo["1d"].lineas[cuerpo["1d"].lineas.length - 1] = "Si no lo renuevas, al vencer los inmuebles del paquete dejan de estar cubiertos por el plan.";
+    cuerpo.vencido.lineas[0] = `Tu paquete «${plan}» venció el ${vence}. Te escribimos para coordinar qué pasa con sus inmuebles.`;
+    cuerpo.vencido.lineas[3] = "Para mantenerlos publicados, renueva con un clic:";
+  }
+
   const c = cuerpo[tipo];
   return {
     to: s.clienteEmail,
     subject: c.asunto,
     text: [saludo(s), "", ...c.lineas.filter((l): l is string => l !== null), "", pie()].join("\n"),
+    replyTo: siteConfig.email,
+  };
+}
+
+/** Confirmación de una renovación pagada desde el enlace del correo: la vigencia ya se extendió. */
+export function correoRenovacionPagada(s: Servicio): CorreoSaliente | null {
+  if (!s.clienteEmail || !s.venceAt) return null;
+  const plan = nombreDePlan(s);
+  return {
+    to: s.clienteEmail,
+    subject: "Renovamos tu publicación",
+    text: [
+      saludo(s),
+      "",
+      `Recibimos el pago de la renovación del plan «${plan}». Tu publicación queda activa hasta el ${fechaLarga(s.venceAt)}.`,
+      s.propertySlug ? `Puedes verla aquí: ${siteConfig.url}/inmuebles/${s.propertySlug}` : null,
+      "",
+      "Te avisaremos otra vez 7 días y 1 día antes del nuevo vencimiento.",
+      "",
+      pie(),
+    ]
+      .filter((l): l is string => l !== null)
+      .join("\n"),
+    replyTo: siteConfig.email,
   };
 }

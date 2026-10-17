@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { exigirAdmin } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { getRepository } from "@/lib/data";
 import { TEMPLATE_TYPES, type TemplateType } from "@/lib/domain";
@@ -12,6 +13,7 @@ function parseType(v: string): TemplateType {
 }
 
 export async function createTemplateAction(formData: FormData): Promise<void> {
+  await exigirAdmin();
   const nombre = str(formData.get("nombre"));
   const contenido = str(formData.get("contenido"));
   if (!nombre || !contenido) return;
@@ -25,6 +27,7 @@ export async function createTemplateAction(formData: FormData): Promise<void> {
 }
 
 export async function updateTemplateAction(id: string, formData: FormData): Promise<void> {
+  await exigirAdmin();
   const nombre = str(formData.get("nombre"));
   const contenido = str(formData.get("contenido"));
   if (!nombre || !contenido) return;
@@ -38,6 +41,7 @@ export async function updateTemplateAction(id: string, formData: FormData): Prom
 }
 
 export async function deleteTemplateAction(formData: FormData): Promise<void> {
+  await exigirAdmin();
   const id = str(formData.get("id"));
   if (id) {
     await getRepository().templates.remove(id);

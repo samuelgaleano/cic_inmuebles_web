@@ -1,10 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { exigirAdmin } from "@/lib/auth";
 import { getRepository } from "@/lib/data";
 import { LEAD_STATUSES, type LeadStatus } from "@/lib/domain";
 
 export async function setLeadStatusAction(formData: FormData): Promise<void> {
+  await exigirAdmin();
   const id = String(formData.get("id") ?? "");
   const estado = String(formData.get("estado") ?? "") as LeadStatus;
   if (id && LEAD_STATUSES.includes(estado)) {
@@ -15,6 +17,7 @@ export async function setLeadStatusAction(formData: FormData): Promise<void> {
 }
 
 export async function deleteLeadAction(formData: FormData): Promise<void> {
+  await exigirAdmin();
   const id = String(formData.get("id") ?? "");
   if (id) {
     await getRepository().leads.remove(id);

@@ -60,8 +60,22 @@ export interface SessionPayload {
   exp: number;
 }
 
-function sign(data: string, secret: string): string {
-  return crypto.createHmac("sha256", secret).update(data).digest("base64url");
+/**
+ * Huella de la contrasena del panel (sha256). Entra en la firma de cada token:
+ * cambiar ADMIN_PASSWORD invalida de inmediato todas las sesiones abiertas, sin
+ * lista de revocacion ni base de datos. La contrasena nunca viaja en el token.
+ */
+function huellaClave(password: string): string {
+  return crypto.createHash("sha256").update(password).digest("hex");
+}
+
+function sign(data: string, config: AdminConfig): string {
+  return crypto
+    .createHmac("sha256", config.secret)
+    .update(data)
+    .update("\0")
+    .update(huellaClave(config.password))
+    .digest("base64url");
 }
 
 export function createSessionToken(email: string, ttlMs: number = DEFAULT_TTL_MS): string {
@@ -72,7 +86,7 @@ export function createSessionToken(email: string, ttlMs: number = DEFAULT_TTL_MS
 
   const payload: SessionPayload = { email, exp: Date.now() + ttlMs };
   const data = Buffer.from(JSON.stringify(payload)).toString("base64url");
-  return `${data}.${sign(data, config.secret)}`;
+  return `${data}.${sign(data, config)}`;
 }
 
 export function verifySessionToken(token?: string | null): SessionPayload | null {
@@ -82,13 +96,15 @@ export function verifySessionToken(token?: string | null): SessionPayload | null
   const [data, sig] = token.split(".");
   if (!data || !sig) return null;
 
-  const expected = sign(data, config.secret);
+  const expected = sign(data, config);
   if (sig.length !== expected.length) return null;
   if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null;
 
   try {
     const payload = JSON.parse(Buffer.from(data, "base64url").toString()) as SessionPayload;
     if (typeof payload.exp !== "number" || payload.exp < Date.now()) return null;
+    // Cambiar ADMIN_EMAIL tambien cierra las sesiones emitidas para el correo anterior.
+    if (typeof payload.email !== "string" || payload.email !== config.email.toLowerCase()) return null;
     return payload;
   } catch {
     return null;

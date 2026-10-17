@@ -52,10 +52,34 @@ describe("createLeadAction", () => {
   it("nunca devuelve el honeypot ni los campos ocultos como valores", async () => {
     const r = await createLeadAction(
       { status: "idle" },
-      form({ tipo: "comprador", nombre: "A", telefono: "abc", website: "spam", propertyId: "p1", fuente: "web" }),
+      form({ tipo: "comprador", nombre: "A", telefono: "abc", website: "", propertyId: "p1", fuente: "web" }),
     );
     expect(r.status).toBe("error");
     expect(Object.keys(r.values ?? {})).toEqual(["nombre", "telefono"]);
+  });
+
+  it("honeypot lleno: éxito falso, idéntico al real, sin guardar ni enviar correo", async () => {
+    for (const datos of [
+      { ...valido, website: "https://spam.example" },
+      // Aunque el resto del formulario sea basura: el bot no debe ver errores de validación.
+      { tipo: "vendedor", nombre: "A", telefono: "abc", website: "x" },
+    ]) {
+      const r = await createLeadAction({ status: "idle" }, form(datos));
+      expect(r.status).toBe("success");
+      expect(r.errors).toBeUndefined();
+      expect(r.message).toBe(
+        datos.tipo === "vendedor" ? "¡Gracias! Recibimos los datos de tu inmueble." : "¡Listo! Recibimos tu solicitud.",
+      );
+    }
+    expect(crear).not.toHaveBeenCalled();
+    expect(avisar).not.toHaveBeenCalled();
+  });
+
+  it("honeypot vacío o con solo espacios: el lead entra normal", async () => {
+    const r = await createLeadAction({ status: "idle" }, form({ ...valido, website: "  " }));
+    expect(r.status).toBe("success");
+    expect(crear).toHaveBeenCalledTimes(1);
+    expect(avisar).toHaveBeenCalledTimes(1);
   });
 
   it("rechaza lo que parece teléfono pero no lo es", async () => {

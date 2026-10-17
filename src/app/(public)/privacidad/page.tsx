@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "/privacidad" },
 };
 
-const ACTUALIZADA = "16 de octubre de 2026";
+const ACTUALIZADA = "17 de octubre de 2026";
 
 type Seccion = { titulo: string; cuerpo: React.ReactNode };
 
@@ -31,7 +31,10 @@ const secciones: Seccion[] = [
     titulo: "Qué datos recogemos y para qué",
     cuerpo: (
       <>
-        <p>Solo recogemos lo que escribes tú en los formularios y lo que genera el funcionamiento normal del sitio.</p>
+        <p>
+          Solo recogemos lo que escribes tú en los formularios, lo que nos das al encargarnos la venta de un inmueble y lo que genera el
+          funcionamiento normal del sitio.
+        </p>
         <ul className={lista}>
           <li>
             <strong className="font-medium text-ink">Formularios de contacto, venta y visita:</strong> nombre y teléfono; opcionalmente correo,
@@ -40,7 +43,14 @@ const secciones: Seccion[] = [
           </li>
           <li>
             <strong className="font-medium text-ink">Contratación de un plan de publicación:</strong> nombre, correo y teléfono. Los usamos para
-            prellenar la pasarela de pago, confirmar tu pago, contactarte después de pagar, identificar tu publicación y avisarte de su vigencia.
+            prellenar la pasarela de pago, confirmar tu pago, contactarte después de pagar e identificar tu publicación. Los guardamos junto al
+            plan para enviarte por correo los avisos de vigencia (7 días antes, 1 día antes y al vencer), con un enlace personal para renovar;
+            ese enlace deja de funcionar 30 días después del vencimiento.
+          </li>
+          <li>
+            <strong className="font-medium text-ink">Propietarios de los inmuebles del portafolio:</strong> nombre, teléfono y, si nos lo das,
+            correo. Quedan en la ficha interna del inmueble y en la hoja de Google Sheets donde administramos el inventario. No se muestran en
+            el sitio.
           </li>
           <li>
             <strong className="font-medium text-ink">Pagos:</strong> la referencia de la transacción, su estado, el monto y el correo del comprador
@@ -76,14 +86,27 @@ const secciones: Seccion[] = [
         <ul className={lista}>
           <li>Supabase: base de datos donde se guardan las solicitudes y el registro de pagos.</li>
           <li>Vercel: alojamiento del sitio.</li>
-          <li>Resend: envío de correos (el aviso interno de una solicitud o de un pago y, en los planes de publicación, los avisos de vigencia).</li>
+          <li>
+            Resend: envío de correos. Por Resend salen los avisos internos de solicitudes y de pagos y, si contratas un plan, la confirmación de
+            tu pago y los avisos de vigencia. Si respondes uno de esos correos, tu respuesta le llega a {siteConfig.name}.
+          </li>
+          <li>
+            Google (Gmail): los avisos internos de solicitudes y de pagos, con los datos que escribiste o que informó la pasarela, llegan a un
+            buzón de Gmail de {siteConfig.name}.
+          </li>
           <li>Wompi: pasarela de pagos.</li>
-          <li>Google Drive y Google Sheets: allí administramos el inventario de inmuebles; no se usan para guardar datos de visitantes.</li>
+          <li>
+            Google Drive y Google Sheets: allí administramos el inventario de inmuebles. La hoja de Sheets incluye el nombre, el teléfono y el
+            correo del propietario de cada inmueble.
+          </li>
           <li>Cloudinary: entrega de las fotografías de los inmuebles.</li>
           <li>
             WhatsApp (Meta): al tocar un botón de WhatsApp se abre la aplicación con tu mensaje; desde ahí rigen las políticas de WhatsApp.
           </li>
-          <li>YouTube: los videos de las fichas se cargan en modo de privacidad ampliada y solo cuando das «play».</li>
+          <li>
+            YouTube: al abrir la ficha de un inmueble con video, tu navegador le pide a YouTube la miniatura del video, así que YouTube recibe
+            datos técnicos como tu dirección IP. El reproductor, en modo de privacidad ampliada, solo se carga cuando das «play».
+          </li>
         </ul>
         <p className="mt-3">Cada proveedor aplica además su propia política de privacidad.</p>
       </>
@@ -93,8 +116,9 @@ const secciones: Seccion[] = [
     titulo: "Cuánto tiempo los conservamos",
     cuerpo: (
       <p>
-        El contenido completo de las notificaciones de pago (que incluye el correo del comprador) se elimina automáticamente a las 72 horas.
-        Los demás datos los conservamos mientras sean necesarios para atender tu solicitud, mantener la relación comercial y cumplir
+        El contenido completo de las notificaciones de pago que envía la pasarela (que incluye el correo del comprador) se elimina en la
+        depuración automática diaria a partir de las 72 horas, así que se conserva como máximo unos 4 días. El registro del pago (referencia,
+        estado y monto) sí se conserva. Los demás datos los conservamos mientras sean necesarios para atender tu solicitud, mantener la relación comercial y cumplir
         obligaciones legales; cuando lo pidas y no haya un deber de conservarlos, los suprimimos.
       </p>
     ),

@@ -108,7 +108,8 @@ describe("correos", () => {
     expect(c.subject).toBe("Tu publicación vence en 7 días");
     expect(c.text).toContain("Alianza por resultados");
     expect(c.text).toContain("/inmuebles/bella-suiza");
-    expect(c.text).toMatch(/\/publica\/agente\?renovar=00000000-0000-4000-8000-000000000001\.[0-9a-f]{32}/);
+    expect(c.text).toMatch(/\/publica\/agente\?renovar=00000000-0000-4000-8000-000000000001\.\d{10}\.[0-9a-f]{32}/);
+    expect(c.replyTo).toBeTruthy();
     expect(c.text).toContain("Hola Marta,");
     expect(c.text).not.toMatch(/[—–]/);
   });
@@ -133,6 +134,7 @@ function deps(overrides: Partial<ServiciosDeps> = {}) {
     store,
     enviarCorreo: vi.fn(async () => true),
     despublicarFicha: vi.fn(async () => true),
+    publicarFicha: vi.fn(async () => true),
     alertar: vi.fn(async () => true),
     ahora: () => AHORA,
   };
@@ -303,5 +305,133 @@ describe("correcciones de la revisión", () => {
     await registrarServicioDePago(TX, getPlan("alianza-90")!, d);
     expect(d.alertar).toHaveBeenCalledTimes(1);
     expect((d.alertar as ReturnType<typeof vi.fn>).mock.calls[0][1]).toContain("agente@ejemplo.co");
+  });
+});
+
+describe("token de renovación con caducidad", () => {
+  beforeEach(() => {
+    vi.stubEnv("RENOVACION_SECRET", "secreto-de-prueba");
+  });
+
+  it("vale hasta 30 días después del vencimiento y luego se rechaza", () => {
+    const id = "00000000-0000-4000-8000-000000000009";
+    const vence = new Date(AHORA.getTime() + 10 * DIA).toISOString();
+    const t = tokenDeRenovacion(id, { venceAt: vence, ahora: AHORA })!;
+    expect(servicioDeToken(t, new Date(AHORA.getTime() + 39 * DIA))).toBe(id);
+    expect(servicioDeToken(t, new Date(AHORA.getTime() + 41 * DIA))).toBeNull();
+  });
+
+  it("no se puede alargar la caducidad sin rehacer la firma", () => {
+    const id = "00000000-0000-4000-8000-000000000009";
+    const t = tokenDeRenovacion(id, { ahora: AHORA })!;
+    const [, exp, sig] = t.split(".");
+    expect(servicioDeToken(`${id}.${Number(exp) + 999999}.${sig}`, AHORA)).toBeNull();
+  });
+});
+
+describe("renovación pagada desde el enlace del correo", () => {
+  const RENOV: WompiTransaction = { ...TX, id: "9999-1610641025-11111" };
+
+  it("extiende el servicio original sin crear otro, vuelve a publicar la ficha y confirma una sola vez", async () => {
+    const d = deps();
+    const s = servicio({ venceAt: new Date(AHORA.getTime() + 5 * DIA).toISOString() });
+    d.mem.filas.push(s);
+    await registrarServicioDePago(RENOV, getPlan("alianza-90")!, d, { renuevaServicioId: s.id });
+    await registrarServicioDePago(RENOV, getPlan("alianza-90")!, d, { renuevaServicioId: s.id });
+    expect(d.mem.filas).toHaveLength(1);
+    expect(diasRestantes(s.venceAt!, AHORA)).toBe(95);
+    expect(d.publicarFicha).toHaveBeenCalledWith("bella-suiza");
+    expect(d.enviarCorreo).toHaveBeenCalledTimes(1);
+    expect((d.enviarCorreo as ReturnType<typeof vi.fn>).mock.calls[0][0].subject).toBe("Renovamos tu publicación");
+  });
+
+  it("un servicio vencido se renueva desde hoy", async () => {
+    const d = deps();
+    const s = servicio({ estado: "vencido", venceAt: new Date(AHORA.getTime() - 3 * DIA).toISOString() });
+    d.mem.filas.push(s);
+    await registrarServicioDePago(RENOV, getPlan("alianza-90")!, d, { renuevaServicioId: s.id });
+    expect(s.estado).toBe("activo");
+    expect(diasRestantes(s.venceAt!, AHORA)).toBe(90);
+  });
+
+  it("si el plan no coincide o el servicio sigue pendiente, se trata como compra nueva", async () => {
+    const d = deps();
+    const otro = servicio({ planId: "publicacion-1", dias: 30 });
+    d.mem.filas.push(otro);
+    await registrarServicioDePago(RENOV, getPlan("alianza-90")!, d, { renuevaServicioId: otro.id });
+    expect(d.mem.filas).toHaveLength(2);
+    expect(d.mem.filas[1].estado).toBe("pendiente_publicar");
+  });
+
+  it("si no se puede volver a publicar la ficha, CIC recibe una alerta", async () => {
+    const d = deps({ publicarFicha: vi.fn(async () => false) });
+    const s = servicio({ venceAt: new Date(AHORA.getTime() + 5 * DIA).toISOString() });
+    d.mem.filas.push(s);
+    await registrarServicioDePago(RENOV, getPlan("alianza-90")!, d, { renuevaServicioId: s.id });
+    expect(d.alertar).toHaveBeenCalledTimes(1);
+  });
+
+  it("los reintentos no repiten la alerta de registro fallido", async () => {
+    const d = deps();
+    d.store.registrar = vi.fn(async () => {
+      throw new ServiciosNoDisponibleError("sin tabla");
+    });
+    await registrarServicioDePago(TX, getPlan("alianza-90")!, d, { alertarSiFalla: false });
+    expect(d.alertar).not.toHaveBeenCalled();
+  });
+});
+
+describe("panel y cron: condiciones contra dobles envíos", () => {
+  it("activar dos veces no reinicia la vigencia", async () => {
+    const d = deps();
+    const { servicio: s } = await d.mem.registrar({ txId: "t", reference: null, planId: "publicacion-1", dias: 30, clienteEmail: null, clienteNombre: null, clienteTelefono: null });
+    const v = { inicioAt: AHORA.toISOString(), venceAt: new Date(AHORA.getTime() + 30 * DIA).toISOString() };
+    expect(await d.mem.activar(s.id, v)).not.toBeNull();
+    expect(await d.mem.activar(s.id, { ...v, venceAt: new Date(AHORA.getTime() + 60 * DIA).toISOString() })).toBeNull();
+    expect(diasRestantes(s.venceAt!, AHORA)).toBe(30);
+  });
+
+  it("renovar con un vencimiento distinto al leído no suma otro periodo", async () => {
+    const d = deps();
+    const s = servicio({ venceAt: new Date(AHORA.getTime() + 5 * DIA).toISOString() });
+    d.mem.filas.push(s);
+    const leido = s.venceAt;
+    expect(await d.mem.renovar(s.id, { inicioAt: null, venceAt: new Date(AHORA.getTime() + 95 * DIA).toISOString() }, leido)).not.toBeNull();
+    expect(await d.mem.renovar(s.id, { inicioAt: null, venceAt: new Date(AHORA.getTime() + 185 * DIA).toISOString() }, leido)).toBeNull();
+    expect(diasRestantes(s.venceAt!, AHORA)).toBe(95);
+  });
+
+  it("el resumen diario recuerda los pagos sin activar los días 2, 7 y 14, no todos los días", async () => {
+    const d = deps();
+    d.mem.filas.push(servicio({ id: "p", estado: "pendiente_publicar", venceAt: null, inicioAt: null, createdAt: new Date(AHORA.getTime() - 7 * DIA).toISOString() }));
+    await revisarVencimientos(d);
+    expect((d.alertar as ReturnType<typeof vi.fn>).mock.calls[0][0]).toBe("Vigencias: pagos sin activar");
+    expect((d.alertar as ReturnType<typeof vi.fn>).mock.calls[0][1]).toContain("SIN ACTIVAR hace 7 días");
+    const d2 = deps();
+    d2.mem.filas.push(servicio({ id: "p", estado: "pendiente_publicar", venceAt: null, inicioAt: null, createdAt: new Date(AHORA.getTime() - 3 * DIA).toISOString() }));
+    await revisarVencimientos(d2);
+    expect(d2.alertar).not.toHaveBeenCalled();
+  });
+
+  it("si la extensión de una renovación falla, se libera el reclamo y el siguiente intento la aplica", async () => {
+    const d = deps();
+    const s = servicio({ venceAt: new Date(AHORA.getTime() + 5 * DIA).toISOString() });
+    d.mem.filas.push(s);
+    const tx = { ...TX, id: "8888-1610641025-22222" };
+    const original = d.mem.renovar.bind(d.mem);
+    d.mem.renovar = vi.fn().mockRejectedValueOnce(new Error("red")).mockImplementation(original);
+    await registrarServicioDePago(tx, getPlan("alianza-90")!, d, { renuevaServicioId: s.id });
+    expect(d.mem.renovaciones.has(tx.id)).toBe(false);
+    expect(d.mem.filas).toHaveLength(1); // no se convirtió en compra nueva
+    expect(d.alertar).toHaveBeenCalledTimes(1);
+    await registrarServicioDePago(tx, getPlan("alianza-90")!, d, { renuevaServicioId: s.id });
+    expect(diasRestantes(s.venceAt!, AHORA)).toBe(95);
+    expect(d.mem.renovaciones.has(tx.id)).toBe(true);
+  });
+
+  it("un paquete vencido no recibe un correo que diga que se desactivó", () => {
+    const c = correoDeAviso(servicio({ planId: "paquete-5", propertySlug: null, venceAt: new Date(AHORA.getTime() - 1000).toISOString() }), "vencido")!;
+    expect(c.text).not.toMatch(/la desactivamos/);
+    expect(c.text).toMatch(/coordinar/);
   });
 });

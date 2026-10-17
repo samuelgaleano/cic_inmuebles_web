@@ -1,4 +1,5 @@
 import { MessageCircle } from "lucide-react";
+import { BotonEnviar } from "@/components/admin/boton-enviar";
 import {
   activarServicioAction,
   asignarFichaAction,
@@ -81,28 +82,35 @@ function Fila({ s, estimadoPrevio }: { s: Servicio; estimadoPrevio?: string }) {
                 aria-label="Ficha a publicar"
                 className="h-9 w-40 rounded-lg border border-line bg-surface px-2.5 text-xs focus:border-brand-500 focus:bg-white focus:outline-none"
               />
-              <button type="submit" className="rounded-lg bg-brand-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-800">
+              <BotonEnviar className="rounded-lg bg-brand-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-800">
                 Activar hoy
-              </button>
+              </BotonEnviar>
             </form>
           )}
           {s.estado !== "pendiente_publicar" && (
             <form action={renovarServicioAction}>
               <input type="hidden" name="id" value={s.id} />
-              <button type="submit" className={boton}>Sumar {s.dias} días</button>
+              <BotonEnviar className={boton}>Sumar {s.dias} días</BotonEnviar>
             </form>
           )}
           {s.estado === "activo" && (
             <form action={vencerServicioAction}>
               <input type="hidden" name="id" value={s.id} />
-              <button type="submit" className={boton}>Vencer ahora</button>
+              <BotonEnviar className={boton}>Vencer ahora</BotonEnviar>
+            </form>
+          )}
+          {s.estado === "pendiente_publicar" && (
+            // Para pagos reversados, reembolsados o que no se van a publicar: sale de la lista sin avisar al cliente.
+            <form action={vencerServicioAction}>
+              <input type="hidden" name="id" value={s.id} />
+              <BotonEnviar className={boton}>Descartar (sin correo)</BotonEnviar>
             </form>
           )}
           {s.estado !== "pendiente_publicar" && !s.propertySlug && !esPaquete && (
             <form action={asignarFichaAction} className="flex items-center gap-1.5">
               <input type="hidden" name="id" value={s.id} />
               <input name="slug" list="fichas" placeholder="enlazar ficha" aria-label="Ficha a enlazar" className="h-9 w-36 rounded-lg border border-line bg-surface px-2.5 text-xs focus:border-brand-500 focus:outline-none" />
-              <button type="submit" className={boton}>Enlazar</button>
+              <BotonEnviar className={boton}>Enlazar</BotonEnviar>
             </form>
           )}
           <div className="flex items-center gap-1">
@@ -156,7 +164,7 @@ export default async function AdminVigenciasPage() {
         </div>
         {disponible && (
           <form action={revisarVigenciasAhoraAction}>
-            <button type="submit" className={boton}>Revisar vencimientos ahora</button>
+            <BotonEnviar className={boton}>Revisar vencimientos ahora</BotonEnviar>
           </form>
         )}
       </div>

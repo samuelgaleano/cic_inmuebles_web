@@ -64,7 +64,7 @@ export function SiteFooter() {
             <ul className="mt-3 flex flex-col">
               <li><Link href="/vender" className={enlace}>Vender mi inmueble</Link></li>
               <li><Link href="/publica" className={enlace}>Publica tu inmueble</Link></li>
-              <li><Link href="/publica/agente" className={enlace}>Alianza para agentes</Link></li>
+              <li><Link href="/publica/agente" className={enlace}>Planes para agentes</Link></li>
               <li><Link href="/publica/condiciones" className={enlace}>Condiciones de publicación</Link></li>
             </ul>
           </nav>

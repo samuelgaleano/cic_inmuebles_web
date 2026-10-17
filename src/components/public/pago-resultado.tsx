@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { CheckCircle2, Clock, MessageCircle, RefreshCw, XCircle, type LucideIcon } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
-import type { Plan } from "@/lib/config/plans";
+import { COMERCIO_EN_PASARELA, type Plan } from "@/lib/config/plans";
+import { AutoActualizar } from "./auto-actualizar";
 import { siteConfig, whatsappLink } from "@/lib/config/site";
 import { formatPrice } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
@@ -21,6 +22,8 @@ export interface PagoResultadoProps {
   reference?: string;
   /** URL actual, para "Actualizar estado" (vuelve a consultar la API). */
   actualUrl: string;
+  /** Pago hecho desde el enlace de renovación del correo: la publicación ya existe. */
+  esRenovacion?: boolean;
 }
 
 type Tono = "ok" | "espera" | "error";
@@ -96,8 +99,8 @@ const CONTENIDO: Record<PagoEstadoVisible, Contenido> = {
   DESCONOCIDO: {
     tono: "espera",
     icono: Clock,
-    titulo: "Recibimos tu solicitud de pago",
-    lead: "No pudimos confirmar la transacción en este momento. La verificamos en las próximas horas y te contactamos.",
+    titulo: "No pudimos confirmar el pago",
+    lead: "Si completaste el pago en Wompi, actualiza el estado en unos minutos. Si no lo completaste, no se hizo ningún cobro.",
     pasosTitulo: "Qué sigue",
     pasos: [
       "Guarda la referencia de esta página.",
@@ -113,8 +116,26 @@ const TONO: Record<Tono, { anillo: string; icono: string; borde: string }> = {
   error: { anillo: "bg-rose-50", icono: "text-rose-700", borde: "border-rose-200" },
 };
 
-export function PagoResultado({ estado, plan, amountInCents, reference, actualUrl }: PagoResultadoProps) {
-  const c = CONTENIDO[estado];
+const RENOVACION_APROBADA: Contenido = {
+  tono: "ok",
+  icono: CheckCircle2,
+  titulo: "Renovación aprobada",
+  lead: "Wompi confirmó el pago de tu renovación.",
+  pasosTitulo: "Qué sigue",
+  pasos: [
+    "Extendemos la vigencia de tu publicación a partir de su fecha de vencimiento, sin perder días.",
+    "Te confirmamos la nueva fecha por correo.",
+    "No tienes que enviar fotos ni datos de nuevo.",
+  ],
+};
+
+export function PagoResultado({ estado, plan, amountInCents, reference, actualUrl, esRenovacion = false }: PagoResultadoProps) {
+  const base = estado === "APPROVED" && esRenovacion ? RENOVACION_APROBADA : CONTENIDO[estado];
+  // Con el plan identificado, el aprobado dice desde cuándo corre la vigencia (no desde el pago).
+  const c =
+    estado === "APPROVED" && plan?.dias && !esRenovacion
+      ? { ...base, pasos: [...base.pasos, `La vigencia de ${plan.dias} días empieza el día en que publiquemos tu inmueble.`] }
+      : base;
   const t = TONO[c.tono];
   const Icono = c.icono;
   const monto = amountInCents != null ? formatPrice(Math.round(amountInCents / 100)) : plan ? formatPrice(plan.precioCOP) : null;
@@ -155,6 +176,12 @@ export function PagoResultado({ estado, plan, amountInCents, reference, actualUr
               <dd className="font-semibold tabular-nums text-ink">{monto}</dd>
             </>
           )}
+          {estado === "APPROVED" && (
+            <>
+              <dt className="font-medium text-muted">En tu extracto</dt>
+              <dd className="text-ink">{COMERCIO_EN_PASARELA}</dd>
+            </>
+          )}
           {reference && (
             <>
               <dt className="font-medium text-muted">Referencia</dt>
@@ -167,6 +194,8 @@ export function PagoResultado({ estado, plan, amountInCents, reference, actualUr
           )}
         </dl>
       )}
+
+      {estado === "PENDING" && <AutoActualizar />}
 
       <h2 className="mt-10 text-[1.0625rem] font-semibold tracking-[-0.01em]">{c.pasosTitulo}</h2>
       <ol className="mt-3 space-y-2.5">

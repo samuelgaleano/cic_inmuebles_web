@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { exigirAdmin } from "@/lib/auth";
 import { getRepository } from "@/lib/data";
 import { desdeHoraBogota } from "@/lib/utils/hora-bogota";
 import {
@@ -20,6 +21,7 @@ function revalidate() {
 
 // --- Agentes -----------------------------------------------------------------
 export async function createAgentAction(formData: FormData): Promise<void> {
+  await exigirAdmin();
   const nombre = str(formData.get("nombre"));
   const email = str(formData.get("email"));
   const rol = str(formData.get("rol")) as AgentRole;
@@ -35,6 +37,7 @@ export async function createAgentAction(formData: FormData): Promise<void> {
 }
 
 export async function deleteAgentAction(formData: FormData): Promise<void> {
+  await exigirAdmin();
   const id = str(formData.get("id"));
   if (id) {
     await getRepository().agents.remove(id);
@@ -43,6 +46,7 @@ export async function deleteAgentAction(formData: FormData): Promise<void> {
 }
 
 export async function setAvailabilityAction(formData: FormData): Promise<void> {
+  await exigirAdmin();
   const agentId = str(formData.get("agentId"));
   if (!agentId) return;
   const slots: AvailabilitySlot[] = [];
@@ -58,6 +62,7 @@ export async function setAvailabilityAction(formData: FormData): Promise<void> {
 
 // --- Citas -------------------------------------------------------------------
 export async function createAppointmentAction(formData: FormData): Promise<void> {
+  await exigirAdmin();
   const propertyId = str(formData.get("propertyId"));
   const clienteNombre = str(formData.get("clienteNombre"));
   const clienteTelefono = str(formData.get("clienteTelefono"));
@@ -83,6 +88,7 @@ export async function createAppointmentAction(formData: FormData): Promise<void>
 }
 
 export async function setAppointmentStatusAction(formData: FormData): Promise<void> {
+  await exigirAdmin();
   const id = str(formData.get("id"));
   const estado = str(formData.get("estado")) as AppointmentStatus;
   if (id && APPOINTMENT_STATUSES.includes(estado)) {
@@ -92,6 +98,7 @@ export async function setAppointmentStatusAction(formData: FormData): Promise<vo
 }
 
 export async function deleteAppointmentAction(formData: FormData): Promise<void> {
+  await exigirAdmin();
   const id = str(formData.get("id"));
   if (id) {
     await getRepository().appointments.remove(id);

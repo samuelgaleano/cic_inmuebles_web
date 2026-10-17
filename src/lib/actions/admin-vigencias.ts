@@ -69,7 +69,7 @@ export async function renovarServicioAction(formData: FormData): Promise<void> {
 
   if (s.propertySlug && !(await fijarPublicacionDeFicha(s.propertySlug, true))) return;
   const v = ventanaDeRenovacion(s, new Date());
-  const r = await store.renovar(id, v);
+  const r = await store.renovar(id, v, s.venceAt); // null si otro envío ya la renovó
   if (r) {
     const correo = correoPublicacionActiva(r);
     if (correo) await sendEmail(correo);

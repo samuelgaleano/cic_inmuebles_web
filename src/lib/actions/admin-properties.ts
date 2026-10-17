@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { exigirAdmin } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getRepository } from "@/lib/data";
@@ -163,6 +164,7 @@ export async function createPropertyAction(
   _prev: PropertyFormState,
   formData: FormData,
 ): Promise<PropertyFormState> {
+  await exigirAdmin();
   const { input, state } = buildInput(formData);
   if (!input) return state!;
 
@@ -198,6 +200,7 @@ export async function updatePropertyAction(
   _prev: PropertyFormState,
   formData: FormData,
 ): Promise<PropertyFormState> {
+  await exigirAdmin();
   const { input, state } = buildInput(formData);
   if (!input) return state!;
 
@@ -224,6 +227,7 @@ export async function updatePropertyAction(
  * Drive. Best-effort.
  */
 export async function createPropertyArchiveAction(formData: FormData): Promise<void> {
+  await exigirAdmin();
   const id = str(formData.get("id"));
   if (!id || !isDriveConfigured()) {
     redirect(id ? `/admin/inmuebles/${id}` : "/admin/inmuebles");
@@ -246,6 +250,7 @@ export async function createPropertyArchiveAction(formData: FormData): Promise<v
 }
 
 export async function deletePropertyAction(formData: FormData): Promise<void> {
+  await exigirAdmin();
   const id = str(formData.get("id"));
   if (id) {
     const repo = getRepository();

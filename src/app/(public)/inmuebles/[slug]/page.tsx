@@ -28,6 +28,7 @@ import { formatArea, formatPrice, formatPriceOrConsult } from "@/lib/utils/forma
 import { propertyUrl, siteConfig } from "@/lib/config/site";
 import { getPublicInventoryOrThrow } from "@/lib/data/public-inventory";
 import { agruparPorSector, encontrarSector, sectorPath } from "@/lib/seo/sectores";
+import { encabezadoFicha, recortarEnPalabra } from "@/lib/seo/textos-seo";
 import { ogImageUrl } from "@/lib/utils/image-loader";
 
 // La ficha se regenera cada hora aunque el panel no la revalide (antes quedaba semanas en la caché del CDN).
@@ -83,24 +84,26 @@ function propertyMeta(p: PublicProperty) {
   // del sector (p. ej. "Area19 Calleja" sí; "Bella Suiza" en Bella Suiza no).
   const sector = p.ubicacion.sector?.toLocaleLowerCase("es");
   const nombreAporta = !sector || p.titulo.toLocaleLowerCase("es") !== sector;
-  const title = `${tipo} en venta${lugar ? ` en ${lugar}` : ""}${nombreAporta ? ` · ${p.titulo}` : ""}`;
+  const prefijo = p.estado === "vendido" ? tipo : `${tipo} en venta`; // lo vendido no se anuncia en venta
+  const title = `${prefijo}${lugar ? ` en ${lugar}` : ""}${nombreAporta ? ` · ${p.titulo}` : ""}`;
 
+  const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`;
   const detalles = [
-    c.habitaciones != null && `${c.habitaciones} habitaciones`,
-    c.banos != null && `${c.banos} baños`,
+    c.habitaciones != null && plural(c.habitaciones, "habitación", "habitaciones"),
+    c.banos != null && plural(c.banos, "baño", "baños"),
     c.area != null && formatArea(c.area),
   ]
     .filter(Boolean)
     .join(", ");
   const description = [
-    `${tipo} en venta${lugar ? ` en ${lugar}` : ""}`,
+    `${prefijo}${lugar ? ` en ${lugar}` : ""}`,
     detalles || null,
-    `${formatPrice(p.precio)}. Agenda tu visita con ${siteConfig.name}.`,
+    `${p.precio > 0 ? formatPrice(p.precio) : "Precio a consultar"}. Agenda tu visita con ${siteConfig.name}.`,
   ]
     .filter(Boolean)
     .join(". ");
 
-  return { title, description: description.slice(0, 160) };
+  return { title, description: recortarEnPalabra(description) };
 }
 
 export async function generateMetadata({
@@ -208,7 +211,13 @@ export default async function PropertyDetailPage({
     ...descripcion.datos,
   ];
 
-  const ubicacionTexto = [ubicacion.sector, ubicacion.ciudad].filter(Boolean).join(", ");
+  const encabezado = encabezadoFicha({
+    tipo: PROPERTY_TYPE_LABELS[property.tipo],
+    sector: ubicacion.sector,
+    ciudad: ubicacion.ciudad,
+    vendido: property.estado === "vendido",
+  });
+  const ubicacionTexto = encabezado.lugar;
   const fichaUrl = propertyUrl(property.slug);
   const parecidos = similares(property, todos);
 
@@ -269,22 +278,27 @@ export default async function PropertyDetailPage({
           <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Inmuebles
         </Link>
 
-        <p className="mt-8 text-[15px] text-muted">
-          {PROPERTY_TYPE_LABELS[property.tipo]}
-          {ubicacionTexto && " · "}
-          {sector ? (
-            // Enlace interno a la página del sector: le da a Google el contexto "apartamentos en X".
-            <>
-              <Link href={sectorPath(sector)} className="text-ink-soft underline decoration-line-strong underline-offset-4 transition-colors hover:text-brand-700 hover:decoration-brand-700">
-                {sector.nombre}
-              </Link>
-              {ubicacion.ciudad ? `, ${ubicacion.ciudad}` : ""}
-            </>
-          ) : (
-            ubicacionTexto
-          )}
-        </p>
-        <h1 className="t-display mt-2 max-w-4xl">{property.titulo}</h1>
+        {/* El H1 lleva tipo, operación y lugar ("Apartamento en venta en Gilmar, Bogotá") además del nombre del
+            edificio, sin cambiar el diseño: la línea pequeña de arriba ahora vive dentro del H1. */}
+        <h1 className="mt-8">
+          <span className="block text-[15px] font-normal tracking-normal text-muted">
+            {encabezado.prefijo}
+            {ubicacionTexto && " en "}
+            {sector ? (
+              // Enlace interno a la página del sector: le da a Google el contexto "apartamentos en X".
+              <>
+                <Link href={sectorPath(sector)} className="text-ink-soft underline decoration-line-strong underline-offset-4 transition-colors hover:text-brand-700 hover:decoration-brand-700">
+                  {sector.nombre}
+                </Link>
+                {ubicacion.ciudad ? `, ${ubicacion.ciudad}` : ""}
+              </>
+            ) : (
+              ubicacionTexto
+            )}
+          </span>
+          <span className="sr-only">: </span>
+          <span className="t-display mt-2 block max-w-4xl">{property.titulo}</span>
+        </h1>
 
         <div className="mt-6 flex flex-wrap items-center justify-between gap-x-8 gap-y-3">
           <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1">

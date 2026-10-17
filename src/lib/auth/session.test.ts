@@ -104,3 +104,47 @@ describe("verifySessionToken", () => {
     expect(verifySessionToken(createSessionToken("jefe@cic.com", -1000))).toBeNull();
   });
 });
+
+describe("revocacion de sesiones", () => {
+  it("cambiar ADMIN_PASSWORD invalida las sesiones ya emitidas", () => {
+    configurar("jefe@cic.com", "clave-vieja", "secreto-largo");
+    const token = createSessionToken("jefe@cic.com");
+    expect(verifySessionToken(token)).not.toBeNull();
+
+    vi.stubEnv("ADMIN_PASSWORD", "clave-nueva");
+    expect(verifySessionToken(token)).toBeNull();
+
+    // Y la sesion nueva, emitida con la clave nueva, si vale.
+    expect(verifySessionToken(createSessionToken("jefe@cic.com"))).not.toBeNull();
+  });
+
+  it("la firma depende solo de la clave vigente: si se restaura la anterior, su token vuelve a valer", () => {
+    configurar("jefe@cic.com", "clave-A", "secreto-largo");
+    const token = createSessionToken("jefe@cic.com");
+    vi.stubEnv("ADMIN_PASSWORD", "clave-B");
+    expect(verifySessionToken(token)).toBeNull();
+    vi.stubEnv("ADMIN_PASSWORD", "clave-A");
+    expect(verifySessionToken(token)).not.toBeNull();
+  });
+
+  it("cambiar ADMIN_EMAIL invalida las sesiones del correo anterior", () => {
+    configurar("jefe@cic.com", "clave-fuerte", "secreto-largo");
+    const token = createSessionToken("jefe@cic.com");
+    vi.stubEnv("ADMIN_EMAIL", "otra@cic.com");
+    expect(verifySessionToken(token)).toBeNull();
+  });
+
+  it("acepta el correo configurado con mayusculas (la sesion se emite en minusculas)", () => {
+    configurar("Jefe@CIC.com", "clave-fuerte", "secreto-largo");
+    expect(verifySessionToken(createSessionToken("jefe@cic.com"))?.email).toBe("jefe@cic.com");
+  });
+
+  it("el token no contiene la contrasena ni su huella", () => {
+    configurar("jefe@cic.com", "clave-fuerte", "secreto-largo");
+    const token = createSessionToken("jefe@cic.com");
+    const [data] = token.split(".");
+    const payload = Buffer.from(data, "base64url").toString();
+    expect(payload).not.toContain("clave-fuerte");
+    expect(Object.keys(JSON.parse(payload)).sort()).toEqual(["email", "exp"]);
+  });
+});

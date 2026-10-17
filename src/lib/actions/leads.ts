@@ -37,9 +37,13 @@ const leadSchema = z.object({
   tipoInmueble: z.string().trim().max(120).optional(),
   ciudad: z.string().trim().max(120).optional(),
   fuente: z.enum(["web", "whatsapp"]).default("web"),
-  // Honeypot anti-spam: debe llegar vacío.
-  website: z.string().max(0).optional(),
+  // El honeypot anti-spam (`website`) se revisa ANTES de validar: ver createLeadAction.
 });
+
+/** Mensaje de éxito real; el honeypot devuelve el mismo para que el bot no note la diferencia. */
+function mensajeExito(tipo: unknown): string {
+  return tipo === "vendedor" ? "¡Gracias! Recibimos los datos de tu inmueble." : "¡Listo! Recibimos tu solicitud.";
+}
 
 /** Campos visibles que se devuelven en el estado de error para repoblar el formulario. */
 const VISIBLE_FIELDS = ["nombre", "telefono", "email", "ciudad", "tipoInmueble", "preferencia", "mensaje"] as const;
@@ -116,6 +120,15 @@ export async function createLeadAction(
   formData: FormData,
 ): Promise<LeadFormState> {
   const raw = Object.fromEntries(formData.entries());
+
+  // Honeypot: el campo `website` está oculto para las personas; si llega con algo, es un bot.
+  // Se responde un éxito idéntico al real, sin validar, sin guardar y sin enviar correo, para
+  // que el bot no aprenda a esquivarlo. (Antes se validaba primero y el bot recibía un error.)
+  const trampa = raw.website;
+  if (typeof trampa === "string" ? trampa.trim() !== "" : trampa !== undefined) {
+    return { status: "success", message: mensajeExito(raw.tipo) };
+  }
+
   const parsed = leadSchema.safeParse(raw);
 
   if (!parsed.success) {
@@ -133,11 +146,6 @@ export async function createLeadAction(
   }
 
   const data = parsed.data;
-
-  // Honeypot: si viene relleno, simulamos éxito sin guardar (probable bot).
-  if (data.website) {
-    return { status: "success", message: "¡Gracias! Te contactaremos pronto." };
-  }
 
   const input: LeadInput = {
     tipo: data.tipo,
@@ -180,10 +188,7 @@ export async function createLeadAction(
 
   return {
     status: "success",
-    message:
-      data.tipo === "vendedor"
-        ? "¡Gracias! Recibimos los datos de tu inmueble."
-        : "¡Listo! Recibimos tu solicitud.",
+    message: mensajeExito(data.tipo),
     whatsappUrl: await buildLeadWhatsappUrl(lead),
   };
 }

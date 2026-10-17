@@ -15,7 +15,14 @@ import { propertyUrl, siteConfig } from "@/lib/config/site";
 import { construirIndice, contextoDe, sugerencias } from "@/lib/search/indice";
 import { agruparPorSector, sectorPath } from "@/lib/seo/sectores";
 import { tipoSingular, titularInventario } from "@/lib/seo/titular";
-import { formatPriceCompact } from "@/lib/utils/format";
+import { formatPrice, formatPriceCompact } from "@/lib/utils/format";
+import { PLANS } from "@/lib/config/plans";
+
+// Tarifa mínima de los planes de agentes, derivada del catálogo (igual que en /publica):
+// si cambia el precio, cambia aquí solo.
+const desdeAgentesCOP = Math.min(
+  ...PLANS.filter((p) => p.audience === "agente" && p.mode === "pago").map((p) => p.precioCOP),
+);
 
 export const metadata: Metadata = {
   alternates: { canonical: "/" },
@@ -85,18 +92,8 @@ export default async function HomePage() {
   const tarjetas = indice.slice(0, 12).map(({ texto: _texto, ...resto }) => resto);
   const fotosGrandes = tarjetas.filter((t) => !SIN_FOTO_GRANDE.includes(t.slug));
 
-  // Enriquece el nodo de organización del layout (mismo @id) con el área de
-  // servicio real: las ciudades del inventario publicado, además del país.
-  const cityNames = [...new Set(todos.map((p) => p.ubicacion.ciudad).filter(Boolean))];
-  const areaJsonLd = {
-    "@context": "https://schema.org",
-    "@type": "RealEstateAgent",
-    "@id": `${siteConfig.url}/#org`,
-    areaServed: [
-      { "@type": "Country", name: "Colombia" },
-      ...cityNames.map((name) => ({ "@type": "City", name })),
-    ],
-  };
+  // El área de servicio (Colombia y Bogotá) vive en el nodo de la organización del layout,
+  // en el mismo @graph: un bloque suelto aquí partía la organización en dos.
 
   // La vitrina como lista para buscadores: qué fichas hay y en qué orden.
   const vitrinaJsonLd = {
@@ -114,7 +111,6 @@ export default async function HomePage() {
 
   return (
     <>
-      <JsonLd data={areaJsonLd} />
       {vitrina.length > 0 && <JsonLd data={vitrinaJsonLd} />}
 
       {/* ─────────────── Portada: titular, acciones, vitrina de fotos reales y buscador ─────────────── */}
@@ -224,8 +220,8 @@ export default async function HomePage() {
           </div>
           <p className="mt-16 max-w-2xl border-t border-white/15 pt-6 text-[15px] leading-relaxed text-white/70">
             ¿Eres agente inmobiliario? Aliémonos: tú traes el inmueble, nosotros lo promocionamos y lo movemos, y compartimos la comisión 50/50.{" "}
-            <Link href="/contacto" className="font-medium text-white underline underline-offset-4 transition-colors hover:text-brand-300">
-              Hablemos
+            <Link href="/publica/agente" className="font-medium text-white underline underline-offset-4 transition-colors hover:text-brand-300">
+              Ver planes para agentes (desde {formatPrice(desdeAgentesCOP)})
             </Link>
             .
           </p>

@@ -14,6 +14,8 @@ export async function sendLeadNotification(lead: Lead): Promise<boolean> {
     to: process.env.LEADS_NOTIFICATION_EMAIL ?? siteConfig.email,
     subject,
     text: renderLeadEmail(lead),
+    // Responder el aviso le escribe directo al interesado, si dejó correo.
+    replyTo: lead.email ?? null,
   });
 }
 

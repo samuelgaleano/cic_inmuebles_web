@@ -1,4 +1,4 @@
-import { AVISO_HUERFANO_MINUTOS, type EventoPagoInput, type EventoPagoRow, type PagosStore, type ReferenciaRow } from "./store";
+import { AVISO_HUERFANO_MINUTOS, type EventoPagoInput, type EventoPagoRow, type PagosStore, type ReferenciaEmitida, type ReferenciaRow } from "./store";
 
 /**
  * Store en memoria con la misma semántica que Supabase (UNIQUE por
@@ -8,7 +8,7 @@ import { AVISO_HUERFANO_MINUTOS, type EventoPagoInput, type EventoPagoRow, type 
  */
 export class MemoryPagosStore implements PagosStore {
   eventos: EventoPagoRow[] = [];
-  referencias: (ReferenciaRow & { revisadaAt: string | null })[] = [];
+  referencias: (ReferenciaRow & { revisadaAt: string | null; renuevaServicioId?: string | null })[] = [];
   avisos = new Map<string, { claimedAt: number; sentAt: number | null }>();
   now = () => Date.now();
   private seq = 1;
@@ -21,11 +21,17 @@ export class MemoryPagosStore implements PagosStore {
     }
   }
 
-  async recordReference(ref: { reference: string; planId: string; amountInCents: number }) {
+  async recordReference(ref: ReferenciaEmitida) {
     this.guard("recordReference");
     if (!this.referencias.some((r) => r.reference === ref.reference)) {
-      this.referencias.push({ ...ref, createdAt: new Date(this.now()).toISOString(), revisadaAt: null });
+      this.referencias.push({ ...ref, renuevaServicioId: ref.renuevaServicioId ?? null, createdAt: new Date(this.now()).toISOString(), revisadaAt: null });
     }
+  }
+
+  async getReference(reference: string): Promise<ReferenciaEmitida | null> {
+    this.guard("getReference");
+    const r = this.referencias.find((x) => x.reference === reference);
+    return r ? { reference: r.reference, planId: r.planId, amountInCents: r.amountInCents, renuevaServicioId: r.renuevaServicioId ?? null } : null;
   }
 
   async recordEvent(e: EventoPagoInput): Promise<"inserted" | "updated" | "duplicate"> {

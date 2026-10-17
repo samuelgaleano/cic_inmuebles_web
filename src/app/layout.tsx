@@ -92,6 +92,11 @@ const siteJsonLd = {
       email: siteConfig.email,
       image: `${siteConfig.url}${siteConfig.ogImage.url}`,
       address: { "@type": "PostalAddress", addressLocality: siteConfig.city, addressCountry: "CO" },
+      // Área de servicio: aquí y no en un bloque aparte de la portada, para que la organización sea un solo nodo.
+      areaServed: [
+        { "@type": "Country", name: "Colombia" },
+        { "@type": "City", name: siteConfig.city },
+      ],
       knowsLanguage: "es",
       sameAs: Object.values(siteConfig.social),
     },

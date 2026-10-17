@@ -42,4 +42,17 @@ create index if not exists servicios_email_idx on servicios_publicacion (cliente
 -- Solo el servidor (service role) toca esta tabla.
 alter table servicios_publicacion enable row level security;
 
+-- Renovación pagada desde el enlace del correo: la referencia emitida recuerda
+-- qué servicio renueva, y cada transacción se aplica UNA sola vez (tx_id único)
+-- aunque llegue por el retorno, el webhook y la conciliación.
+alter table pagos_referencias add column if not exists renueva_servicio_id uuid;
+
+create table if not exists servicios_renovaciones (
+  tx_id        text primary key,
+  servicio_id  uuid not null references servicios_publicacion (id) on delete cascade,
+  created_at   timestamptz not null default now()
+);
+
+alter table servicios_renovaciones enable row level security;
+
 notify pgrst, 'reload schema';

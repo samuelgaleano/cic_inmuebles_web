@@ -8,6 +8,7 @@ import { construirIndice, contextoDe, sugerencias } from "@/lib/search/indice";
 import { buscar } from "@/lib/search/motor";
 import { leerParams } from "@/lib/search/url";
 import { agruparPorSector, sectorPath } from "@/lib/seo/sectores";
+import { recortarEnPalabra } from "@/lib/seo/textos-seo";
 import { titularInventario } from "@/lib/seo/titular";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -15,11 +16,14 @@ export async function generateMetadata(): Promise<Metadata> {
   const donde = t.sectores.length > 0 ? `${t.lugar}: ${t.sectores.slice(0, 3).join(", ")}` : t.lugar;
   return {
     title: t.titulo,
-    description: `${t.tipos} en venta en ${donde}. Describe lo que buscas, filtra por precio y características y agenda tu visita con ${siteConfig.name}.`.slice(0, 160),
+    // Texto fijo corto y corte en palabra completa: antes salía cortado a mitad de palabra en Google.
+    description: recortarEnPalabra(
+      `${t.tipos} en venta en ${donde}. Describe lo que buscas, filtra por precio y agenda tu visita con ${siteConfig.name}.`,
+    ),
     alternates: { canonical: "/inmuebles" },
     openGraph: {
       title: `${t.titulo} | ${siteConfig.name}`,
-      description: `${t.tipos} en venta en ${donde}.`.slice(0, 200),
+      description: recortarEnPalabra(`${t.tipos} en venta en ${donde}.`, 200),
       url: `${siteConfig.url}/inmuebles`,
       images: [siteConfig.ogImage],
     },

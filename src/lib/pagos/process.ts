@@ -16,8 +16,8 @@ export interface ProcessDeps {
   fetchTransactionsByReference: (reference: string) => Promise<WompiTransaction[] | null>;
   sendPaymentNotification: (p: PaymentNotice) => Promise<boolean>;
   sendPagosAlert: (subject: string, text: string) => Promise<boolean>;
-  /** Crea el servicio de publicación (vigencia y avisos) de un pago aprobado. Opcional: nunca debe romper el pago. */
-  registrarServicio?: (tx: WompiTransaction, plan: Plan) => Promise<void>;
+  /** Crea o renueva el servicio de publicación (vigencia y avisos) de un pago aprobado. Opcional: nunca debe romper el pago. */
+  registrarServicio?: (tx: WompiTransaction, plan: Plan, opts: { renuevaServicioId: string | null; alertarSiFalla: boolean }) => Promise<void>;
 }
 
 export type ProcessOutcome = PagoEstado | "dedup" | "store_error";
@@ -49,7 +49,7 @@ export function defaultDeps(): ProcessDeps {
     fetchTransactionsByReference: fetchTransactionsByReferenceFromApi,
     sendPaymentNotification: sendPaymentNotificationReal,
     sendPagosAlert: sendPagosAlertReal,
-    registrarServicio: (tx, plan) => registrarServicioDePago(tx, plan),
+    registrarServicio: (tx, plan, opts) => registrarServicioDePago(tx, plan, undefined, opts),
   };
 }
 
@@ -61,7 +61,8 @@ function classify(tx: WompiTransaction): Classified {
   const planId = planIdFromReference(tx.reference);
   const plan = planId ? getPlan(planId) : undefined;
   if (!plan || !planId) return { estado: "sin_destino", planId, amountOk: null };
-  const amountOk = amountMatchesPlan(plan, tx.amountInCents);
+  // La transacción viene siempre de la API de Wompi: sin monto, o en otra moneda, no se da por buena.
+  const amountOk = tx.amountInCents != null && (tx.currency ?? "COP") === "COP" && amountMatchesPlan(plan, tx.amountInCents);
   return { estado: amountOk ? "ok" : "revisar", plan, planId, amountOk };
 }
 
@@ -134,12 +135,25 @@ export async function processTransaction(
 
   const notified = tx.status === "APPROVED" ? await notifyOnce(tx, c, deps) : false;
 
-  // Un pago aprobado y por el monto correcto abre su servicio (idempotente por transacción).
-  if (tx.status === "APPROVED" && c.estado === "ok") {
+  // Un pago aprobado y por el monto correcto abre su servicio, o renueva el que venía en el enlace del
+  // correo (idempotente por transacción). La alerta por fallo sale solo la primera vez que se ve el evento.
+  if (tx.status === "APPROVED" && c.estado === "ok" && deps.registrarServicio) {
+    let leida = true;
+    let renuevaServicioId: string | null = null;
     try {
-      await deps.registrarServicio?.(tx, c.plan);
+      renuevaServicioId = (await store.getReference(tx.reference))?.renuevaServicioId ?? null;
     } catch (err) {
-      console.error(`[pago] no se pudo registrar el servicio de ${tx.id}:`, describe(err));
+      // Sin saber si es una renovación no se decide: tratarla como compra nueva la acreditaría dos veces.
+      // La recarga del retorno o la conciliación la retoman.
+      leida = false;
+      console.error(`[pago] no se pudo leer la referencia de ${tx.id}; el servicio se registra en otro intento:`, describe(err));
+    }
+    if (leida) {
+      try {
+        await deps.registrarServicio(tx, c.plan, { renuevaServicioId, alertarSiFalla: nuevo });
+      } catch (err) {
+        console.error(`[pago] no se pudo registrar el servicio de ${tx.id}:`, describe(err));
+      }
     }
   }
 
@@ -218,6 +232,9 @@ export async function confirmFromRedirect(
 ): Promise<{ found: false } | { found: true; status: string; reference: string; amountInCents?: number }> {
   if (!WOMPI_TX_ID.test(txId) || !CIC_REFERENCE.test(reference)) return { found: false };
   try {
+    // Solo se consulta a Wompi (con la llave privada) por referencias que este sitio emitió de verdad:
+    // la página de retorno es pública y no debe servir para disparar consultas con datos inventados.
+    if (!(await deps.store.getReference(reference))) return { found: false };
     const tx = await deps.fetchTransaction(txId);
     if (!tx || tx.reference !== reference) return { found: false };
     const r = await processTransaction(txId, { source: "redirect", tx }, deps);

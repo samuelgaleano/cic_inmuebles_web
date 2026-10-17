@@ -4,6 +4,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { SafeImage } from "@/components/ui/safe-image";
 import { cn } from "@/lib/utils/cn";
 import { PROPERTY_TYPE_LABELS } from "@/lib/domain";
+import { elegirDosDistintos } from "@/lib/utils/elegir-fotos";
 import { formatPriceOrConsult } from "@/lib/utils/format";
 import { Declaracion } from "./declaracion";
 import type { DatosTarjeta } from "./tarjeta-inmueble";
@@ -40,9 +41,9 @@ function Foto({ p, className }: { p?: DatosTarjeta; className?: string }) {
  * derecha un mosaico con dos inmuebles reales y las dos cifras que lo respaldan.
  */
 export function PruebaPortafolio({ items, total }: { items: DatosTarjeta[]; total: number }) {
-  const conFoto = items.filter((p) => p.portada);
-  const a = conFoto[1] ?? conFoto[0];
-  const b = conFoto[2] ?? conFoto[1];
+  // Con exactamente dos inmuebles con foto, el método anterior (conFoto[1] ?? …, conFoto[2] ?? conFoto[1])
+  // ponía la misma foto en los dos huecos.
+  const [a, b] = elegirDosDistintos(items.filter((p) => p.portada));
 
   return (
     <div className="grid items-center gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.95fr)] lg:gap-16">

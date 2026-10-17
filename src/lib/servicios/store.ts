@@ -16,16 +16,25 @@ export class ServiciosNoDisponibleError extends Error {}
 export class ServiciosStoreError extends Error {}
 
 export interface ServiciosStore {
+  /** true si la tabla existe (migración 0004 aplicada). Nunca lanza. */
+  disponible(): Promise<boolean>;
+  /** Reclama la aplicación de una renovación pagada: true solo la primera vez para ese tx_id. */
+  registrarRenovacion(txId: string, servicioId: string): Promise<boolean>;
+  /** Deshace el reclamo si la renovación no se pudo aplicar, para que el siguiente intento la retome. */
+  liberarRenovacion(txId: string): Promise<void>;
   /** Idempotente por tx_id: repetir el pago aprobado no crea otro servicio. */
   registrar(n: NuevoServicio): Promise<{ servicio: Servicio; creado: boolean }>;
   listar(): Promise<Servicio[]>;
   /** Solo lo que el cron diario necesita mirar: activos y vencidos sin su aviso de vencimiento (sin el tope del panel). */
   listarParaRevision(): Promise<Servicio[]>;
   obtener(id: string): Promise<Servicio | null>;
-  /** Fija la ventana de vigencia y deja el servicio activo (opcionalmente enlazado a una ficha). */
+  /** Fija la ventana de vigencia y deja el servicio activo. Solo si sigue pendiente: un doble clic no activa dos veces. */
   activar(id: string, v: { propertySlug?: string | null; inicioAt: string; venceAt: string }): Promise<Servicio | null>;
-  /** Extiende la vigencia y limpia los avisos para que se vuelvan a enviar. */
-  renovar(id: string, v: { inicioAt: string | null; venceAt: string }): Promise<Servicio | null>;
+  /**
+   * Extiende la vigencia y limpia los avisos para que se vuelvan a enviar. Solo si el vencimiento sigue
+   * siendo `venceEsperado` (el que se leyó antes de calcular): así un doble envío no suma dos periodos.
+   */
+  renovar(id: string, v: { inicioAt: string | null; venceAt: string }, venceEsperado: string | null): Promise<Servicio | null>;
   /**
    * Pasa a vencido. Sin `forzar` solo si la fecha de vencimiento ya pasó (así una renovación
    * hecha mientras corría el cron no se pisa). Con `forzar` vence ya y recorta vence_at a ahora.
@@ -90,6 +99,27 @@ function falla(op: string, error: { message: string; code?: string } | null): ne
 const AVISO_COLUMNA: Record<TipoAviso, string> = { "7d": "aviso_7d_at", "1d": "aviso_1d_at", vencido: "aviso_vencido_at" };
 
 class SupabaseServiciosStore implements ServiciosStore {
+  async disponible(): Promise<boolean> {
+    try {
+      const { error } = await getSupabaseAdmin().from("servicios_publicacion").select("id").limit(1);
+      return !error;
+    } catch {
+      return false;
+    }
+  }
+
+  async registrarRenovacion(txId: string, servicioId: string): Promise<boolean> {
+    const { error } = await getSupabaseAdmin().from("servicios_renovaciones").insert({ tx_id: txId, servicio_id: servicioId });
+    if (!error) return true;
+    if (error.code === "23505") return false; // ya aplicada por otro intento
+    falla("registrarRenovacion", error);
+  }
+
+  async liberarRenovacion(txId: string): Promise<void> {
+    const { error } = await getSupabaseAdmin().from("servicios_renovaciones").delete().eq("tx_id", txId);
+    if (error) falla("liberarRenovacion", error);
+  }
+
   async registrar(n: NuevoServicio): Promise<{ servicio: Servicio; creado: boolean }> {
     const db = getSupabaseAdmin();
     const previo = await db.from("servicios_publicacion").select(COLUMNAS).eq("tx_id", n.txId).maybeSingle();
@@ -158,12 +188,18 @@ class SupabaseServiciosStore implements ServiciosStore {
       aviso_vencido_at: null,
     };
     if (v.propertySlug !== undefined) patch.property_slug = v.propertySlug;
-    const { data, error } = await getSupabaseAdmin().from("servicios_publicacion").update(patch).eq("id", id).select(COLUMNAS).maybeSingle();
+    const { data, error } = await getSupabaseAdmin()
+      .from("servicios_publicacion")
+      .update(patch)
+      .eq("id", id)
+      .eq("estado", "pendiente_publicar")
+      .select(COLUMNAS)
+      .maybeSingle();
     if (error) falla("activar", error);
     return data ? aServicio(data as Row) : null;
   }
 
-  async renovar(id: string, v: { inicioAt: string | null; venceAt: string }): Promise<Servicio | null> {
+  async renovar(id: string, v: { inicioAt: string | null; venceAt: string }, venceEsperado: string | null): Promise<Servicio | null> {
     const patch: Record<string, unknown> = {
       estado: "activo",
       vence_at: v.venceAt,
@@ -172,7 +208,9 @@ class SupabaseServiciosStore implements ServiciosStore {
       aviso_vencido_at: null,
     };
     if (v.inicioAt) patch.inicio_at = v.inicioAt;
-    const { data, error } = await getSupabaseAdmin().from("servicios_publicacion").update(patch).eq("id", id).select(COLUMNAS).maybeSingle();
+    const base = getSupabaseAdmin().from("servicios_publicacion").update(patch).eq("id", id);
+    const condicionada = venceEsperado ? base.eq("vence_at", venceEsperado) : base.is("vence_at", null);
+    const { data, error } = await condicionada.select(COLUMNAS).maybeSingle();
     if (error) falla("renovar", error);
     return data ? aServicio(data as Row) : null;
   }
@@ -203,8 +241,23 @@ class SupabaseServiciosStore implements ServiciosStore {
 /** Store en memoria con la misma semántica: pruebas y desarrollo sin Supabase. */
 export class MemoryServiciosStore implements ServiciosStore {
   filas: Servicio[] = [];
+  renovaciones = new Map<string, string>();
   private seq = 1;
   now = () => Date.now();
+
+  async disponible(): Promise<boolean> {
+    return true;
+  }
+
+  async registrarRenovacion(txId: string, servicioId: string): Promise<boolean> {
+    if (this.renovaciones.has(txId)) return false;
+    this.renovaciones.set(txId, servicioId);
+    return true;
+  }
+
+  async liberarRenovacion(txId: string): Promise<void> {
+    this.renovaciones.delete(txId);
+  }
 
   async registrar(n: NuevoServicio): Promise<{ servicio: Servicio; creado: boolean }> {
     const previo = this.filas.find((s) => s.txId === n.txId);
@@ -246,15 +299,16 @@ export class MemoryServiciosStore implements ServiciosStore {
 
   async activar(id: string, v: { propertySlug?: string | null; inicioAt: string; venceAt: string }): Promise<Servicio | null> {
     const s = this.filas.find((x) => x.id === id);
-    if (!s) return null;
+    if (!s || s.estado !== "pendiente_publicar") return null;
     Object.assign(s, { estado: "activo", inicioAt: v.inicioAt, venceAt: v.venceAt, aviso7dAt: null, aviso1dAt: null, avisoVencidoAt: null });
     if (v.propertySlug !== undefined) s.propertySlug = v.propertySlug;
     return s;
   }
 
-  async renovar(id: string, v: { inicioAt: string | null; venceAt: string }): Promise<Servicio | null> {
+  async renovar(id: string, v: { inicioAt: string | null; venceAt: string }, venceEsperado: string | null): Promise<Servicio | null> {
     const s = this.filas.find((x) => x.id === id);
-    if (!s) return null;
+    const igual = (a: string | null, b: string | null) => (a && b ? new Date(a).getTime() === new Date(b).getTime() : a === b);
+    if (!s || !igual(s.venceAt, venceEsperado)) return null;
     Object.assign(s, { estado: "activo", venceAt: v.venceAt, aviso7dAt: null, aviso1dAt: null, avisoVencidoAt: null });
     if (v.inicioAt) s.inicioAt = v.inicioAt;
     return s;

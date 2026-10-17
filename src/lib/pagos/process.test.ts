@@ -199,6 +199,7 @@ describe("processTransaction", () => {
 describe("confirmFromRedirect", () => {
   it("devuelve el estado real cuando id y referencia coinciden", async () => {
     const d = deps();
+    await d.store.recordReference({ reference: APROBADA.reference, planId: "alianza-90", amountInCents: 1_000_000 });
     const r = await confirmFromRedirect(APROBADA.id, APROBADA.reference, d);
     // El monto que se muestra al usuario es el que Wompi cobró, no el del catálogo.
     expect(r).toEqual({ found: true, status: "APPROVED", reference: APROBADA.reference, amountInCents: 1_000_000 });
@@ -229,5 +230,43 @@ describe("confirmFromRedirect", () => {
     expect(await confirmFromRedirect(APROBADA.id, APROBADA.reference, d)).toEqual({ found: false });
     const d2 = deps({ fetchTransaction: vi.fn(async () => { throw new Error("boom"); }) });
     expect(await confirmFromRedirect(APROBADA.id, APROBADA.reference, d2)).toEqual({ found: false });
+  });
+});
+
+describe("endurecimiento del procesamiento", () => {
+  it("el retorno no consulta a Wompi por una referencia que este sitio no emitió", async () => {
+    const d = deps();
+    const r = await confirmFromRedirect(APROBADA.id, APROBADA.reference, d);
+    expect(r).toEqual({ found: false });
+    expect(d.fetchTransaction).not.toHaveBeenCalled();
+  });
+
+  it("sin monto o en otra moneda, el pago no se da por bueno", async () => {
+    for (const tx of [{ ...APROBADA, amountInCents: undefined }, { ...APROBADA, currency: "USD" }]) {
+      const d = deps({ fetchTransaction: vi.fn(async () => tx as WompiTransaction) });
+      const r = await processTransaction(tx.id, { source: "redirect" }, d);
+      expect(r.outcome).toBe("revisar");
+    }
+  });
+
+  it("un pago de renovación le pasa al registro el servicio que renueva y solo alerta la primera vez", async () => {
+    const registrar = vi.fn<NonNullable<ProcessDeps["registrarServicio"]>>(async () => {});
+    const d = deps({ registrarServicio: registrar });
+    await d.store.recordReference({ reference: APROBADA.reference, planId: "alianza-90", amountInCents: 1_000_000, renuevaServicioId: "00000000-0000-4000-8000-000000000001" });
+    await processTransaction(APROBADA.id, { source: "redirect" }, d);
+    await processTransaction(APROBADA.id, { source: "redirect" }, d);
+    expect(registrar.mock.calls[0][2]).toEqual({ renuevaServicioId: "00000000-0000-4000-8000-000000000001", alertarSiFalla: true });
+    expect(registrar.mock.calls[1][2].alertarSiFalla).toBe(false);
+  });
+
+  it("si no se puede leer la referencia, el servicio no se registra en esa pasada (se reintenta)", async () => {
+    const registrar = vi.fn<NonNullable<ProcessDeps["registrarServicio"]>>(async () => {});
+    const d = deps({ registrarServicio: registrar });
+    d.store.getReference = vi.fn(async () => {
+      throw new Error("supabase caído");
+    });
+    const r = await processTransaction(APROBADA.id, { source: "redirect" }, d);
+    expect(r.outcome).toBe("ok");
+    expect(registrar).not.toHaveBeenCalled();
   });
 });

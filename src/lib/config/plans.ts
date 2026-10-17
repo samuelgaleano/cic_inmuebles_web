@@ -9,6 +9,12 @@
  * exige Wompi se hace en un solo lugar: `wompiAmountInCents()`.
  */
 
+/**
+ * Nombre del comercio que muestra la pasarela de Wompi (la cuenta que recibe los pagos de CIC).
+ * Cambiarlo cuando CIC tenga su cuenta propia.
+ */
+export const COMERCIO_EN_PASARELA = "Distribuciones JS";
+
 export type PlanAudience = "agente" | "propietario";
 export type PlanMode = "pago" | "contacto";
 /** Eje de decisión de la página de planes: cobro por inmueble o por paquete de espacios. */

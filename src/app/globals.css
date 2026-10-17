@@ -545,12 +545,18 @@ input[type="range"].rango:focus-visible {
   }
 }
 
-/* Vitrina: fotos reales del portafolio que se relevan con un fundido lento. Se detiene al pasar el cursor o al enfocar. */
+/* Vitrina: fotos reales del portafolio que se relevan con un fundido lento. Se detiene al pasar el cursor o al enfocar.
+   Las fotos están apiladas: una transparente seguiría recibiendo el clic y llevaría a otro inmueble. Por eso solo
+   la foto que está entrando o a la vista recibe el puntero (pointer-events), y lo suelta en el instante en que
+   empieza a irse. Se usa pointer-events y no visibility para que los cuatro enlaces sigan en el orden de tabulación
+   y para los lectores de pantalla. */
 .vitrina-foto {
   opacity: 0;
+  pointer-events: none;
 }
 .vitrina-foto:first-child {
   opacity: 1;
+  pointer-events: auto;
 }
 .vitrina:hover .vitrina-foto,
 .vitrina:hover .vitrina-img,
@@ -558,23 +564,37 @@ input[type="range"].rango:focus-visible {
 .vitrina:focus-within .vitrina-img {
   animation-play-state: paused;
 }
+/* !important: los valores de una animación ganan a las reglas normales; sin él, la foto enfocada con el teclado
+   quedaba invisible (pausada en opacidad 0) encima de la visible. */
 .vitrina .vitrina-foto:focus-within {
-  opacity: 1;
+  opacity: 1 !important;
+  pointer-events: auto !important;
   z-index: 2;
 }
+/* pointer-events es discreto: cambia a mitad de camino entre dos fotogramas clave, así que el cambio se fija con
+   dos fotogramas casi pegados a MITAD de cada fundido (cuando ambas fotos están al 50 %): así el clic va siempre a
+   la que más se ve, también si la vitrina se pausa con el cursor en pleno cruce. */
 @keyframes vitrina-3 {
-  0% { opacity: 0; }
+  0% { opacity: 0; pointer-events: none; }
+  2.64% { pointer-events: none; }
+  2.65% { pointer-events: auto; }
   5.3% { opacity: 1; }
   33.3% { opacity: 1; }
+  35.99% { pointer-events: auto; }
+  36% { pointer-events: none; }
   38.7% { opacity: 0; }
-  100% { opacity: 0; }
+  100% { opacity: 0; pointer-events: none; }
 }
 @keyframes vitrina-4 {
-  0% { opacity: 0; }
+  0% { opacity: 0; pointer-events: none; }
+  1.99% { pointer-events: none; }
+  2% { pointer-events: auto; }
   4% { opacity: 1; }
   25% { opacity: 1; }
+  26.99% { pointer-events: auto; }
+  27% { pointer-events: none; }
   29% { opacity: 0; }
-  100% { opacity: 0; }
+  100% { opacity: 0; pointer-events: none; }
 }
 @keyframes vitrina-zoom-3 {
   0% { transform: scale(1); }
@@ -639,9 +659,11 @@ input[type="range"].rango:focus-visible {
   }
   .vitrina-foto {
     opacity: 0;
+    pointer-events: none;
   }
   .vitrina-foto:first-child {
     opacity: 1;
+    pointer-events: auto;
   }
   .paso-progreso {
     transform: scaleX(1);

@@ -42,8 +42,18 @@ export class PagosStoreError extends Error {}
  * fallo de infraestructura se lanza como PagosStoreError para que el webhook
  * responda 500 y Wompi reintente.
  */
+export interface ReferenciaEmitida {
+  reference: string;
+  planId: string;
+  amountInCents: number;
+  /** Servicio que renueva este pago (enlace de renovación del correo). */
+  renuevaServicioId?: string | null;
+}
+
 export interface PagosStore {
-  recordReference(ref: { reference: string; planId: string; amountInCents: number }): Promise<void>;
+  recordReference(ref: ReferenciaEmitida): Promise<void>;
+  /** La referencia tal como se emitió, o null si este sitio nunca la emitió. */
+  getReference(reference: string): Promise<ReferenciaEmitida | null>;
   /**
    * "inserted": fila nueva. "updated": ya existía como sin_verificar y se
    * completó con los datos verificados. "duplicate": ya existía tal cual.
@@ -111,14 +121,27 @@ function isoAgo(ms: number): string {
 }
 
 class SupabasePagosStore implements PagosStore {
-  async recordReference(ref: { reference: string; planId: string; amountInCents: number }): Promise<void> {
+  async recordReference(ref: ReferenciaEmitida): Promise<void> {
+    const fila: Record<string, unknown> = { reference: ref.reference, plan_id: ref.planId, amount_in_cents: ref.amountInCents };
+    // La columna llega con la migración 0004: solo se envía cuando hay una renovación, que exige esa migración.
+    if (ref.renuevaServicioId) fila.renueva_servicio_id = ref.renuevaServicioId;
     const { error } = await getSupabaseAdmin()
       .from("pagos_referencias")
-      .upsert(
-        { reference: ref.reference, plan_id: ref.planId, amount_in_cents: ref.amountInCents },
-        { onConflict: "reference", ignoreDuplicates: true },
-      );
+      .upsert(fila, { onConflict: "reference", ignoreDuplicates: true });
     if (error) fail("recordReference", error);
+  }
+
+  async getReference(reference: string): Promise<ReferenciaEmitida | null> {
+    const db = getSupabaseAdmin().from("pagos_referencias");
+    let r = await db.select("reference, plan_id, amount_in_cents, renueva_servicio_id").eq("reference", reference).maybeSingle();
+    // 42703: columna inexistente (0004 sin aplicar). Se lee sin ella.
+    if (r.error && (r.error.code === "42703" || /renueva_servicio_id/.test(r.error.message))) {
+      r = await getSupabaseAdmin().from("pagos_referencias").select("reference, plan_id, amount_in_cents").eq("reference", reference).maybeSingle();
+    }
+    if (r.error) fail("getReference", r.error);
+    if (!r.data) return null;
+    const d = r.data as { reference: string; plan_id: string; amount_in_cents: number; renueva_servicio_id?: string | null };
+    return { reference: d.reference, planId: d.plan_id, amountInCents: Number(d.amount_in_cents), renuevaServicioId: d.renueva_servicio_id ?? null };
   }
 
   async recordEvent(e: EventoPagoInput): Promise<"inserted" | "updated" | "duplicate"> {

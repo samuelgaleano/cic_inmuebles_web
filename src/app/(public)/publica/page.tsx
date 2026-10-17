@@ -32,15 +32,21 @@ const opciones = [
     href: "/vender",
     para: "Soy propietario",
     titulo: "Quiero vender mi inmueble",
-    desc: "Sé tu agencia de cabecera sin costo inicial. Promocionamos tu propiedad, atendemos a los interesados y solo cobramos comisión cuando se cierra la venta.",
+    desc: "Somos tu agencia de cabecera, sin costo inicial. Promocionamos tu propiedad, atendemos a los interesados y solo cobramos comisión cuando se cierra la venta.",
     cifra: "3 %",
     cifraTexto: "solo cuando se cierra la venta",
     puntos: ["Sin mensualidad", "Sin costo inicial", "Atendemos a los interesados"],
     cta: "Quiero vender",
+    // Contraste medido sobre brand-700 (#047d5b), peor caso con la marca encima: texto blanco 4,61:1 (AA),
+    // etiqueta blanca sobre ink/20 6,68:1 y chulos brand-200 3,62:1 (no texto, ≥ 3:1). Con blanco al 80 % daba 3,88:1.
     fondo: "bg-brand-700 text-white",
-    marca: "text-white/[0.09]",
+    // Opacidad de grupo: los cubos que se cruzan no suman blanco (con /[0.06] por cara el cruce bajaba a 4,29:1).
+    marca: "text-white opacity-[0.06]",
     cifraColor: "text-white",
-    etiqueta: "bg-white/15 text-white",
+    texto: "text-white",
+    lista: "text-white",
+    chulo: "text-brand-200",
+    etiqueta: "bg-ink/20 text-white",
     boton: "bg-white text-ink group-hover:bg-brand-50",
   },
   {
@@ -55,6 +61,9 @@ const opciones = [
     fondo: "bg-ink text-white",
     marca: "text-brand-500/[0.16]",
     cifraColor: "text-brand-400",
+    texto: "text-white/80",
+    lista: "text-white/90",
+    chulo: "text-brand-400",
     etiqueta: "bg-brand-500 text-ink",
     boton: "bg-brand-500 text-ink group-hover:bg-brand-400",
   },
@@ -101,19 +110,19 @@ export default function PublicaPage() {
 
             <p className={cn("relative w-fit rounded-full px-4 py-1.5 text-[14px] font-medium", o.etiqueta)}>{o.para}</p>
             <h2 className="t-headline relative mt-6 max-w-md">{o.titulo}</h2>
-            <p className="relative mt-4 max-w-md leading-relaxed text-white/80">{o.desc}</p>
+            <p className={cn("relative mt-4 max-w-md leading-relaxed", o.texto)}>{o.desc}</p>
 
             <div className="relative mt-8">
               <p className={cn("tnum font-display text-[3.5rem] font-medium leading-none tracking-[-0.03em] sm:text-[4.5rem]", o.cifraColor)}>
                 {o.cifra}
               </p>
-              <p className="mt-2 text-[15px] text-white/80">{o.cifraTexto}</p>
+              <p className={cn("mt-2 text-[15px]", o.texto)}>{o.cifraTexto}</p>
             </div>
 
-            <ul className="relative mt-6 flex flex-col gap-2 text-[15px] text-white/90">
+            <ul className={cn("relative mt-6 flex flex-col gap-2 text-[15px]", o.lista)}>
               {o.puntos.map((t) => (
                 <li key={t} className="flex items-center gap-2.5">
-                  <Check className="h-4 w-4 shrink-0 text-brand-400" aria-hidden />
+                  <Check className={cn("h-4 w-4 shrink-0", o.chulo)} aria-hidden />
                   {t}
                 </li>
               ))}

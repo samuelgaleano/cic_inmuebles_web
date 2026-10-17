@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useId, useRef, useState } from "react";
 import { preconnect } from "react-dom";
 import { CreditCard, Loader2, ShieldCheck, X } from "lucide-react";
 import { formatPrice } from "@/lib/utils/format";
 import { buttonVariants } from "@/components/ui/button";
+import { COMERCIO_EN_PASARELA } from "@/lib/config/plans";
+import { CLAVE_DATOS, DATOS_VACIOS, esDatosPago, leerDatosGuardados, urlPaginaCompleta, type DatosComprador } from "./checkout-utils";
 
 type WidgetResult = { transaction?: { id?: string; status?: string } | null };
 
@@ -67,44 +69,16 @@ function useWompiWidget(wanted: boolean, attempt: number): [WidgetState, () => v
   return [wanted && state === "idle" ? "loading" : state, reset];
 }
 
-type DatosPago = {
-  currency: string;
-  amountInCents: number;
-  reference: string;
-  publicKey: string;
-  signature: string;
-  redirectUrl: string;
-};
-
-// Web Checkout de Wompi (página completa, https://docs.wompi.co/docs/colombia/widget-checkout-web/):
-// mismos datos y misma firma de integridad que ya entrega el servidor, sin ventana flotante.
-function urlPaginaCompleta(d: DatosPago, f: { nombre: string; email: string; telefono: string }): string {
-  const telefono = f.telefono.replace(/\D/g, "");
-  const q = new URLSearchParams({
-    "public-key": d.publicKey,
-    currency: d.currency,
-    "amount-in-cents": String(d.amountInCents),
-    reference: d.reference,
-    "signature:integrity": d.signature,
-    "redirect-url": d.redirectUrl,
-    "customer-data:email": f.email,
-    "customer-data:full-name": f.nombre,
-  });
-  // Sin teléfono el servicio quedaba sin WhatsApp de contacto en el panel de vigencias.
-  if (telefono) {
-    q.set("customer-data:phone-number", telefono);
-    q.set("customer-data:phone-number-prefix", "+57");
-  }
-  return `https://checkout.wompi.co/p/?${q.toString()}`;
-}
-
 /**
  * La ventana de Wompi se monta en posición absoluta al inicio del documento, no de la pantalla:
  * si la persona pulsó «Contratar» con la página bajada, se abría fuera de la vista. Esto lleva la
  * página hasta la ventana en cuanto aparece y, cuando se cierra sin pagar, devuelve a la persona
  * al plan donde estaba. Devuelve una función para dejar de vigilar.
  */
-function acompanarVentanaWompi(volverA: number): () => void {
+function acompanarVentanaWompi(
+  volverA: number,
+  avisos: { alCerrar: () => void; noAbrio: () => void; terminado: () => boolean },
+): () => void {
   let modal: HTMLElement | null = null;
   let observador: MutationObserver | null = null;
   let tocada = false; // si la persona ya desplazó por su cuenta, no se le mueve la página
@@ -141,21 +115,48 @@ function acompanarVentanaWompi(volverA: number): () => void {
     alInicio();
     // Wompi enfoca su primer campo y el navegador puede volver a mover la página: se corrige un rato.
     for (const ms of [150, 400, 800, 1500]) ajustes.push(window.setTimeout(alInicio, ms));
+    let avisada = false;
     observador = new MutationObserver(() => {
       if (!modal || abierta(modal)) return;
+      // Con un pago terminado Wompi cierra su ventana y, en la misma tarea, llama al callback que navega al
+      // resultado: ahí no se mueve la página ni se dice «sin cobro» mientras carga la confirmación.
+      if (avisos.terminado()) {
+        fin();
+        return;
+      }
       ir(volverA); // en el cierre y otra vez al ocultarse, por si Wompi movió la página entre medias
+      if (!avisada) {
+        avisada = true;
+        avisos.alCerrar();
+      }
       if (modal.hidden || !modal.isConnected) fin();
     });
-    observador.observe(m, { attributes: true, attributeFilter: ["class", "style"] });
+    observador.observe(m, { attributes: true, attributeFilter: ["class", "style", "hidden"] });
     observador.observe(document.body, { childList: true });
   }, 100);
-  const rendirse = window.setTimeout(fin, 20000); // si Wompi nunca abre, no se vigila para siempre
+  // Lo que Wompi toca al abrir (aria-hidden en los hijos de <body> y estilos del body) se anota para devolverlo
+  // si su ventana nunca aparece y hay que retirarla a mano.
+  const ocultosAntes = new Set([...document.body.children].filter((e) => e.hasAttribute("aria-hidden")));
+  const estiloBody = document.body.getAttribute("style");
+  // Si la ventana de Wompi no aparece, su velo oscuro queda encima de la página sin salida: se le pide a
+  // Wompi que cierre (atiende Escape), se retira lo que quede y se devuelve la página como estaba.
+  const rendirse = window.setTimeout(() => {
+    fin();
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", keyCode: 27, bubbles: true } as KeyboardEventInit));
+    document.querySelectorAll<HTMLElement>(".waybox-backdrop, .waybox-preload-wrapper, .waybox-modal").forEach((e) => {
+      if (!(e.classList.contains("waybox-modal") && abierta(e) && e.getBoundingClientRect().height > 0)) e.remove();
+    });
+    for (const hijo of document.body.children) if (!ocultosAntes.has(hijo)) hijo.removeAttribute("aria-hidden");
+    if (estiloBody === null) document.body.removeAttribute("style");
+    else document.body.setAttribute("style", estiloBody);
+    avisos.noAbrio();
+  }, 15000);
   return fin;
 }
 
 const FIELDS = [
   { key: "nombre", label: "Nombre completo", type: "text", autoComplete: "name", placeholder: "Como aparece en tu documento" },
-  { key: "email", label: "Correo electrónico", type: "email", autoComplete: "email", placeholder: "Recibirás ahí el comprobante" },
+  { key: "email", label: "Correo electrónico", type: "email", autoComplete: "email", placeholder: "nombre@correo.com" },
   { key: "telefono", label: "Teléfono (WhatsApp)", type: "tel", autoComplete: "tel", placeholder: "Ej. 300 123 4567" },
 ] as const;
 
@@ -164,12 +165,15 @@ export function PlanCheckout({
   planNombre,
   precioCOP,
   renovacion,
+  avisosActivos = false,
 }: {
   planId: string;
   planNombre: string;
   precioCOP: number;
-  /** Viene del enlace de renovación del correo: abre el pago con los datos ya escritos. */
-  renovacion?: { nombre: string; email: string; telefono: string };
+  /** Viene del enlace de renovación del correo: abre el pago con los datos ya escritos y lo liga al servicio. */
+  renovacion?: DatosComprador & { token: string };
+  /** true si el registro de vigencias funciona: solo entonces se prometen avisos por correo. */
+  avisosActivos?: boolean;
 }) {
   const [open, setOpen] = useState(Boolean(renovacion));
   const [wanted, setWanted] = useState(false);
@@ -179,11 +183,18 @@ export function PlanCheckout({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [lenta, setLenta] = useState(false);
-  const [form, setForm] = useState({ nombre: renovacion?.nombre ?? "", email: renovacion?.email ?? "", telefono: renovacion?.telefono ?? "" });
+  const [cerrada, setCerrada] = useState<string | null>(null);
+  const [form, setForm] = useState<DatosComprador>(() =>
+    renovacion ? { nombre: renovacion.nombre, email: renovacion.email, telefono: renovacion.telefono } : DATOS_VACIOS,
+  );
   const dialogRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const loadingRef = useRef(false);
+  const intentoRef = useRef<AbortController | null>(null);
+  const vigiaRef = useRef<(() => void) | null>(null);
   const uid = useId();
+
+  // Al desmontar no quedan temporizadores ni observadores vivos.
+  useEffect(() => () => vigiaRef.current?.(), []);
 
   // Intención de pago: al pasar el cursor o enfocar el botón ya preconectamos
   // y empezamos a bajar el widget, así "Pagar" está listo cuando se llega a él.
@@ -193,14 +204,32 @@ export function PlanCheckout({
     setWanted(true);
   };
 
+  const abrir = () => {
+    warm();
+    setCerrada(null);
+    if (!renovacion) {
+      try {
+        const guardados = leerDatosGuardados(window.sessionStorage.getItem(CLAVE_DATOS));
+        if (guardados) setForm(guardados);
+      } catch {
+        // sin almacenamiento (modo privado estricto): se escribe de nuevo, nada más
+      }
+    }
+    setOpen(true);
+  };
+
+  // Cerrar siempre se puede y cancela de verdad: si la preparación del pago sigue en curso, se aborta
+  // y la pasarela ya no se abre después por su cuenta.
   const close = () => {
-    loadingRef.current = false;
+    intentoRef.current?.abort();
+    intentoRef.current = null;
     setLoading(false);
     setLenta(false);
     setOpen(false);
     setError(null);
     setNotice(null);
   };
+  const cerrarDesdeTeclado = useEffectEvent(close);
 
   // Bloqueo de scroll + foco inicial + Escape + trampa de foco + foco de vuelta al botón.
   useEffect(() => {
@@ -212,13 +241,7 @@ export function PlanCheckout({
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        // Salir siempre se puede: cerrar esta ventana no genera ningún cobro.
-        loadingRef.current = false;
-        setLoading(false);
-        setLenta(false);
-        setOpen(false);
-        setError(null);
-        setNotice(null);
+        cerrarDesdeTeclado(); // cerrar no genera ningún cobro
         return;
       }
       if (e.key !== "Tab") return;
@@ -246,7 +269,6 @@ export function PlanCheckout({
   }, [open]);
 
   const setLoadingState = (v: boolean) => {
-    loadingRef.current = v;
     setLoading(v);
     if (!v) setLenta(false);
   };
@@ -263,6 +285,9 @@ export function PlanCheckout({
   const pay = async (e: React.FormEvent, modo: "ventana" | "pagina" = "ventana") => {
     e.preventDefault();
     if (modo === "ventana" && (widget !== "ready" || !window.WidgetCheckout)) return;
+    intentoRef.current?.abort();
+    const intento = new AbortController();
+    intentoRef.current = intento;
     setLoadingState(true);
     setError(null);
     setNotice(null);
@@ -270,16 +295,19 @@ export function PlanCheckout({
       const res = await fetch("/api/pagos/wompi", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planId }),
+        body: JSON.stringify(renovacion ? { planId, renovar: renovacion.token } : { planId }),
+        signal: intento.signal,
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.ok) {
-        setError(data.error ?? "No pudimos iniciar el pago. Inténtalo de nuevo en un momento.");
+      const data: unknown = await res.json().catch(() => ({}));
+      if (intento.signal.aborted) return; // la persona canceló mientras esperaba
+      if (!res.ok || !esDatosPago(data)) {
+        const msg = (data as { error?: unknown } | null)?.error;
+        setError(typeof msg === "string" ? msg : "No pudimos iniciar el pago. Inténtalo de nuevo en un momento.");
         setLoadingState(false);
         return;
       }
       if (modo === "pagina") {
-        window.location.assign(urlPaginaCompleta(data as DatosPago, form));
+        window.location.assign(urlPaginaCompleta(data, form));
         return;
       }
       const checkout = new window.WidgetCheckout!({
@@ -292,7 +320,7 @@ export function PlanCheckout({
         customerData: {
           email: form.email,
           fullName: form.nombre,
-          phoneNumber: form.telefono,
+          phoneNumber: form.telefono.replace(/\D/g, ""),
           phoneNumberPrefix: "+57",
         },
       });
@@ -301,30 +329,47 @@ export function PlanCheckout({
       // se cierra antes de abrirla: su bloqueo de desplazamiento y su trampa de foco lo impedían.
       setLoadingState(false);
       setOpen(false);
+      intentoRef.current = null;
       const volverA = window.scrollY;
       // Un cuadro de espera para que se libere el bloqueo de desplazamiento antes de que Wompi se coloque.
       await new Promise((r) => requestAnimationFrame(() => r(null)));
-      acompanarVentanaWompi(volverA);
+      let conTransaccion = false;
+      vigiaRef.current?.();
+      vigiaRef.current = acompanarVentanaWompi(volverA, {
+        terminado: () => conTransaccion,
+        alCerrar: () => {
+          setCerrada("Cerraste la pasarela sin pagar: no se hizo ningún cobro. Puedes intentarlo de nuevo o elegir otro plan.");
+          triggerRef.current?.focus({ preventScroll: true });
+        },
+        noAbrio: () => {
+          setNotice("La ventana de pago no terminó de cargar. No se hizo ningún cobro. Prueba con «Abrir el pago en pantalla completa».");
+          setOpen(true);
+        },
+      });
       checkout.open((result) => {
-        setLoadingState(false);
         const txId = result?.transaction?.id;
+        // Wompi redirige por su cuenta al terminar; si la ventana se cerró antes, se lleva a la confirmación.
         if (txId) {
-          // Wompi redirige por su cuenta al terminar; si la ventana se cerró
-          // antes de que lo hiciera, llevamos al usuario a la confirmación.
+          conTransaccion = true;
           window.location.assign(`${data.redirectUrl}&id=${encodeURIComponent(txId)}`);
-          return;
         }
-        setNotice("Cerraste la pasarela sin completar el pago. No se hizo ningún cobro; puedes intentarlo cuando quieras.");
-        setOpen(true);
       });
     } catch {
+      if (intento.signal.aborted) return;
       setError("No pudimos conectar con la pasarela. Revisa tu conexión e inténtalo de nuevo.");
       setLoadingState(false);
     }
   };
 
-  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setForm((f) => ({ ...f, [k]: e.target.value }));
+  const set = (k: keyof DatosComprador) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const nuevo = { ...form, [k]: e.target.value };
+    setForm(nuevo);
+    try {
+      window.sessionStorage.setItem(CLAVE_DATOS, JSON.stringify(nuevo)); // para cambiar de plan sin reescribir
+    } catch {
+      // sin almacenamiento disponible: no pasa nada
+    }
+  };
 
   const canPay = widget === "ready" && !loading;
   const titleId = `${uid}-titulo`;
@@ -334,10 +379,7 @@ export function PlanCheckout({
       <button
         ref={triggerRef}
         type="button"
-        onClick={() => {
-          warm();
-          setOpen(true);
-        }}
+        onClick={abrir}
         onPointerEnter={warm}
         onFocus={warm}
         className={buttonVariants({ variant: "primary", size: "md", className: "w-full justify-center" })}
@@ -345,6 +387,10 @@ export function PlanCheckout({
         <CreditCard className="h-4 w-4" />
         Contratar por {formatPrice(precioCOP)}
       </button>
+      {/* Siempre montada: así el lector de pantalla anuncia el aviso cuando aparece. */}
+      <p role="status" className={cerrada ? "mt-2 text-center text-[13px] leading-snug text-ink-soft" : "sr-only"}>
+        {cerrada ?? ""}
+      </p>
 
       {open && (
         <div
@@ -396,7 +442,8 @@ export function PlanCheckout({
                 </div>
               ))}
               <p className="text-xs leading-relaxed text-muted">
-                Con estos datos prellenamos la pasarela, te contactamos después del pago y te avisamos por correo antes de que venza tu publicación. Más detalles en la{" "}
+                Con estos datos prellenamos la pasarela y te contactamos después del pago
+                {avisosActivos ? "; también te avisamos por correo antes de que venza tu publicación" : ""}. Más detalles en la{" "}
                 <a href="/privacidad" target="_blank" rel="noopener" className="underline underline-offset-2">política de datos</a>.
               </p>
 
@@ -456,7 +503,7 @@ export function PlanCheckout({
                       : "Cargando pasarela…"}
               </button>
               <p className="text-center text-xs leading-relaxed text-muted">
-                ¿La ventana de pago se ve cortada o no te deja bajar?{" "}
+                ¿Prefieres pagar en una página aparte?{" "}
                 <button
                   type="button"
                   disabled={loading}
@@ -472,8 +519,15 @@ export function PlanCheckout({
               <p className="flex items-start justify-center gap-1.5 text-center text-xs leading-relaxed text-muted">
                 <ShieldCheck className="mt-0.5 h-3.5 w-3.5 flex-none text-brand-700" aria-hidden="true" />
                 <span>
-                  Pago seguro con Wompi: tarjetas, PSE y Nequi. Al terminar vuelves aquí con el resultado.
+                  Pago seguro con Wompi: tarjetas, PSE y Nequi. En la pasarela verás el comercio «{COMERCIO_EN_PASARELA}», la cuenta con la que CIC Inmuebles recibe sus pagos. Al terminar vuelves aquí con el resultado.
                 </span>
+              </p>
+              <p className="text-center text-xs leading-relaxed text-muted">
+                Al pagar aceptas las{" "}
+                <a href="/publica/condiciones" target="_blank" rel="noopener" className="underline underline-offset-2">
+                  condiciones de publicación
+                </a>
+                .
               </p>
             </form>
           </div>

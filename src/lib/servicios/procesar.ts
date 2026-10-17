@@ -2,16 +2,18 @@ import { getPlan, type Plan } from "@/lib/config/plans";
 import type { WompiTransaction } from "@/lib/integrations/wompi";
 import { sendPagosAlert } from "@/lib/notifications/payment";
 import { sendEmail } from "@/lib/notifications/resend";
-import { correoDeAviso, correoPagoRecibido, type CorreoSaliente } from "./correos";
+import { correoDeAviso, correoPagoRecibido, correoRenovacionPagada, type CorreoSaliente } from "./correos";
 import { fijarPublicacionDeFicha } from "./ficha";
 import { getServiciosStore, ServiciosNoDisponibleError, type ServiciosStore } from "./store";
-import { accionDeHoy, fechaLarga, type Servicio } from "./vigencia";
+import { accionDeHoy, fechaLarga, ventanaDeRenovacion, type Servicio } from "./vigencia";
 
 export interface ServiciosDeps {
   store: ServiciosStore;
   enviarCorreo: (m: CorreoSaliente) => Promise<boolean>;
   /** false si no se pudo despublicar (se reintenta al día siguiente). */
   despublicarFicha: (slug: string) => Promise<boolean>;
+  /** false si no se pudo volver a publicar la ficha de una renovación pagada. */
+  publicarFicha: (slug: string) => Promise<boolean>;
   alertar: (asunto: string, texto: string) => Promise<boolean>;
   ahora: () => Date;
 }
@@ -21,6 +23,7 @@ export function defaultServiciosDeps(): ServiciosDeps {
     store: getServiciosStore(),
     enviarCorreo: (m) => sendEmail(m),
     despublicarFicha: (slug) => fijarPublicacionDeFicha(slug, false),
+    publicarFicha: (slug) => fijarPublicacionDeFicha(slug, true),
     alertar: (asunto, texto) => sendPagosAlert(asunto, texto),
     ahora: () => new Date(),
   };
@@ -39,8 +42,19 @@ export async function registrarServicioDePago(
   tx: WompiTransaction,
   plan: Plan,
   deps: ServiciosDeps = defaultServiciosDeps(),
+  opts: { renuevaServicioId?: string | null; alertarSiFalla?: boolean } = {},
 ): Promise<void> {
   if (plan.mode !== "pago" || !plan.dias) return;
+  const alertarSiFalla = opts.alertarSiFalla ?? true;
+  if (opts.renuevaServicioId) {
+    // Una renovación nunca cae en «compra nueva» por un error: si falla, se reintenta en la próxima pasada.
+    try {
+      if (await aplicarRenovacionPagada(tx, plan, opts.renuevaServicioId, deps)) return;
+    } catch (err) {
+      console.error(`[vigencias] renovación de ${tx.id} sin aplicar (se reintenta):`, describe(err));
+      return;
+    }
+  }
   try {
     const { servicio, creado } = await deps.store.registrar({
       txId: tx.id,
@@ -66,6 +80,8 @@ export async function registrarServicioDePago(
   } catch (err) {
     const pendiente = err instanceof ServiciosNoDisponibleError;
     console.error(`[vigencias] no se pudo registrar el servicio de ${tx.id}:`, describe(err));
+    // Los reintentos (recargar el retorno, webhook, cron) no repiten la alerta: basta una por transacción.
+    if (!alertarSiFalla) return;
     // El pago ya quedó avisado y la conciliación no vuelve a pasar por aquí: se avisa a CIC para registrarlo a mano.
     await deps
       .alertar(
@@ -81,6 +97,56 @@ export async function registrarServicioDePago(
       )
       .catch(() => false);
   }
+}
+
+/**
+ * Renovación pagada desde el enlace del correo: extiende el servicio original (sin perder días vigentes)
+ * en lugar de crear uno nuevo que quedaría pendiente mientras el viejo vence y despublica la ficha.
+ * true si quedó resuelta (aplicada ahora o antes); false si hay que tratar el pago como compra nueva.
+ */
+async function aplicarRenovacionPagada(tx: WompiTransaction, plan: Plan, servicioId: string, deps: ServiciosDeps): Promise<boolean> {
+  const s = await deps.store.obtener(servicioId);
+  // Solo se renueva el mismo plan y un servicio que ya corre o venció; si no, es una compra nueva.
+  if (!s || s.planId !== plan.id || s.estado === "pendiente_publicar") return false;
+  if (!(await deps.store.registrarRenovacion(tx.id, s.id))) return true; // ya aplicada por otro intento
+
+  // Si la extensión no se aplica (error de red o cambio simultáneo), se libera el reclamo: el siguiente
+  // intento (recarga del retorno o conciliación) la vuelve a aplicar en vez de darla por hecha.
+  let renovado: Servicio | null = null;
+  try {
+    renovado = await deps.store.renovar(s.id, ventanaDeRenovacion(s, deps.ahora()), s.venceAt);
+  } catch (err) {
+    console.error(`[vigencias] no se pudo extender ${s.id}:`, describe(err));
+  }
+  if (!renovado) {
+    await deps.store.liberarRenovacion(tx.id).catch(() => undefined);
+    await deps
+      .alertar(
+        "Renovación pagada pendiente de aplicar",
+        [`Transacción Wompi: ${tx.id}`, `Plan: ${plan.nombre}`, `Servicio: ${s.id}`, "", "Se reintenta sola; si persiste, renuévala a mano en /admin/vigencias."].join("\n"),
+      )
+      .catch(() => false);
+    throw new Error(`renovación de ${s.id} sin aplicar`);
+  }
+  const fichaOk = !s.propertySlug || (await deps.publicarFicha(s.propertySlug));
+  if (!fichaOk) {
+    await deps
+      .alertar(
+        "Renovación pagada sin aplicar del todo",
+        [
+          `Transacción Wompi: ${tx.id}`,
+          `Plan: ${plan.nombre}`,
+          `Servicio: ${s.id}${s.propertySlug ? ` · ficha ${s.propertySlug}` : ""}`,
+          "",
+          "La vigencia se extendió, pero la ficha no se pudo volver a publicar: publícala a mano.",
+        ].join("\n"),
+      )
+      .catch(() => false);
+    return true;
+  }
+  const correo = correoRenovacionPagada(renovado);
+  if (correo && !(await deps.enviarCorreo(correo))) console.error(`[vigencias] no se pudo enviar la confirmación de renovación de ${s.id}`);
+  return true;
 }
 
 export interface ResumenVigencias {
@@ -110,6 +176,20 @@ export async function revisarVencimientos(deps: ServiciosDeps = defaultServicios
 
   const ahora = deps.ahora();
   const lineas: string[] = [];
+
+  // Pagos que siguen sin activar: el reloj no corre hasta que CIC publique y active. Se recuerdan cada día.
+  try {
+    const todos = await deps.store.listar();
+    for (const p of todos) {
+      if (p.estado !== "pendiente_publicar") continue;
+      const dias = Math.floor((ahora.getTime() - new Date(p.createdAt).getTime()) / 86_400_000);
+      if (![2, 7, 14].includes(dias)) continue; // recordatorio acotado, no un correo eterno
+      const quien = [p.clienteNombre, p.clienteEmail, p.clienteTelefono].filter(Boolean).join(" · ") || "(sin datos)";
+      lineas.push(`SIN ACTIVAR hace ${dias} días: ${getPlan(p.planId)?.nombre ?? p.planId}. Cliente: ${quien}. Actívalo en /admin/vigencias al publicar.`);
+    }
+  } catch (err) {
+    console.error("[vigencias] no se pudieron listar los pendientes:", describe(err));
+  }
 
   for (const s of servicios) {
     const accion = accionDeHoy(s, ahora);
@@ -165,7 +245,7 @@ export async function revisarVencimientos(deps: ServiciosDeps = defaultServicios
 
   if (lineas.length > 0) {
     await deps.alertar(
-      `Vigencias: ${r.vencidos} vencidos, ${r.avisosEnviados} avisos`,
+      r.vencidos || r.avisosEnviados || r.fallos || r.sinCorreo ? `Vigencias: ${r.vencidos} vencidos, ${r.avisosEnviados} avisos` : "Vigencias: pagos sin activar",
       [...lineas, "", "Detalle y acciones en /admin/vigencias."].join("\n"),
     );
   }

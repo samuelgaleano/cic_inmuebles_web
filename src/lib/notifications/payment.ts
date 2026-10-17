@@ -42,6 +42,9 @@ export async function sendPaymentNotification(p: PaymentNotice): Promise<boolean
     to: process.env.LEADS_NOTIFICATION_EMAIL ?? siteConfig.email,
     subject,
     text,
+    replyTo: p.customerEmail ?? null,
+    // Si se reintenta tras un fallo al marcarlo enviado, Resend no manda un segundo aviso.
+    idempotencyKey: p.transactionId ? `cic-pago-aprobado-${p.transactionId}` : undefined,
   });
 }
 

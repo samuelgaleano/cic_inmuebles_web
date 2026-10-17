@@ -21,12 +21,22 @@ const navItems = [
 // «Vender» sale de la lista y pasa a ser el botón principal de la barra.
 const navEscritorio = navItems.filter((i) => i.href !== "/vender");
 
+// En el móvil, los agentes llegan directo a los planes (justo después de «Publica tu inmueble»).
+const navMovil = [
+  { href: "/", label: "Inicio" },
+  ...navItems.flatMap((i) => (i.href === "/publica" ? [i, { href: "/publica/agente", label: "Publicar como agente" }] : [i])),
+  { href: "/favoritos", label: "Favoritos" },
+];
+
 export function SiteHeader() {
   const pathname = usePathname();
   const menu = useRef<HTMLDialogElement>(null);
   const { ids: favoritos } = useFavoritos();
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+  // En el menú móvil solo se marca la entrada más específica (en /publica/agente, «Publicar como agente»).
+  const isActiveMovil = (href: string) =>
+    isActive(href) && !navMovil.some((o) => o.href !== href && o.href.startsWith(`${href}/`) && isActive(o.href));
 
   // El menú móvil es un <dialog> modal: el navegador atrapa el foco, Escape lo cierra
   // y lo de atrás queda inerte. Solo falta bloquear el scroll de la página.
@@ -125,15 +135,15 @@ export function SiteHeader() {
         </div>
         <nav aria-label="Menú móvil" className="wrap pt-10">
           <ul>
-            {[{ href: "/", label: "Inicio" }, ...navItems, { href: "/favoritos", label: "Favoritos" }].map((item, i) => (
+            {navMovil.map((item, i) => (
               <li key={item.href} className="anim-sube border-b border-line" style={{ "--d": `${80 + i * 55}ms` } as React.CSSProperties}>
                 <Link
                   href={item.href}
                   onClick={cerrar}
-                  aria-current={isActive(item.href) ? "page" : undefined}
+                  aria-current={isActiveMovil(item.href) ? "page" : undefined}
                   className={cn(
                     "block py-4 text-[2rem] font-semibold leading-tight tracking-[-0.03em]",
-                    isActive(item.href) ? "text-brand-700" : "text-ink",
+                    isActiveMovil(item.href) ? "text-brand-700" : "text-ink",
                   )}
                 >
                   {item.label}

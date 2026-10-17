@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { autorizadoCron } from "@/lib/auth/cron";
+import { sendPagosAlert } from "@/lib/notifications/payment";
 import { defaultDeps } from "@/lib/pagos/process";
 import { reconcile } from "@/lib/pagos/reconcile";
 import { getPagosStore, isPagosStoreConfigured } from "@/lib/pagos/store";
@@ -13,15 +15,20 @@ export const maxDuration = 60;
  * `Authorization: Bearer <CRON_SECRET>`, o Samuel a mano.
  *   GET /api/pagos/wompi/reconciliar          -> corre la reconciliación
  *   GET /api/pagos/wompi/reconciliar?tx=<id>  -> traza completa de una transacción
+ *
+ * Tres tareas independientes, cada una en su try: la reconciliación, la purga
+ * del payload crudo de más de 72 h (Ley 1581) y la revisión de vigencias. Que
+ * falle una no impide las otras. Si alguna falla se avisa a Pixies con
+ * `sendPagosAlert`, sin datos personales ni mensajes de error (pueden traer
+ * referencias o correos): solo qué tarea falló. El detalle queda en los logs.
  */
-function authorized(req: Request): boolean {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return false;
-  return req.headers.get("authorization") === `Bearer ${secret}`;
+
+function mensajeError(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
 }
 
 export async function GET(req: Request) {
-  if (!authorized(req)) {
+  if (!autorizadoCron(req)) {
     return NextResponse.json({ ok: false, error: "No autorizado" }, { status: 401 });
   }
   if (!isPagosStoreConfigured()) {
@@ -34,24 +41,56 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: true, tx, eventos: eventos.map(({ raw: _raw, ...e }) => e) });
   }
 
-  // Las dos tareas son independientes: que falle una no impide la otra.
+  const fallos: string[] = [];
+
+  // 1) Reconciliación.
   let result: Awaited<ReturnType<typeof reconcile>> | null = null;
   let errorPagos: string | null = null;
   try {
     result = await reconcile(defaultDeps());
   } catch (err) {
-    errorPagos = err instanceof Error ? err.message : String(err);
+    errorPagos = mensajeError(err);
     console.error("[pagos] la reconciliación diaria falló:", errorPagos);
+    fallos.push("La reconciliación de pagos falló.");
   }
 
-  // La misma corrida diaria revisa las vigencias de las publicaciones (avisos y vencimientos).
+  // 2) Purga de 72 h. `reconcile` ya purga al final de una corrida completa; si
+  //    se cayó antes de llegar ahí, se purga aquí para no retener datos de más.
+  let rawPurgados: number | null = result ? result.rawPurgados : null;
+  if (!result) {
+    try {
+      rawPurgados = await getPagosStore().purgeRaw();
+    } catch (err) {
+      console.error("[pagos] la purga de payloads falló:", mensajeError(err));
+      fallos.push("La purga del payload crudo de más de 72 h falló.");
+    }
+  }
+
+  // 3) Vigencias de las publicaciones (avisos y vencimientos), en la misma corrida diaria.
   let vigencias: Awaited<ReturnType<typeof revisarVencimientos>> | { error: string };
   try {
     vigencias = await revisarVencimientos();
+    if (vigencias.disponible === false) {
+      console.warn("[vigencias] tablas de vigencias no disponibles: aplicar migracion 0004 en el SQL Editor de Supabase.");
+    }
   } catch (err) {
-    console.error("[vigencias] la revisión diaria falló:", err instanceof Error ? err.message : err);
+    console.error("[vigencias] la revisión diaria falló:", mensajeError(err));
     vigencias = { error: "falló la revisión de vigencias" };
+    fallos.push("La revisión de vigencias de las publicaciones falló.");
   }
-  if (!result) return NextResponse.json({ ok: false, at: new Date().toISOString(), error: errorPagos, vigencias }, { status: 500 });
-  return NextResponse.json({ ok: true, at: new Date().toISOString(), ...result, vigencias });
+
+  if (fallos.length) {
+    try {
+      await sendPagosAlert(
+        `Cron diario con fallos (${fallos.length})`,
+        [...fallos, "", "Detalle en los logs de Vercel de /api/pagos/wompi/reconciliar."].join("\n"),
+      );
+    } catch (err) {
+      console.error("[pagos] no se pudo enviar la alerta del cron:", mensajeError(err));
+    }
+  }
+
+  const at = new Date().toISOString();
+  if (!result) return NextResponse.json({ ok: false, at, error: errorPagos, rawPurgados, vigencias }, { status: 500 });
+  return NextResponse.json({ ok: true, at, ...result, vigencias });
 }
