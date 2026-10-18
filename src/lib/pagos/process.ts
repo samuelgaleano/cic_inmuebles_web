@@ -217,7 +217,7 @@ async function notifyOnce(tx: WompiTransaction, c: Classified & { estado: "ok" |
 // comercio nuevo copia este archivo a SU repo y pone SU prefijo aquí, no
 // comparte deploy con otros — ver docs/2026-09-14-wompi-nuevo-comercio.md).
 /** Referencias que emite CIC: CIC-<planId>-<6 dígitos>-<timestamp>. */
-const CIC_REFERENCE = /^CIC-[a-z0-9-]{1,40}-\d{6}-\d{10,16}$/;
+export const CIC_REFERENCE = /^CIC-[a-z0-9-]{1,40}-\d{6}-\d{10,16}$/;
 
 /**
  * Confirmación desde la página de retorno del widget. Exige id y referencia

@@ -53,6 +53,19 @@ export function urlPaginaCompleta(d: DatosPago, f: DatosComprador): string {
   return `https://checkout.wompi.co/p/?${q.toString()}`;
 }
 
+/**
+ * Cada cuánto consulta la página el estado de un pago en curso: cada 5 s los primeros 2 minutos, cada 10 s
+ * hasta los 5 y cada 20 s hasta los 20 (Nequi y PSE pueden tardar). Pasado ese tiempo se deja de consultar:
+ * la conciliación diaria y el botón «Volver al comercio» siguen cubriendo el caso.
+ */
+export const SEGUIMIENTO_MAX_MS = 20 * 60_000;
+export function esperaDeSeguimiento(transcurridoMs: number): number | null {
+  if (transcurridoMs >= SEGUIMIENTO_MAX_MS) return null;
+  if (transcurridoMs < 2 * 60_000) return 5_000;
+  if (transcurridoMs < 5 * 60_000) return 10_000;
+  return 20_000;
+}
+
 /** Una respuesta del servidor sirve para abrir la pasarela solo si trae todo lo necesario. */
 export function esDatosPago(d: unknown): d is DatosPago {
   if (!d || typeof d !== "object") return false;

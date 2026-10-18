@@ -6,7 +6,7 @@ import { CreditCard, Loader2, ShieldCheck, X } from "lucide-react";
 import { formatPrice } from "@/lib/utils/format";
 import { buttonVariants } from "@/components/ui/button";
 import { COMERCIO_EN_PASARELA } from "@/lib/config/plans";
-import { CLAVE_DATOS, DATOS_VACIOS, esDatosPago, leerDatosGuardados, urlPaginaCompleta, type DatosComprador } from "./checkout-utils";
+import { CLAVE_DATOS, DATOS_VACIOS, esDatosPago, esperaDeSeguimiento, leerDatosGuardados, urlPaginaCompleta, type DatosComprador } from "./checkout-utils";
 
 type WidgetResult = { transaction?: { id?: string; status?: string } | null };
 
@@ -154,6 +154,36 @@ function acompanarVentanaWompi(
   return fin;
 }
 
+/**
+ * Mientras dura el pago, esta página (que contiene la ventana de Wompi) le pregunta al servidor por el estado de la
+ * referencia. Así el pago queda registrado y CIC recibe el aviso aunque quien paga cierre la ventana de Wompi sin
+ * pulsar «Volver al comercio». No mueve ni interrumpe nada de lo que ve la persona. Devuelve cómo detenerlo.
+ */
+function seguirPago(reference: string): () => void {
+  const inicio = Date.now();
+  let timer: number | undefined;
+  let detenido = false;
+  const detener = () => {
+    detenido = true;
+    window.clearTimeout(timer);
+  };
+  const turno = async () => {
+    if (detenido) return;
+    try {
+      const res = await fetch(`/api/pagos/wompi/estado?ref=${encodeURIComponent(reference)}`, { cache: "no-store" });
+      const d = (await res.json().catch(() => null)) as { final?: boolean; estado?: string } | null;
+      if (d?.final || d?.estado === "desconocida" || res.status === 503) return detener();
+    } catch {
+      // sin red por un momento: se reintenta en el siguiente turno
+    }
+    const espera = esperaDeSeguimiento(Date.now() - inicio);
+    if (espera === null || detenido) return;
+    timer = window.setTimeout(turno, espera);
+  };
+  timer = window.setTimeout(turno, 4_000);
+  return detener;
+}
+
 const FIELDS = [
   { key: "nombre", label: "Nombre completo", type: "text", autoComplete: "name", placeholder: "Como aparece en tu documento" },
   { key: "email", label: "Correo electrónico", type: "email", autoComplete: "email", placeholder: "nombre@correo.com" },
@@ -191,10 +221,17 @@ export function PlanCheckout({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const intentoRef = useRef<AbortController | null>(null);
   const vigiaRef = useRef<(() => void) | null>(null);
+  const seguimientoRef = useRef<(() => void) | null>(null);
   const uid = useId();
 
   // Al desmontar no quedan temporizadores ni observadores vivos.
-  useEffect(() => () => vigiaRef.current?.(), []);
+  useEffect(
+    () => () => {
+      vigiaRef.current?.();
+      seguimientoRef.current?.();
+    },
+    [],
+  );
 
   // Intención de pago: al pasar el cursor o enfocar el botón ya preconectamos
   // y empezamos a bajar el widget, así "Pagar" está listo cuando se llega a él.
@@ -346,6 +383,9 @@ export function PlanCheckout({
           setOpen(true);
         },
       });
+      // Registro del pago sin depender de «Volver al comercio»: se consulta el estado mientras dure.
+      seguimientoRef.current?.();
+      seguimientoRef.current = seguirPago(data.reference);
       checkout.open((result) => {
         const txId = result?.transaction?.id;
         // Wompi redirige por su cuenta al terminar; si la ventana se cerró antes, se lleva a la confirmación.
@@ -519,7 +559,7 @@ export function PlanCheckout({
               <p className="flex items-start justify-center gap-1.5 text-center text-xs leading-relaxed text-muted">
                 <ShieldCheck className="mt-0.5 h-3.5 w-3.5 flex-none text-brand-700" aria-hidden="true" />
                 <span>
-                  Pago seguro con Wompi: tarjetas, PSE y Nequi. En la pasarela verás el comercio «{COMERCIO_EN_PASARELA}», la cuenta con la que CIC Inmuebles recibe sus pagos. Al terminar vuelves aquí con el resultado.
+                  Pago seguro con Wompi: tarjetas, PSE y Nequi. En la pasarela verás el comercio «{COMERCIO_EN_PASARELA}», la cuenta con la que CIC Inmuebles recibe sus pagos. Al terminar pulsa «Volver al comercio» para ver el resultado; si cierras la ventana antes, tu pago igual queda registrado y te escribimos.
                 </span>
               </p>
               <p className="text-center text-xs leading-relaxed text-muted">
