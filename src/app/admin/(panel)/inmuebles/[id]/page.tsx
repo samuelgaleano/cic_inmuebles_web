@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import { PropertyForm } from "@/components/admin/property-form";
 import { DriveArchivePanel } from "@/components/admin/drive-archive";
+import { RelacionesInmueble } from "@/components/admin/relaciones-inmueble";
 import { updatePropertyAction } from "@/lib/actions/admin-properties";
 import { getRepository } from "@/lib/data";
 import { isDriveConfigured, listFolderFiles } from "@/lib/integrations/drive";
@@ -41,6 +42,8 @@ export default async function EditarInmueblePage({
         </Link>
       </div>
       <PropertyForm action={action} property={property} />
+
+      <RelacionesInmueble property={property} />
 
       <DriveArchivePanel
         configured={driveConfigured}

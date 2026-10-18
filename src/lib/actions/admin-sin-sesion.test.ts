@@ -60,6 +60,7 @@ vi.mock("@/lib/services/drive-import", () => ({
 import { createSessionToken } from "@/lib/auth/session";
 import * as agenda from "./admin-agenda";
 import * as crm from "./admin-crm";
+import * as datos from "./admin-datos";
 import * as drive from "./admin-drive";
 import * as leads from "./admin-leads";
 import * as properties from "./admin-properties";
@@ -97,6 +98,8 @@ function invocar(nombre: string, fn: (...args: unknown[]) => Promise<unknown>): 
     case "importPropertiesFromDriveAction":
     case "createPropertyAction":
       return fn({}, fd);
+    case "importarHojaAction":
+      return fn(null, fd);
     case "updateTemplateAction":
       return fn("abc", fd);
     case "updatePropertyAction":
@@ -106,7 +109,7 @@ function invocar(nombre: string, fn: (...args: unknown[]) => Promise<unknown>): 
   }
 }
 
-const modulos = { agenda, crm, drive, leads, properties, sheets, templates };
+const modulos = { agenda, crm, datos, drive, leads, properties, sheets, templates };
 const acciones = Object.entries(modulos).flatMap(([modulo, m]) =>
   Object.entries(m)
     .filter(([, v]) => typeof v === "function")
@@ -130,7 +133,7 @@ afterEach(() => {
 
 describe("acciones del panel sin sesion", () => {
   it("hay acciones que revisar (si esto falla, cambio la forma de exportarlas)", () => {
-    expect(acciones.length).toBeGreaterThanOrEqual(29);
+    expect(acciones.length).toBeGreaterThanOrEqual(30);
   });
 
   it.each(acciones)("%s redirige al login y no toca datos", async (_id, nombre, fn) => {

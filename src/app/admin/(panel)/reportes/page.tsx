@@ -64,7 +64,7 @@ export default async function AdminReportesPage() {
       <section className="rounded-2xl border border-line bg-white p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="flex items-center gap-2 font-semibold text-ink">
-            <FileText className="h-5 w-5 text-brand-600" /> Catálogo en Google Sheets
+            <FileText className="h-5 w-5 text-brand-600" /> Copia opcional en Google Sheets
           </h2>
           {sheetsOn && (
             <div className="flex flex-wrap items-center gap-2">
@@ -88,8 +88,8 @@ export default async function AdminReportesPage() {
         </div>
         <p className="mt-2 text-sm text-muted">
           {sheetsOn
-            ? "El catálogo se sincroniza automáticamente al crear, editar o eliminar inmuebles (incluido el estado). Usa “Sincronizar ahora” para reescribir todo de una vez."
-            : "Conecta una hoja agregando GOOGLE_SHEETS_SPREADSHEET_ID en Vercel (con la misma cuenta de servicio de Drive) y compártela como editor. El inventario se mantendrá actualizado solo."}
+            ? "El catálogo se copia a la hoja al crear, editar o eliminar inmuebles. La plataforma ya no depende de ella: todo se ve y se descarga desde Datos y se revisa en Conexiones."
+            : "No hace falta: todo se gestiona en el panel y se descarga desde Datos (CSV para Excel o Google Sheets) cuando se necesite."}
         </p>
       </section>
 
