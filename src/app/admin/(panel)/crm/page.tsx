@@ -1,7 +1,7 @@
 import { MessageCircle, Search } from "lucide-react";
 import Link from "next/link";
 import { BotonEnviar } from "@/components/admin/boton-enviar";
-import { crearContactoAction } from "@/lib/actions/admin-crm";
+import { crearContactoAction, sincronizarCrmAction } from "@/lib/actions/admin-crm";
 import { getCrmStore } from "@/lib/crm/store";
 import {
   ESTADO_BUSQUEDA_LABELS,
@@ -48,7 +48,7 @@ function Persona({ c }: { c: Pick<ContactoResumen, "id" | "nombre" | "telefono" 
   );
 }
 
-export default async function AdminCrmPage({ searchParams }: { searchParams: Promise<{ vista?: string; q?: string; error?: string }> }) {
+export default async function AdminCrmPage({ searchParams }: { searchParams: Promise<{ vista?: string; q?: string; error?: string; listo?: string }> }) {
   const sp = await searchParams;
   const vista: Vista = VISTAS.some((v) => v.id === sp.vista) ? (sp.vista as Vista) : "contactos";
   const q = (sp.q ?? "").slice(0, 80);
@@ -82,6 +82,20 @@ export default async function AdminCrmPage({ searchParams }: { searchParams: Pro
   const vigentes = (c: Captacion) => c.estado !== "descartada" && c.estado !== "vendida";
   const activas = (b: Busqueda) => b.estado === "activa" || b.estado === "en_visitas";
 
+  // Lo que hay que hacer hoy: cada grupo muestra cuántos son y los primeros nombres, con enlace a su ficha.
+  const nombreDe = (id: string) => porId.get(id)?.nombre ?? "(sin nombre)";
+  const pendientes = [
+    { titulo: "Vendedores por aprobar", items: captaciones.filter((c) => vigentes(c) && !c.aprobada).map((c) => ({ id: c.contactoId, nombre: nombreDe(c.contactoId) })) },
+    { titulo: "Pago del vendedor pendiente", items: captaciones.filter((c) => vigentes(c) && c.estatusPago === "pendiente").map((c) => ({ id: c.contactoId, nombre: nombreDe(c.contactoId) })) },
+    { titulo: "Fotos y video por coordinar", items: captaciones.filter((c) => vigentes(c) && c.multimedia !== "listo").map((c) => ({ id: c.contactoId, nombre: nombreDe(c.contactoId) })) },
+    {
+      titulo: "Compradores sin inmuebles propuestos",
+      items: busquedas.filter((b) => activas(b) && !nPropuestas.get(b.id)).map((b) => ({ id: b.contactoId, nombre: nombreDe(b.contactoId) })),
+    },
+    { titulo: "Contactos sin seguimiento", items: todos.filter((c) => !c.archivado && !c.ultimaActividad).map((c) => ({ id: c.id, nombre: c.nombre })) },
+  ];
+  const hayPendientes = pendientes.some((g) => g.items.length > 0);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -89,6 +103,9 @@ export default async function AdminCrmPage({ searchParams }: { searchParams: Pro
           <h1 className="text-2xl font-bold tracking-tight text-ink">CRM</h1>
           <p className="mt-0.5 text-sm text-muted">Vendedores, compradores e inmuebles conectados. Solo el equipo ve esta sección.</p>
         </div>
+        <form action={sincronizarCrmAction}>
+          <BotonEnviar className="rounded-xl border border-line bg-white px-3 py-2 text-xs font-semibold text-ink-soft transition-colors hover:border-ink hover:text-ink">Sincronizar con inmuebles, leads y planes</BotonEnviar>
+        </form>
         <dl className="flex gap-2 text-xs">
           <div className={chip}>
             <dt className="inline">Contactos </dt>
@@ -105,11 +122,45 @@ export default async function AdminCrmPage({ searchParams }: { searchParams: Pro
         </dl>
       </div>
 
+      {sp.listo && (
+        <p role="status" className="rounded-xl border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-800">
+          {sp.listo.slice(0, 600)}
+        </p>
+      )}
+
       {sp.error && (
         <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
           {sp.error}
         </p>
       )}
+
+      <section aria-labelledby="pendientes" className="rounded-2xl border border-line bg-white p-5">
+        <h2 id="pendientes" className="mb-3 text-sm font-bold text-ink">Por hacer</h2>
+        {hayPendientes ? (
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+            {pendientes.map((g) => (
+              <div key={g.titulo}>
+                <p className="text-xs font-semibold text-ink-soft">
+                  {g.titulo} <span className={`ml-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${g.items.length ? "bg-accent-500/15 text-accent-600" : "bg-ink/[0.07] text-muted"}`}>{g.items.length}</span>
+                </p>
+                <ul className="mt-1.5 space-y-1 text-xs">
+                  {g.items.slice(0, 3).map((i, n) => (
+                    <li key={`${i.id}-${n}`}>
+                      <Link href={`/admin/crm/contactos/${i.id}`} className="text-brand-700 underline underline-offset-2">
+                        {i.nombre}
+                      </Link>
+                    </li>
+                  ))}
+                  {g.items.length > 3 && <li className="text-muted">y {g.items.length - 3} más</li>}
+                  {g.items.length === 0 && <li className="text-muted">Al día</li>}
+                </ul>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted">Todo al día. Cuando entren leads, pagos o inmuebles con propietario, aparecen aquí lo que falta por hacer.</p>
+        )}
+      </section>
 
       <nav aria-label="Secciones del CRM" className="flex gap-1 border-b border-line">
         {VISTAS.map((v) => (

@@ -1,5 +1,7 @@
 import { getPlan, type Plan } from "@/lib/config/plans";
 import type { WompiTransaction } from "@/lib/integrations/wompi";
+import { getCrmStore } from "@/lib/crm/store";
+import { vincularServicio } from "@/lib/crm/vinculos";
 import { sendPagosAlert } from "@/lib/notifications/payment";
 import { sendEmail } from "@/lib/notifications/resend";
 import { correoDeAviso, correoPagoRecibido, correoRenovacionPagada, type CorreoSaliente } from "./correos";
@@ -66,6 +68,8 @@ export async function registrarServicioDePago(
       clienteTelefono: tx.customerPhone ?? null,
     });
     if (!creado) return;
+    // Quien paga un plan queda en el CRM con su compra en la línea de tiempo (no debe afectar el cobro si falla).
+    await vincularServicio(getCrmStore(), servicio).catch((err) => console.error("[vigencias] No se pudo pasar la compra al CRM:", describe(err)));
     const correo = correoPagoRecibido(servicio);
     if (correo && !(await deps.enviarCorreo(correo))) {
       console.error(`[vigencias] no se pudo enviar la confirmación del servicio ${servicio.id}`);

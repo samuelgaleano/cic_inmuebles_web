@@ -2,6 +2,8 @@
 
 import { after } from "next/server";
 import { z } from "zod";
+import { getCrmStore } from "@/lib/crm/store";
+import { vincularLead } from "@/lib/crm/vinculos";
 import { getRepository } from "@/lib/data";
 import { sendLeadNotification } from "@/lib/notifications/email";
 import { whatsappLink } from "@/lib/config/site";
@@ -186,6 +188,15 @@ export async function createLeadAction(
 
   // El aviso por correo sale DESPUÉS de responder (hasta 8 s de espera para el visitante) y un
   // fallo del correo ya no convierte un lead guardado en un error.
+  // El lead también entra solo al CRM (persona + vendedor o comprador), por separado del correo: un fallo
+  // o una demora de uno no afecta al otro ni al lead ya guardado.
+  after(async () => {
+    try {
+      await vincularLead(getCrmStore(), lead);
+    } catch (err) {
+      console.error("[leads] No se pudo pasar al CRM:", err instanceof Error ? err.message : err);
+    }
+  });
   after(async () => {
     try {
       await sendLeadNotification(lead);

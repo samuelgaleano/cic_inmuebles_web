@@ -22,6 +22,8 @@ import {
   type TipoComprador,
 } from "@/lib/crm/tipos";
 import { getRepository } from "@/lib/data";
+import { getServiciosStore } from "@/lib/servicios/store";
+import { sincronizarTodo, vincularLead } from "@/lib/crm/vinculos";
 
 /**
  * Acciones del CRM. Todas exigen sesión de administrador (el CRM es solo para el equipo).
@@ -299,7 +301,7 @@ export async function registrarActividadAction(fd: FormData): Promise<void> {
   refrescar(contactoId);
 }
 
-// ---------------------------------------------------------------- Desde un lead
+// ---------------------------------------------------------------- Desde un lead y sincronización
 
 /**
  * Pasa un lead del formulario al CRM: crea (o reutiliza por teléfono) al contacto, abre su captación o
@@ -309,54 +311,39 @@ export async function pasarLeadAlCrmAction(fd: FormData): Promise<void> {
   await exigirAdmin();
   const leadId = texto(fd, "leadId");
   if (!UUID.test(leadId)) return;
-  const leads = await getRepository().leads.list();
-  const lead = leads.find((l) => l.id === leadId);
+  const lead = (await getRepository().leads.list()).find((l) => l.id === leadId);
   if (!lead) volver("/admin/leads", "No encontré ese lead.");
 
-  const base = { nombre: lead.nombre, email: lead.email, ciudad: lead.ciudad };
-  const conTelefono = validarContacto({ ...base, telefono: lead.telefono, origen: lead.fuente });
-  const v = conTelefono.ok ? conTelefono : validarContacto({ ...base, notas: `Teléfono del formulario (no válido): ${lead.telefono}`, origen: lead.fuente });
-  if (!v.ok) volver("/admin/leads", Object.values(v.errores)[0]);
-
-  const marca = `[lead:${lead.id}]`;
   let contactoId: string;
   try {
-    const crm = getCrmStore();
-    const { contacto } = await crm.crearContacto({ ...v.valor, origen: lead.fuente });
-    contactoId = contacto.id;
-    const previas = await crm.listarActividades(contacto.id);
-    if (!previas.some((a) => a.detalle.includes(marca))) {
-      if (lead.tipo === "vendedor") {
-        await crm.crearCaptacion({
-          contactoId: contacto.id,
-          ...(lead.tipoInmueble || lead.ciudad ? { ubicacion: [lead.tipoInmueble, lead.ciudad].filter(Boolean).join(" · ") } : {}),
-          comisionPct: 3,
-          estatusPago: "pendiente",
-          aprobada: false,
-          multimedia: "por_coordinar",
-          estado: "nueva",
-        });
-      } else {
-        const b = await crm.crearBusqueda({
-          contactoId: contacto.id,
-          tipo: "comprador",
-          ...(lead.mensaje ? { especificacion: lead.mensaje.slice(0, 600) } : {}),
-          potencial: false,
-          estado: "activa",
-        });
-        if (lead.propertyId) await crm.proponer(b.id, lead.propertyId).catch(() => undefined);
-      }
-      const intencion = lead.intencion === "visita" ? "quiere agendar una visita" : lead.intencion === "info" ? "pidió más información" : "dejó sus datos";
-      await crm.registrarActividad({
-        contactoId: contacto.id,
-        tipo: "nota",
-        detalle: `Lead del formulario web ${marca}: ${intencion}${lead.propertySlug ? ` (${lead.propertySlug})` : ""}.${lead.mensaje ? ` Mensaje: ${lead.mensaje}` : ""}`.slice(0, 2000),
-        ...(lead.propertyId ? { propertyId: lead.propertyId } : {}),
-      });
-    }
+    const v = await vincularLead(getCrmStore(), lead);
+    if (!v) volver("/admin/leads", "Revisa el nombre del lead: no se pudo crear el contacto.");
+    contactoId = v.contactoId;
   } catch (err) {
     volver("/admin/leads", mensajeDe(err));
   }
   refrescar();
   redirect(FICHA(contactoId));
+}
+
+/** Carga en el CRM todo lo que ya existe: propietarios de los inmuebles, leads y compradores de planes. */
+export async function sincronizarCrmAction(): Promise<void> {
+  await exigirAdmin();
+  let mensaje: string;
+  try {
+    const repo = getRepository();
+    const [propiedades, leads] = await Promise.all([repo.properties.list(), repo.leads.list()]);
+    const servicios = await getServiciosStore().listar().catch(() => []);
+    const r = await sincronizarTodo(getCrmStore(), { propiedades, leads, servicios });
+    const errores = r.inmuebles.errores + r.leads.errores + r.servicios.errores;
+    mensaje =
+      `Listo. Inmuebles: ${r.inmuebles.creada} vendedores nuevos, ${r.inmuebles.actualizada} al día, ${r.inmuebles.sin_propietario} sin propietario cargado. ` +
+      `Leads: ${r.leads.vinculados} nuevos en el CRM (${r.leads.omitidos} descartados u omitidos). ` +
+      `Planes: ${r.servicios.creados} compradores nuevos.` +
+      (errores ? ` Hubo ${errores} con error (revisa los registros del servidor).` : "");
+  } catch (err) {
+    volver("/admin/crm", mensajeDe(err));
+  }
+  refrescar();
+  redirect(`/admin/crm?vista=contactos&listo=${encodeURIComponent(mensaje)}`);
 }

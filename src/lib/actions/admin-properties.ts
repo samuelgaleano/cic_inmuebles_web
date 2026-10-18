@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { exigirAdmin } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { getCrmStore } from "@/lib/crm/store";
+import { vincularInmueble } from "@/lib/crm/vinculos";
 import { getRepository } from "@/lib/data";
 import { ensurePropertyArchive, isDriveConfigured } from "@/lib/integrations/drive";
 import { isSheetsConfigured, syncAllPropertiesToSheet, syncPropertyToSheet } from "@/lib/integrations/sheets";
@@ -12,6 +14,7 @@ import {
   PROPERTY_TYPES,
   PROPERTY_TYPE_LABELS,
   type MediaProvider,
+  type Property,
   type PropertyInput,
   type PropertyMedia,
 } from "@/lib/domain";
@@ -160,6 +163,15 @@ function buildInput(formData: FormData): { input?: PropertyInput; state?: Proper
   return { input };
 }
 
+/** Su propietario queda como vendedor en el CRM (y su estado al día). Nunca impide guardar el inmueble. */
+async function enlazarConCrm(property: Property): Promise<void> {
+  try {
+    await vincularInmueble(getCrmStore(), property);
+  } catch (err) {
+    console.error("[admin] No se pudo enlazar el inmueble con el CRM:", err instanceof Error ? err.message : err);
+  }
+}
+
 export async function createPropertyAction(
   _prev: PropertyFormState,
   formData: FormData,
@@ -182,10 +194,9 @@ export async function createPropertyAction(
     }
 
     // Catálogo en Google Sheets (best-effort).
-    if (isSheetsConfigured()) {
-      const fresh = await getRepository().properties.getById(created.id);
-      await syncPropertyToSheet(fresh ?? created);
-    }
+    const fresh = await getRepository().properties.getById(created.id);
+    if (isSheetsConfigured()) await syncPropertyToSheet(fresh ?? created);
+    await enlazarConCrm(fresh ?? created);
   } catch (err) {
     console.error("[admin] Error al crear inmueble:", err);
     return { error: "No se pudo crear el inmueble." };
@@ -212,6 +223,7 @@ export async function updatePropertyAction(
     if (!updated) return { error: "El inmueble no existe." };
     slug = updated.slug;
     if (isSheetsConfigured()) await syncPropertyToSheet(updated);
+    await enlazarConCrm(updated);
   } catch (err) {
     console.error("[admin] Error al actualizar inmueble:", err);
     return { error: "No se pudo actualizar el inmueble." };
