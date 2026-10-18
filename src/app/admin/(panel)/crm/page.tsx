@@ -65,14 +65,18 @@ export default async function AdminCrmPage({ searchParams }: { searchParams: Pro
     );
   }
 
-  const [contactos, captaciones, busquedas, propiedades] = await Promise.all([
+  const [contactos, todasCaptaciones, todasBusquedas, propiedades] = await Promise.all([
     crm.listarContactos({ q: vista === "contactos" ? q : undefined }),
     crm.listarCaptaciones(),
     crm.listarBusquedas(),
     getRepository().properties.list(),
   ]);
   // Los contactos de la pestaña pueden venir filtrados por la búsqueda: para nombrar a vendedores y compradores se leen todos.
-  const todos = q && vista === "contactos" ? await crm.listarContactos({ incluirArchivados: true }) : contactos;
+  const todos = await crm.listarContactos({ incluirArchivados: true });
+  // Lo que pertenece a un contacto archivado no cuenta en los listados ni en los pendientes.
+  const activos = new Set(todos.filter((c) => !c.archivado).map((c) => c.id));
+  const captaciones = todasCaptaciones.filter((c) => activos.has(c.contactoId));
+  const busquedas = todasBusquedas.filter((b) => activos.has(b.contactoId));
   const porId = new Map(todos.map((c) => [c.id, c]));
   const inmueble = new Map(propiedades.map((p) => [p.id, p]));
   const propuestas = await crm.listarPropuestas(busquedas.map((b) => b.id));
