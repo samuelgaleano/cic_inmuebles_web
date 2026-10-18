@@ -3,10 +3,13 @@
  * correo) para poder probarlo: el cron y el panel solo llaman a estas funciones.
  *
  * El reloj arranca cuando CIC publica el inmueble y activa el servicio, no al
- * pagar. Se avisa 7 y 1 día antes del vencimiento y una vez al vencer.
+ * pagar. Se avisa 7 y 1 día antes del vencimiento y una vez al vencer; después
+ * del vencimiento corre un día de gracia en que la ficha sigue publicada para
+ * que el cliente renueve sin interrupciones.
  */
 
-export type EstadoServicio = "pendiente_publicar" | "activo" | "vencido";
+/** «descartado» saca el registro de la lista sin borrar el pago (pagos reversados, pruebas, duplicados). */
+export type EstadoServicio = "pendiente_publicar" | "activo" | "vencido" | "descartado";
 export type TipoAviso = "7d" | "1d" | "vencido";
 
 export interface Servicio {
@@ -31,6 +34,15 @@ export interface Servicio {
 }
 
 const DIA_MS = 86_400_000;
+
+/** Días que la publicación sigue visible después de vencer, para que el cliente renueve sin que se caiga. */
+export const DIAS_DE_GRACIA = 1;
+
+/** Hasta cuándo se mantiene publicada un servicio vencido: el vencimiento más la gracia. */
+export function finDeGracia(venceAt: string | Date): Date {
+  const vence = typeof venceAt === "string" ? new Date(venceAt) : venceAt;
+  return sumarDias(vence, DIAS_DE_GRACIA);
+}
 
 export function sumarDias(desde: Date, dias: number): Date {
   return new Date(desde.getTime() + dias * DIA_MS);
@@ -67,24 +79,30 @@ export interface AccionVigencia {
   vencer: boolean;
   /** Aviso que corresponde enviar hoy (solo uno, el más urgente), o null. */
   aviso: TipoAviso | null;
+  /** true si ya pasó el vencimiento pero sigue dentro del día de gracia: la ficha continúa publicada. */
+  gracia: boolean;
 }
 
 /**
  * Qué toca hacer hoy con un servicio. Solo los activos con fecha de
- * vencimiento tienen reloj. Un servicio ya vencido solo necesita su aviso de
- * vencimiento si todavía no se envió (p. ej. falló el correo ese día).
+ * vencimiento tienen reloj. Al pasar el vencimiento se avisa una vez y la ficha
+ * sigue publicada durante el día de gracia; recién después se despublica. Un
+ * servicio ya vencido solo necesita su aviso si todavía no se envió (p. ej.
+ * falló el correo ese día).
  */
 export function accionDeHoy(s: Servicio, ahora: Date): AccionVigencia {
-  if (s.estado === "pendiente_publicar" || !s.venceAt) return { vencer: false, aviso: null };
+  if (s.estado === "pendiente_publicar" || s.estado === "descartado" || !s.venceAt) return { vencer: false, aviso: null, gracia: false };
   const restan = new Date(s.venceAt).getTime() - ahora.getTime();
 
   if (restan <= 0) {
-    return { vencer: s.estado === "activo", aviso: s.avisoVencidoAt ? null : "vencido" };
+    const aviso = s.avisoVencidoAt ? null : "vencido";
+    const enGracia = s.estado === "activo" && ahora.getTime() < finDeGracia(s.venceAt).getTime();
+    return { vencer: s.estado === "activo" && !enGracia, aviso, gracia: enGracia };
   }
-  if (s.estado !== "activo") return { vencer: false, aviso: null };
-  if (restan <= DIA_MS && !s.aviso1dAt) return { vencer: false, aviso: "1d" };
-  if (restan <= 7 * DIA_MS && !s.aviso7dAt && !s.aviso1dAt) return { vencer: false, aviso: "7d" };
-  return { vencer: false, aviso: null };
+  if (s.estado !== "activo") return { vencer: false, aviso: null, gracia: false };
+  if (restan <= DIA_MS && !s.aviso1dAt) return { vencer: false, aviso: "1d", gracia: false };
+  if (restan <= 7 * DIA_MS && !s.aviso7dAt && !s.aviso1dAt) return { vencer: false, aviso: "7d", gracia: false };
+  return { vencer: false, aviso: null, gracia: false };
 }
 
 /** Etiqueta corta del estado para el panel y los correos. */
@@ -92,6 +110,7 @@ export const ETIQUETA_ESTADO: Record<EstadoServicio, string> = {
   pendiente_publicar: "Pendiente de publicar",
   activo: "Activo",
   vencido: "Vencido",
+  descartado: "Descartado",
 };
 
 /** Fecha y hora en Bogotá: «17 de octubre de 2026, 11:08 p. m.» (Colombia no tiene horario de verano). */

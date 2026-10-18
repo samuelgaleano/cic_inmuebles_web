@@ -90,6 +90,24 @@ export async function vencerServicioAction(formData: FormData): Promise<void> {
   refrescar();
 }
 
+/** Saca de la lista un servicio pendiente o vencido sin avisar al cliente ni borrar el pago. */
+export async function descartarServicioAction(formData: FormData): Promise<void> {
+  if (!(await exigirSesion())) return;
+  const id = texto(formData.get("id"));
+  if (!id) return;
+  await getServiciosStore().descartar(id);
+  refrescar();
+}
+
+/** Deshace un descarte hecho por error. */
+export async function restaurarServicioAction(formData: FormData): Promise<void> {
+  if (!(await exigirSesion())) return;
+  const id = texto(formData.get("id"));
+  if (!id) return;
+  await getServiciosStore().restaurar(id);
+  refrescar();
+}
+
 /** Enlaza el servicio con una ficha (para que se despublique sola al vencer). */
 export async function asignarFichaAction(formData: FormData): Promise<void> {
   if (!(await exigirSesion())) return;

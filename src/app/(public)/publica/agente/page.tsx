@@ -103,7 +103,7 @@ function preguntas(avisosActivos: boolean) {
     {
       q: "¿El plan se renueva o se cobra solo?",
       a: avisosActivos
-        ? "No. Cada pago es único: no guardamos tu tarjeta ni hacemos cobros automáticos. Te escribimos por correo 7 días y 1 día antes del vencimiento con un enlace para renovar en un paso; si no renuevas, la publicación se desactiva al vencer."
+        ? "No. Cada pago es único: no guardamos tu tarjeta ni hacemos cobros automáticos. Te escribimos por correo 7 días y 1 día antes del vencimiento con un enlace para renovar en un paso. Si el plazo pasa, te damos 1 día de gracia con la publicación activa; si no renuevas, después se desactiva."
         : "No. Cada pago es único: no guardamos tu tarjeta ni hacemos cobros automáticos. Para seguir publicado al terminar la vigencia, vuelves a pagar el plan.",
     },
     {
@@ -211,7 +211,7 @@ export default async function AgentePlanesPage({ searchParams }: { searchParams:
     if (servicioId) {
       try {
         const s = await getServiciosStore().obtener(servicioId);
-        if (s && getPlan(s.planId)?.mode === "pago") {
+        if (s && s.estado !== "descartado" && getPlan(s.planId)?.mode === "pago") {
           renovacion = { planId: s.planId, nombre: s.clienteNombre ?? "", email: s.clienteEmail ?? "", telefono: s.clienteTelefono ?? "", token: sp.renovar };
         }
       } catch {

@@ -107,7 +107,7 @@ export async function registrarServicioDePago(
 async function aplicarRenovacionPagada(tx: WompiTransaction, plan: Plan, servicioId: string, deps: ServiciosDeps): Promise<boolean> {
   const s = await deps.store.obtener(servicioId);
   // Solo se renueva el mismo plan y un servicio que ya corre o venció; si no, es una compra nueva.
-  if (!s || s.planId !== plan.id || s.estado === "pendiente_publicar") return false;
+  if (!s || s.planId !== plan.id || s.estado === "pendiente_publicar" || s.estado === "descartado") return false;
   if (!(await deps.store.registrarRenovacion(tx.id, s.id))) return true; // ya aplicada por otro intento
 
   // Si la extensión no se aplica (error de red o cambio simultáneo), se libera el reclamo: el siguiente
@@ -159,8 +159,8 @@ export interface ResumenVigencias {
 }
 
 /**
- * Revisión diaria: avisa 7 y 1 día antes, y al vencer despublica la ficha
- * enlazada, marca el servicio como vencido y avisa. Cada paso es idempotente:
+ * Revisión diaria: avisa 7 y 1 día antes; al vencer avisa y deja un día de gracia con la ficha publicada;
+ * pasada la gracia despublica la ficha enlazada y marca el servicio como vencido. Cada paso es idempotente:
  * si un correo o una despublicación fallan, se reintentan en la siguiente
  * corrida. Al final deja un resumen a CIC con quién debe recibir seguimiento.
  */
@@ -199,18 +199,21 @@ export async function revisarVencimientos(deps: ServiciosDeps = defaultServicios
     const quien = [s.clienteNombre, s.clienteEmail, s.clienteTelefono].filter(Boolean).join(" · ") || "(sin datos)";
 
     try {
+      // Si otro servicio vigente cubre la misma ficha (una renovación), esta ya no se apaga:
+      // el servicio viejo se cierra sin despublicar ni avisar de un vencimiento que no ocurrió
+      // (tampoco durante el día de gracia).
+      const yaVencio = s.estado === "activo" && s.venceAt !== null && new Date(s.venceAt).getTime() <= ahora.getTime();
+      const cubierta =
+        yaVencio &&
+        s.propertySlug &&
+        servicios.some((o) => o.id !== s.id && o.estado === "activo" && o.propertySlug === s.propertySlug && o.venceAt && new Date(o.venceAt).getTime() > ahora.getTime());
+      if (cubierta) {
+        await deps.store.marcarVencido(s.id, { ahora });
+        await deps.store.marcarAviso(s.id, "vencido");
+        lineas.push(`CERRADO sin despublicar: ${s.propertySlug} sigue cubierta por una renovación vigente (${plan}). Cliente: ${quien}`);
+        continue;
+      }
       if (accion.vencer) {
-        // Si otro servicio vigente cubre la misma ficha (una renovación), esta ya no se apaga:
-        // el servicio viejo se cierra sin despublicar ni avisar de un vencimiento que no ocurrió.
-        const cubierta =
-          s.propertySlug &&
-          servicios.some((o) => o.id !== s.id && o.estado === "activo" && o.propertySlug === s.propertySlug && o.venceAt && new Date(o.venceAt).getTime() > ahora.getTime());
-        if (cubierta) {
-          await deps.store.marcarVencido(s.id, { ahora });
-          await deps.store.marcarAviso(s.id, "vencido");
-          lineas.push(`CERRADO sin despublicar: ${s.propertySlug} sigue cubierta por una renovación vigente (${plan}). Cliente: ${quien}`);
-          continue;
-        }
         // Primero se despublica: si falla, el servicio sigue activo y se reintenta mañana.
         if (s.propertySlug && !(await deps.despublicarFicha(s.propertySlug))) {
           r.fallos += 1;
@@ -223,7 +226,7 @@ export async function revisarVencimientos(deps: ServiciosDeps = defaultServicios
       }
 
       if (accion.aviso) {
-        const correo = correoDeAviso(s, accion.aviso);
+        const correo = correoDeAviso(s, accion.aviso, { gracia: accion.gracia });
         if (!correo) {
           await deps.store.marcarAviso(s.id, accion.aviso); // sin correo no se insiste cada día
           r.sinCorreo += 1;

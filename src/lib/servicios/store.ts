@@ -42,6 +42,10 @@ export interface ServiciosStore {
   marcarVencido(id: string, opts?: { forzar?: boolean; ahora?: Date }): Promise<void>;
   marcarAviso(id: string, tipo: TipoAviso): Promise<void>;
   asignarFicha(id: string, propertySlug: string | null): Promise<void>;
+  /** Saca de la lista un servicio sin reloj corriendo (pendiente o vencido); true si lo descartó. No borra nada. */
+  descartar(id: string): Promise<boolean>;
+  /** Deshace un descarte: vuelve a «pendiente» si nunca corrió su vigencia y a «vencido» si ya había corrido. */
+  restaurar(id: string): Promise<boolean>;
 }
 
 type Row = {
@@ -236,6 +240,29 @@ class SupabaseServiciosStore implements ServiciosStore {
     const { error } = await getSupabaseAdmin().from("servicios_publicacion").update({ property_slug: propertySlug }).eq("id", id);
     if (error) falla("asignarFicha", error);
   }
+
+  async descartar(id: string): Promise<boolean> {
+    const { data, error } = await getSupabaseAdmin()
+      .from("servicios_publicacion")
+      .update({ estado: "descartado" })
+      .eq("id", id)
+      .in("estado", ["pendiente_publicar", "vencido"])
+      .select("id")
+      .maybeSingle();
+    if (error) falla("descartar", error);
+    return Boolean(data);
+  }
+
+  async restaurar(id: string): Promise<boolean> {
+    const db = getSupabaseAdmin().from("servicios_publicacion");
+    const previo = await db.select("vence_at").eq("id", id).eq("estado", "descartado").maybeSingle();
+    if (previo.error) falla("restaurar/leer", previo.error);
+    if (!previo.data) return false;
+    const estado = previo.data.vence_at ? "vencido" : "pendiente_publicar";
+    const { data, error } = await getSupabaseAdmin().from("servicios_publicacion").update({ estado }).eq("id", id).eq("estado", "descartado").select("id").maybeSingle();
+    if (error) falla("restaurar", error);
+    return Boolean(data);
+  }
 }
 
 /** Store en memoria con la misma semántica: pruebas y desarrollo sin Supabase. */
@@ -338,6 +365,20 @@ export class MemoryServiciosStore implements ServiciosStore {
   async asignarFicha(id: string, propertySlug: string | null): Promise<void> {
     const s = this.filas.find((x) => x.id === id);
     if (s) s.propertySlug = propertySlug;
+  }
+
+  async descartar(id: string): Promise<boolean> {
+    const s = this.filas.find((x) => x.id === id);
+    if (!s || (s.estado !== "pendiente_publicar" && s.estado !== "vencido")) return false;
+    s.estado = "descartado";
+    return true;
+  }
+
+  async restaurar(id: string): Promise<boolean> {
+    const s = this.filas.find((x) => x.id === id);
+    if (!s || s.estado !== "descartado") return false;
+    s.estado = s.venceAt ? "vencido" : "pendiente_publicar";
+    return true;
   }
 }
 

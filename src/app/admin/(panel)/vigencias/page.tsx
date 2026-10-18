@@ -1,9 +1,12 @@
 import { MessageCircle } from "lucide-react";
+import Link from "next/link";
 import { BotonEnviar } from "@/components/admin/boton-enviar";
 import {
   activarServicioAction,
   asignarFichaAction,
+  descartarServicioAction,
   renovarServicioAction,
+  restaurarServicioAction,
   revisarVigenciasAhoraAction,
   vencerServicioAction,
 } from "@/lib/actions/admin-vigencias";
@@ -11,7 +14,7 @@ import { getPlan } from "@/lib/config/plans";
 import { getRepository } from "@/lib/data";
 import { enlaceDeRenovacion } from "@/lib/servicios/correos";
 import { getServiciosStore, ServiciosNoDisponibleError } from "@/lib/servicios/store";
-import { diasRestantes, ETIQUETA_ESTADO, fechaLarga, type Servicio } from "@/lib/servicios/vigencia";
+import { diasRestantes, DIAS_DE_GRACIA, ETIQUETA_ESTADO, fechaLarga, finDeGracia, type Servicio } from "@/lib/servicios/vigencia";
 import { enlaceWhatsApp } from "@/lib/utils/telefono";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +23,7 @@ const ESTILO_ESTADO: Record<Servicio["estado"], string> = {
   pendiente_publicar: "bg-accent-500/15 text-accent-600",
   activo: "bg-brand-50 text-brand-700",
   vencido: "bg-ink/[0.07] text-muted",
+  descartado: "bg-ink/[0.04] text-muted",
 };
 
 const boton =
@@ -50,7 +54,11 @@ function Fila({ s, estimadoPrevio }: { s: Servicio; estimadoPrevio?: string }) {
           <>
             <p>Vence {fechaLarga(s.venceAt)}</p>
             <p className={restan !== null && restan <= 7 ? "font-semibold text-accent-600" : "text-muted"}>
-              {restan !== null && restan > 0 ? `Faltan ${restan} día${restan === 1 ? "" : "s"}` : "Ya venció"}
+              {restan !== null && restan > 0
+                ? `Faltan ${restan} día${restan === 1 ? "" : "s"}`
+                : s.estado === "activo" && new Date() < finDeGracia(s.venceAt)
+                  ? `Venció · en gracia hasta ${fechaLarga(finDeGracia(s.venceAt).toISOString())}`
+                  : "Ya venció"}
             </p>
           </>
         ) : (
@@ -87,7 +95,7 @@ function Fila({ s, estimadoPrevio }: { s: Servicio; estimadoPrevio?: string }) {
               </BotonEnviar>
             </form>
           )}
-          {s.estado !== "pendiente_publicar" && (
+          {(s.estado === "activo" || s.estado === "vencido") && (
             <form action={renovarServicioAction}>
               <input type="hidden" name="id" value={s.id} />
               <BotonEnviar className={boton}>Sumar {s.dias} días</BotonEnviar>
@@ -99,14 +107,21 @@ function Fila({ s, estimadoPrevio }: { s: Servicio; estimadoPrevio?: string }) {
               <BotonEnviar className={boton}>Vencer ahora</BotonEnviar>
             </form>
           )}
-          {s.estado === "pendiente_publicar" && (
-            // Para pagos reversados, reembolsados o que no se van a publicar: sale de la lista sin avisar al cliente.
-            <form action={vencerServicioAction}>
+          {(s.estado === "pendiente_publicar" || s.estado === "vencido") && (
+            // Para pagos reversados, reembolsados, pruebas o que no se van a publicar: sale de la lista sin avisar al cliente
+            // y sin borrar el pago (se puede restaurar desde «Ver descartados»).
+            <form action={descartarServicioAction}>
               <input type="hidden" name="id" value={s.id} />
               <BotonEnviar className={boton}>Descartar (sin correo)</BotonEnviar>
             </form>
           )}
-          {s.estado !== "pendiente_publicar" && !s.propertySlug && !esPaquete && (
+          {s.estado === "descartado" && (
+            <form action={restaurarServicioAction}>
+              <input type="hidden" name="id" value={s.id} />
+              <BotonEnviar className={boton}>Restaurar</BotonEnviar>
+            </form>
+          )}
+          {(s.estado === "activo" || s.estado === "vencido") && !s.propertySlug && !esPaquete && (
             <form action={asignarFichaAction} className="flex items-center gap-1.5">
               <input type="hidden" name="id" value={s.id} />
               <input name="slug" list="fichas" placeholder="enlazar ficha" aria-label="Ficha a enlazar" className="h-9 w-36 rounded-lg border border-line bg-surface px-2.5 text-xs focus:border-brand-500 focus:outline-none" />
@@ -119,7 +134,7 @@ function Fila({ s, estimadoPrevio }: { s: Servicio; estimadoPrevio?: string }) {
                 <MessageCircle className="h-4 w-4" />
               </a>
             )}
-            {s.estado !== "pendiente_publicar" && (
+            {(s.estado === "activo" || s.estado === "vencido") && (
               <a href={enlaceDeRenovacion(s)} target="_blank" rel="noreferrer" className="text-xs font-medium text-muted underline underline-offset-2 hover:text-ink">
                 Enlace de renovación
               </a>
@@ -131,7 +146,8 @@ function Fila({ s, estimadoPrevio }: { s: Servicio; estimadoPrevio?: string }) {
   );
 }
 
-export default async function AdminVigenciasPage() {
+export default async function AdminVigenciasPage({ searchParams }: { searchParams: Promise<{ ver?: string }> }) {
+  const verDescartados = (await searchParams).ver === "descartados";
   let servicios: Servicio[] = [];
   let disponible = true;
   try {
@@ -142,12 +158,14 @@ export default async function AdminVigenciasPage() {
   }
 
   const fichas = (await getRepository().properties.list()).map((p) => p.slug);
-  const orden = { pendiente_publicar: 0, activo: 1, vencido: 2 } as const;
+  const orden = { pendiente_publicar: 0, activo: 1, vencido: 2, descartado: 3 } as const;
+  const descartados = servicios.filter((s) => s.estado === "descartado").length;
+  if (!verDescartados) servicios = servicios.filter((s) => s.estado !== "descartado");
   servicios.sort((a, b) => orden[a.estado] - orden[b.estado] || (a.venceAt ?? "").localeCompare(b.venceAt ?? ""));
 
   // Un pago pendiente con el mismo correo y plan que uno anterior suele ser su renovación: se sugiere su ficha.
   const previoDe = (s: Servicio) =>
-    servicios.find((x) => x.id !== s.id && x.estado !== "pendiente_publicar" && x.planId === s.planId && x.clienteEmail && x.clienteEmail === s.clienteEmail)
+    servicios.find((x) => x.id !== s.id && (x.estado === "activo" || x.estado === "vencido") && x.planId === s.planId && x.clienteEmail && x.clienteEmail === s.clienteEmail)
       ?.propertySlug ?? undefined;
 
   const pendientes = servicios.filter((s) => s.estado === "pendiente_publicar").length;
@@ -159,7 +177,15 @@ export default async function AdminVigenciasPage() {
           <h1 className="text-2xl font-bold tracking-tight text-ink">Vigencias</h1>
           <p className="mt-0.5 text-sm text-muted">
             {servicios.length} servicio{servicios.length === 1 ? "" : "s"} · {pendientes} por activar. La vigencia empieza a contar al activarlo,
-            no al pagar. Cada día se avisa 7 y 1 día antes y se desactiva al vencer.
+            no al pagar. Se avisa 7 y 1 día antes; al vencer hay {DIAS_DE_GRACIA} día de gracia con la ficha publicada y después se desactiva.
+            {descartados > 0 && (
+              <>
+                {" "}
+                <Link href={verDescartados ? "/admin/vigencias" : "/admin/vigencias?ver=descartados"} className="font-medium text-brand-700 underline underline-offset-2">
+                  {verDescartados ? "Ocultar descartados" : `Ver descartados (${descartados})`}
+                </Link>
+              </>
+            )}
           </p>
         </div>
         {disponible && (

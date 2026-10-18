@@ -4,7 +4,7 @@ import { formatPrice } from "@/lib/utils/format";
 import { normalizarTelefono } from "@/lib/utils/telefono";
 import { htmlDeCorreo, type BloqueCorreo } from "./correo-html";
 import { tokenDeRenovacion } from "./token";
-import { fechaHora, type Servicio, type TipoAviso } from "./vigencia";
+import { DIAS_DE_GRACIA, fechaHora, finDeGracia, type Servicio, type TipoAviso } from "./vigencia";
 
 export interface CorreoSaliente {
   to: string;
@@ -115,9 +115,7 @@ export function correoPublicacionActiva(s: Servicio): CorreoSaliente | null {
   return armar(s, "Tu inmueble ya está publicado", {
     preheader: `Tu publicación está activa hasta el ${fechaHora(s.venceAt)}.`,
     titulo: "Tu inmueble ya está publicado",
-    parrafos: [
-      `Tu publicación del plan «${plan}» ya está activa. Desde hoy corre su vigencia de ${s.dias} días.`,
-    ],
+    parrafos: [`Tu publicación del plan «${plan}» está activa. Su vigencia es de ${s.dias} días y vence el ${fechaHora(s.venceAt)}.`],
     filas: [
       { etiqueta: "Plan", valor: plan },
       ...(s.inicioAt ? [{ etiqueta: "Empezó", valor: fechaHora(s.inicioAt) }] : []),
@@ -129,8 +127,11 @@ export function correoPublicacionActiva(s: Servicio): CorreoSaliente | null {
   });
 }
 
-/** Aviso de vencimiento próximo o consumado, con el enlace de renovación. */
-export function correoDeAviso(s: Servicio, tipo: TipoAviso): CorreoSaliente | null {
+/**
+ * Aviso de vencimiento próximo o consumado, con el enlace de renovación. `gracia` es true cuando el
+ * servicio ya venció pero la ficha sigue publicada durante el día de gracia.
+ */
+export function correoDeAviso(s: Servicio, tipo: TipoAviso, opts: { gracia?: boolean } = {}): CorreoSaliente | null {
   if (!s.venceAt) return null;
   const plan = nombreDePlan(s);
   const vence = fechaHora(s.venceAt);
@@ -157,7 +158,20 @@ export function correoDeAviso(s: Servicio, tipo: TipoAviso): CorreoSaliente | nu
         ? "Si no lo renuevas, al vencer los inmuebles del paquete dejan de estar cubiertos por el plan."
         : "Si no la renuevas, la desactivamos automáticamente al vencer.",
     },
-    vencido: {
+    vencido: opts.gracia
+      ? {
+          asunto: "Tu publicación venció: tienes 1 día para renovar",
+          titulo: "Tu publicación venció",
+          parrafos: [
+            `Tu ${que} del plan «${plan}» venció el ${vence}.`,
+            `Te damos ${DIAS_DE_GRACIA} día de gracia: la mantenemos publicada hasta el ${fechaHora(finDeGracia(s.venceAt).toISOString())}. Renueva antes de esa hora y no se interrumpe.`,
+          ],
+          boton: "Renovar ahora",
+          nota: paquete
+            ? "Pasado ese plazo, los inmuebles del paquete dejan de estar cubiertos y te escribimos para coordinar. El enlace funciona hasta 30 días después del vencimiento."
+            : "Pasado ese plazo la desactivamos. Aun así, el enlace funciona hasta 30 días después del vencimiento y abre el plan con tus datos ya escritos.",
+        }
+      : {
       asunto: "Tu publicación venció",
       titulo: "Tu publicación venció",
       parrafos: paquete
@@ -176,6 +190,7 @@ export function correoDeAviso(s: Servicio, tipo: TipoAviso): CorreoSaliente | nu
     filas: [
       { etiqueta: "Plan", valor: plan },
       { etiqueta: tipo === "vencido" ? "Venció" : "Vence", valor: vence },
+      ...(opts.gracia ? [{ etiqueta: "Publicada hasta", valor: fechaHora(finDeGracia(s.venceAt).toISOString()) }] : []),
       ...(ficha ? [{ etiqueta: "Inmueble", valor: "Ver la ficha", url: ficha }] : []),
     ],
     boton: { texto: t.boton, url: enlaceDeRenovacion(s) },

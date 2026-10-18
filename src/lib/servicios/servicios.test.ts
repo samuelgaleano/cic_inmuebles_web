@@ -5,7 +5,7 @@ import { correoDeAviso, correoPagoRecibido, correoPublicacionActiva } from "./co
 import { registrarServicioDePago, revisarVencimientos, type ServiciosDeps } from "./procesar";
 import { MemoryServiciosStore, ServiciosNoDisponibleError, type ServiciosStore } from "./store";
 import { servicioDeToken, tokenDeRenovacion } from "./token";
-import { accionDeHoy, diasRestantes, ventanaDeActivacion, ventanaDeRenovacion, type Servicio } from "./vigencia";
+import { accionDeHoy, diasRestantes, DIAS_DE_GRACIA, ventanaDeActivacion, ventanaDeRenovacion, type Servicio } from "./vigencia";
 
 const DIA = 86_400_000;
 const AHORA = new Date("2026-10-16T12:00:00.000Z");
@@ -50,7 +50,8 @@ describe("vigencia", () => {
   });
 
   it("un servicio pendiente de publicar no tiene reloj", () => {
-    expect(accionDeHoy(servicio({ estado: "pendiente_publicar", inicioAt: null, venceAt: null }), AHORA)).toEqual({ vencer: false, aviso: null });
+    expect(accionDeHoy(servicio({ estado: "pendiente_publicar", inicioAt: null, venceAt: null }), AHORA)).toEqual({ vencer: false, aviso: null, gracia: false });
+    expect(accionDeHoy(servicio({ estado: "descartado" }), AHORA)).toEqual({ vencer: false, aviso: null, gracia: false });
   });
 
   it("avisa a los 7 días y a 1 día, y solo una vez cada uno", () => {
@@ -63,14 +64,20 @@ describe("vigencia", () => {
 
   it("si la corrida se saltó el aviso de 7 días, a 1 día solo manda el de 1 día", () => {
     const s = servicio({ venceAt: new Date(AHORA.getTime() + 0.9 * DIA).toISOString() });
-    expect(accionDeHoy(s, AHORA)).toEqual({ vencer: false, aviso: "1d" });
+    expect(accionDeHoy(s, AHORA)).toEqual({ vencer: false, aviso: "1d", gracia: false });
   });
 
-  it("al vencer: vence el servicio activo y manda el aviso de vencimiento una sola vez", () => {
+  it("al vencer: avisa y deja 1 día de gracia con la ficha publicada; pasada la gracia, vence", () => {
     const s = servicio({ venceAt: new Date(AHORA.getTime() - 1000).toISOString() });
-    expect(accionDeHoy(s, AHORA)).toEqual({ vencer: true, aviso: "vencido" });
-    expect(accionDeHoy({ ...s, estado: "vencido" }, AHORA)).toEqual({ vencer: false, aviso: "vencido" });
-    expect(accionDeHoy({ ...s, estado: "vencido", avisoVencidoAt: "x" }, AHORA)).toEqual({ vencer: false, aviso: null });
+    expect(accionDeHoy(s, AHORA)).toEqual({ vencer: false, aviso: "vencido", gracia: true });
+    // el aviso ya se mandó dentro de la gracia: ese día no hay nada más que hacer
+    expect(accionDeHoy({ ...s, avisoVencidoAt: "x" }, AHORA)).toEqual({ vencer: false, aviso: null, gracia: true });
+    // pasada la gracia se despublica y, si faltó el aviso, se manda
+    const tarde = servicio({ venceAt: new Date(AHORA.getTime() - DIAS_DE_GRACIA * DIA - 1000).toISOString() });
+    expect(accionDeHoy(tarde, AHORA)).toEqual({ vencer: true, aviso: "vencido", gracia: false });
+    expect(accionDeHoy({ ...tarde, avisoVencidoAt: "x" }, AHORA)).toEqual({ vencer: true, aviso: null, gracia: false });
+    expect(accionDeHoy({ ...tarde, estado: "vencido" }, AHORA)).toEqual({ vencer: false, aviso: "vencido", gracia: false });
+    expect(accionDeHoy({ ...tarde, estado: "vencido", avisoVencidoAt: "x" }, AHORA)).toEqual({ vencer: false, aviso: null, gracia: false });
   });
 });
 
@@ -201,8 +208,27 @@ describe("revisarVencimientos", () => {
     expect((await revisarVencimientos(d)).avisosEnviados).toBe(1);
   });
 
-  it("al vencer despublica la ficha, marca vencido y avisa; la alerta a CIC lista al cliente", async () => {
+  it("al vencer avisa con el día de gracia y la ficha sigue publicada; al día siguiente la despublica", async () => {
     const { d, s } = await conServicio({ venceAt: new Date(AHORA.getTime() - 1000).toISOString() });
+    const r = await revisarVencimientos(d);
+    expect(d.despublicarFicha).not.toHaveBeenCalled();
+    expect(s.estado).toBe("activo");
+    expect(r).toMatchObject({ vencidos: 0, avisosEnviados: 1 });
+    const enviado = (d.enviarCorreo as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(enviado.subject).toMatch(/1 día para renovar/);
+    expect(enviado.text).toMatch(/1 día de gracia/);
+    expect(enviado.text).toMatch(/la mantenemos publicada hasta/);
+    expect(enviado.text).not.toMatch(/venció el [^.]*y la desactivamos/);
+    // al día siguiente ya pasó la gracia: se despublica y no se repite el aviso
+    d.ahora = () => new Date(AHORA.getTime() + DIA);
+    const r2 = await revisarVencimientos(d);
+    expect(d.despublicarFicha).toHaveBeenCalledWith("bella-suiza");
+    expect(s.estado).toBe("vencido");
+    expect(r2).toMatchObject({ vencidos: 1, avisosEnviados: 0 });
+  });
+
+  it("al vencer despublica la ficha, marca vencido y avisa; la alerta a CIC lista al cliente", async () => {
+    const { d, s } = await conServicio({ venceAt: new Date(AHORA.getTime() - 2 * DIA).toISOString() });
     const r = await revisarVencimientos(d);
     expect(d.despublicarFicha).toHaveBeenCalledWith("bella-suiza");
     expect(s.estado).toBe("vencido");
@@ -212,7 +238,7 @@ describe("revisarVencimientos", () => {
   });
 
   it("si no se puede despublicar, el servicio sigue activo y se reintenta", async () => {
-    const { d, s } = await conServicio({ venceAt: new Date(AHORA.getTime() - 1000).toISOString() });
+    const { d, s } = await conServicio({ venceAt: new Date(AHORA.getTime() - 2 * DIA).toISOString() });
     (d.despublicarFicha as ReturnType<typeof vi.fn>).mockResolvedValueOnce(false);
     const r = await revisarVencimientos(d);
     expect(r).toMatchObject({ vencidos: 0, fallos: 1 });
@@ -229,7 +255,7 @@ describe("revisarVencimientos", () => {
   });
 
   it("un paquete (sin ficha enlazada) vence sin despublicar nada", async () => {
-    const { d, s } = await conServicio({ planId: "paquete-5", propertySlug: null, venceAt: new Date(AHORA.getTime() - 1000).toISOString() });
+    const { d, s } = await conServicio({ planId: "paquete-5", propertySlug: null, venceAt: new Date(AHORA.getTime() - 2 * DIA).toISOString() });
     await revisarVencimientos(d);
     expect(d.despublicarFicha).not.toHaveBeenCalled();
     expect(s.estado).toBe("vencido");
@@ -427,6 +453,35 @@ describe("panel y cron: condiciones contra dobles envíos", () => {
     await registrarServicioDePago(tx, getPlan("alianza-90")!, d, { renuevaServicioId: s.id });
     expect(diasRestantes(s.venceAt!, AHORA)).toBe(95);
     expect(d.mem.renovaciones.has(tx.id)).toBe(true);
+  });
+
+  it("descartar saca el servicio de la revisión sin borrarlo y se puede restaurar", async () => {
+    const d = deps();
+    const pendiente = servicio({ id: "p", estado: "pendiente_publicar", inicioAt: null, venceAt: null });
+    const activo = servicio({ id: "a", txId: "tx-a" });
+    const vencido = servicio({ id: "v", txId: "tx-v", estado: "vencido" });
+    d.mem.filas.push(pendiente, activo, vencido);
+    expect(await d.mem.descartar("p")).toBe(true);
+    expect(await d.mem.descartar("v")).toBe(true);
+    expect(await d.mem.descartar("a")).toBe(false); // con el reloj corriendo no se descarta: primero se vence
+    expect(await d.mem.descartar("p")).toBe(false); // ya descartado
+    expect(pendiente.estado).toBe("descartado");
+    expect(d.mem.filas).toHaveLength(3); // nada se borra
+    expect(await d.mem.restaurar("p")).toBe(true);
+    expect(pendiente.estado).toBe("pendiente_publicar");
+    expect(await d.mem.restaurar("v")).toBe(true);
+    expect(vencido.estado).toBe("vencido");
+    expect(await d.mem.restaurar("a")).toBe(false);
+  });
+
+  it("un servicio descartado no se renueva por un pago: el pago entra como compra nueva", async () => {
+    const d = deps();
+    const s = servicio({ estado: "descartado" });
+    d.mem.filas.push(s);
+    const tx = { id: "tx-ren", status: "APPROVED", reference: "CIC-alianza-90-1-1", amountInCents: 1_000_000, currency: "COP", customerEmail: "a@b.co" };
+    await registrarServicioDePago(tx, getPlan("alianza-90")!, d, { renuevaServicioId: s.id });
+    expect(s.estado).toBe("descartado");
+    expect(d.mem.filas.some((x) => x.txId === "tx-ren" && x.estado === "pendiente_publicar")).toBe(true);
   });
 
   it("un paquete vencido no recibe un correo que diga que se desactivó", () => {
