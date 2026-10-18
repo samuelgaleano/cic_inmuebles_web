@@ -49,6 +49,10 @@ export interface CrmStore {
   // Línea de tiempo
   listarActividades(contactoId: string): Promise<Actividad[]>;
   registrarActividad(input: ActividadInput): Promise<Actividad>;
+
+  // Leads del formulario enlazados con su persona (llave foránea leads.contacto_id)
+  enlazarLead(leadId: string, contactoId: string): Promise<void>;
+  leadsDeContacto(contactoId: string): Promise<string[]>;
 }
 
 // ---------------------------------------------------------------- Supabase
@@ -373,6 +377,18 @@ class SupabaseCrmStore implements CrmStore {
     if (error) falla("registrarActividad", error);
     return aActividad(data as ActividadRow);
   }
+
+  async enlazarLead(leadId: string, contactoId: string): Promise<void> {
+    const { error } = await this.db().from("leads").update({ contacto_id: contactoId }).eq("id", leadId);
+    // Sin la columna (migración 0008 sin aplicar) el lead entra al CRM igual, solo sin la llave.
+    if (error && !/contacto_id|schema cache|does not exist/i.test(error.message)) falla("enlazarLead", error);
+  }
+
+  async leadsDeContacto(contactoId: string): Promise<string[]> {
+    const { data, error } = await this.db().from("leads").select("id").eq("contacto_id", contactoId).limit(500);
+    if (error) return [];
+    return ((data ?? []) as { id: string }[]).map((l) => l.id);
+  }
 }
 
 // ---------------------------------------------------------------- Memoria
@@ -384,6 +400,7 @@ export class MemoryCrmStore implements CrmStore {
   busquedas: Busqueda[] = [];
   propuestas: Propuesta[] = [];
   actividades: Actividad[] = [];
+  leadsEnlazados = new Map<string, string>();
   private seq = 1;
   now = () => Date.now();
   /** Inmuebles que existen (para simular la llave foránea). Si es null no se valida. */
@@ -545,6 +562,15 @@ export class MemoryCrmStore implements CrmStore {
     const a: Actividad = { ...input, id: this.id(), ocurrioEn: input.ocurrioEn ?? this.ahora() };
     this.actividades.push(a);
     return a;
+  }
+
+  async enlazarLead(leadId: string, contactoId: string): Promise<void> {
+    this.exigirContacto(contactoId);
+    this.leadsEnlazados.set(leadId, contactoId);
+  }
+
+  async leadsDeContacto(contactoId: string): Promise<string[]> {
+    return [...this.leadsEnlazados].filter(([, c]) => c === contactoId).map(([l]) => l);
   }
 }
 

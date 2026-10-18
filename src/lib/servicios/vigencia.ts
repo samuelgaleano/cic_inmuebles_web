@@ -31,6 +31,38 @@ export interface Servicio {
   aviso1dAt: string | null;
   avisoVencidoAt: string | null;
   createdAt: string;
+  /** Persona del CRM a la que pertenece (llave foránea). Opcional: los planes anteriores a 0008 pueden no tenerla. */
+  contactoId?: string | null;
+  /** Inmueble enlazado (llave foránea; `propertySlug` es solo el texto de su dirección). */
+  propertyId?: string | null;
+  /** Cuándo aprobó Wompi el pago (distinto de `createdAt`, que es cuándo se registró aquí). */
+  pagadoAt?: string | null;
+}
+
+/** Cómo nació un tramo de vigencia en el libro de periodos de un plan. */
+export const TIPOS_PERIODO = ["activacion", "renovacion", "suma_manual", "recorte"] as const;
+export type TipoPeriodo = (typeof TIPOS_PERIODO)[number];
+
+export const ETIQUETA_PERIODO: Record<TipoPeriodo, string> = {
+  activacion: "Activación",
+  renovacion: "Renovación pagada",
+  suma_manual: "Días sumados a mano",
+  recorte: "Tiempo recortado",
+};
+
+export interface Periodo {
+  id: number;
+  servicioId: string;
+  tipo: TipoPeriodo;
+  desde: string;
+  hasta: string;
+  txId: string | null;
+  createdAt: string;
+}
+
+/** Días enteros de un tramo (redondeo al más cercano). */
+export function diasDePeriodo(p: Pick<Periodo, "desde" | "hasta">): number {
+  return Math.round((new Date(p.hasta).getTime() - new Date(p.desde).getTime()) / DIA_MS);
 }
 
 const DIA_MS = 86_400_000;

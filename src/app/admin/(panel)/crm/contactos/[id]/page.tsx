@@ -33,8 +33,9 @@ import {
 } from "@/lib/crm/tipos";
 import { getRepository } from "@/lib/data";
 import { getPlan } from "@/lib/config/plans";
+import { getPagosStore } from "@/lib/pagos/store";
 import { getServiciosStore } from "@/lib/servicios/store";
-import { ETIQUETA_ESTADO, fechaLarga, type Servicio } from "@/lib/servicios/vigencia";
+import { DIAS_DE_GRACIA, diasDePeriodo, ETIQUETA_ESTADO, ETIQUETA_PERIODO, fechaHora as fechaHoraBogota, finDeGracia, type Periodo, type Servicio } from "@/lib/servicios/vigencia";
 import { formatPrice } from "@/lib/utils/format";
 import { enlaceWhatsApp, normalizarTelefono } from "@/lib/utils/telefono";
 
@@ -74,14 +75,28 @@ export default async function FichaContactoPage({ params, searchParams }: { para
 
   // Leads del formulario de esta persona (mismo teléfono) y sus servicios de publicación (mismo correo o teléfono).
   const mismoTelefono = (crudo?: string) => Boolean(contacto.telefonoE164 && crudo && normalizarTelefono(crudo)?.e164 === contacto.telefonoE164);
-  const susLeads = leads.filter((l) => mismoTelefono(l.telefono) || Boolean(contacto.email && l.email?.toLowerCase() === contacto.email));
+  // Los leads y planes enlazados por llave foránea y, para los anteriores al enlace, los que coinciden por teléfono o correo.
+  const idsLeads = new Set(await crm.leadsDeContacto(id));
+  const susLeads = leads.filter((l) => idsLeads.has(l.id) || mismoTelefono(l.telefono) || Boolean(contacto.email && l.email?.toLowerCase() === contacto.email));
+  const serviciosStore = getServiciosStore();
   let susServicios: Servicio[] = [];
   try {
-    susServicios = (await getServiciosStore().listar()).filter(
-      (s) => s.estado !== "descartado" && (Boolean(contacto.email && s.clienteEmail?.toLowerCase() === contacto.email) || mismoTelefono(s.clienteTelefono ?? undefined)),
+    susServicios = (await serviciosStore.listar()).filter(
+      (s) => s.contactoId === contacto.id || (!s.contactoId && (Boolean(contacto.email && s.clienteEmail?.toLowerCase() === contacto.email) || mismoTelefono(s.clienteTelefono ?? undefined))),
     );
   } catch {
     susServicios = []; // sin la tabla de servicios la ficha funciona igual
+  }
+  // Por cada plan: el estado real del pago y los tramos de vigencia que concedió.
+  const pagosStore = getPagosStore();
+  const pagosYPeriodos = new Map<string, { aprobado?: { montoCOP: number; cuando: string }; periodos: Periodo[] }>();
+  for (const sv of susServicios) {
+    const eventos = await pagosStore.trace(sv.txId).catch(() => []);
+    const ok = eventos.find((e) => e.status === "APPROVED");
+    pagosYPeriodos.set(sv.id, {
+      ...(ok ? { aprobado: { montoCOP: Math.round((ok.amountInCents ?? 0) / 100), cuando: ok.receivedAt } } : {}),
+      periodos: await serviciosStore.periodos(sv.id).catch(() => []),
+    });
   }
 
   const wa = contacto.telefono ? enlaceWhatsApp(contacto.telefono, `Hola ${contacto.nombre.split(" ")[0]}, te escribimos de CIC Inmuebles.`) : undefined;
@@ -478,14 +493,62 @@ export default async function FichaContactoPage({ params, searchParams }: { para
 
           {susServicios.length > 0 && (
             <section className={tarjeta} aria-labelledby="servicios">
-              <h2 id="servicios" className="mb-3 text-sm font-bold text-ink">Planes de publicación</h2>
-              <ul className="space-y-2 text-sm">
-                {susServicios.map((s) => (
-                  <li key={s.id} className="text-ink-soft">
-                    <span className="font-medium text-ink">{getPlan(s.planId)?.nombre ?? s.planId}</span> · {ETIQUETA_ESTADO[s.estado]}
-                    {s.venceAt && <span className="text-xs text-muted"> · vence {fechaLarga(s.venceAt)}</span>}
-                  </li>
-                ))}
+              <h2 id="servicios" className="mb-3 text-sm font-bold text-ink">Pagos y vigencia</h2>
+              <ul className="space-y-5">
+                {susServicios.map((sv) => {
+                  const d = pagosYPeriodos.get(sv.id);
+                  const plan = getPlan(sv.planId);
+                  const pagadoEn = sv.pagadoAt ?? d?.aprobado?.cuando ?? sv.createdAt;
+                  const enGracia = sv.estado === "activo" && sv.venceAt && new Date() > new Date(sv.venceAt) && new Date() < finDeGracia(sv.venceAt);
+                  return (
+                    <li key={sv.id} className="rounded-xl border border-line p-4 text-sm">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="font-semibold text-ink">{plan?.nombre ?? sv.planId}</p>
+                        <span className="rounded-full bg-ink/[0.07] px-2.5 py-0.5 text-xs font-semibold text-ink-soft">{ETIQUETA_ESTADO[sv.estado]}</span>
+                      </div>
+
+                      <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
+                        <dt className="text-muted">Pago</dt>
+                        <dd className={d?.aprobado ? "font-semibold text-brand-700" : "text-ink-soft"}>
+                          {d?.aprobado ? "Aprobado" : "Sin confirmación en el registro de pagos"}
+                          {d?.aprobado && d.aprobado.montoCOP > 0 ? ` · ${formatPrice(d.aprobado.montoCOP)}` : plan?.precioCOP ? ` · ${formatPrice(plan.precioCOP)}` : ""}
+                        </dd>
+                        <dt className="text-muted">Pagado el</dt>
+                        <dd className="text-ink-soft">
+                          {fechaHoraBogota(pagadoEn)}
+                          {!sv.pagadoAt && <span className="text-muted"> (fecha de registro)</span>}
+                        </dd>
+                        <dt className="text-muted">Referencia</dt>
+                        <dd className="break-all font-mono text-ink-soft">{sv.reference ?? "—"}</dd>
+                        <dt className="text-muted">Transacción</dt>
+                        <dd className="break-all font-mono text-ink-soft">{sv.txId}</dd>
+                      </dl>
+
+                      <h3 className="mb-1 mt-4 text-xs font-bold uppercase tracking-wider text-muted">Rangos de vigencia</h3>
+                      {d && d.periodos.length > 0 ? (
+                        <ol className="space-y-1.5 border-l border-line pl-3 text-xs">
+                          {d.periodos.map((p) => (
+                            <li key={p.id} className={p.tipo === "recorte" ? "text-rose-700" : "text-ink-soft"}>
+                              <span className="font-semibold">{ETIQUETA_PERIODO[p.tipo]}</span>: {fechaHoraBogota(p.desde)} → {fechaHoraBogota(p.hasta)} · {diasDePeriodo(p)} día{diasDePeriodo(p) === 1 ? "" : "s"}
+                            </li>
+                          ))}
+                        </ol>
+                      ) : sv.inicioAt && sv.venceAt ? (
+                        <p className="text-xs text-ink-soft">
+                          {fechaHoraBogota(sv.inicioAt)} → {fechaHoraBogota(sv.venceAt)} <span className="text-muted">(anterior al libro de periodos)</span>
+                        </p>
+                      ) : (
+                        <p className="text-xs text-muted">Todavía no empieza: la vigencia corre desde que CIC publique el inmueble.</p>
+                      )}
+                      {sv.venceAt && (
+                        <p className="mt-2 text-xs text-ink-soft">
+                          {sv.estado === "activo" ? "Vence" : "Terminó"} el <strong className="text-ink">{fechaHoraBogota(sv.venceAt)}</strong>
+                          {enGracia && sv.venceAt ? ` · en gracia hasta ${fechaHoraBogota(finDeGracia(sv.venceAt).toISOString())} (${DIAS_DE_GRACIA} día)` : ""}
+                        </p>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
               <Link href="/admin/vigencias" className="mt-3 inline-block text-xs font-semibold text-brand-700 underline underline-offset-2">
                 Ir a Vigencias

@@ -22,6 +22,7 @@ import {
   type TipoComprador,
 } from "@/lib/crm/tipos";
 import { getRepository } from "@/lib/data";
+import { fetchTransaction } from "@/lib/integrations/wompi";
 import { getServiciosStore } from "@/lib/servicios/store";
 import { sincronizarTodo, vincularLead } from "@/lib/crm/vinculos";
 
@@ -333,13 +334,28 @@ export async function sincronizarCrmAction(): Promise<void> {
   try {
     const repo = getRepository();
     const [propiedades, leads] = await Promise.all([repo.properties.list(), repo.leads.list()]);
-    const servicios = await getServiciosStore().listar().catch(() => []);
-    const r = await sincronizarTodo(getCrmStore(), { propiedades, leads, servicios });
+    const serviciosStore = getServiciosStore();
+    const servicios = await serviciosStore.listar().catch(() => []);
+    // Los planes sin fecha de pago de Wompi la completan ahora (los anteriores a 0008 solo tenían la de registro).
+    let fechasCompletadas = 0;
+    for (const s of servicios.filter((x) => !x.pagadoAt && x.txId).slice(0, 50)) {
+      try {
+        const tx = await fetchTransaction(s.txId);
+        const cuando = tx?.finalizedAt ?? tx?.createdAt;
+        if (cuando) {
+          await serviciosStore.fijarPagadoAt(s.id, cuando);
+          fechasCompletadas += 1;
+        }
+      } catch {
+        /* sin Wompi o sin la columna: se deja para la próxima */
+      }
+    }
+    const r = await sincronizarTodo(getCrmStore(), { propiedades, leads, servicios }, { asignarContactoAServicio: (id, contactoId) => serviciosStore.asignarContacto(id, contactoId) });
     const errores = r.inmuebles.errores + r.leads.errores + r.servicios.errores;
     mensaje =
       `Listo. Inmuebles: ${r.inmuebles.creada} vendedores nuevos, ${r.inmuebles.actualizada} al día, ${r.inmuebles.sin_propietario} sin propietario cargado. ` +
       `Leads: ${r.leads.vinculados} nuevos en el CRM (${r.leads.omitidos} descartados u omitidos). ` +
-      `Planes: ${r.servicios.creados} compradores nuevos.` +
+      `Planes: ${r.servicios.creados} compradores nuevos, ${fechasCompletadas} fechas de pago completadas.` +
       (errores ? ` Hubo ${errores} con error (revisa los registros del servidor).` : "");
   } catch (err) {
     volver("/admin/crm", mensajeDe(err));

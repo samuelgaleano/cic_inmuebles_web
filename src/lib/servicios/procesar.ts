@@ -66,10 +66,13 @@ export async function registrarServicioDePago(
       clienteEmail: tx.customerEmail,
       clienteNombre: tx.customerName ?? null,
       clienteTelefono: tx.customerPhone ?? null,
+      pagadoAt: tx.finalizedAt ?? tx.createdAt ?? null,
     });
     if (!creado) return;
     // Quien paga un plan queda en el CRM con su compra en la línea de tiempo (no debe afectar el cobro si falla).
-    await vincularServicio(getCrmStore(), servicio).catch((err) => console.error("[vigencias] No se pudo pasar la compra al CRM:", describe(err)));
+    await vincularServicio(getCrmStore(), servicio, (id, contactoId) => deps.store.asignarContacto(id, contactoId)).catch((err) =>
+      console.error("[vigencias] No se pudo pasar la compra al CRM:", describe(err)),
+    );
     const correo = correoPagoRecibido(servicio);
     if (correo && !(await deps.enviarCorreo(correo))) {
       console.error(`[vigencias] no se pudo enviar la confirmación del servicio ${servicio.id}`);
@@ -118,7 +121,7 @@ async function aplicarRenovacionPagada(tx: WompiTransaction, plan: Plan, servici
   // intento (recarga del retorno o conciliación) la vuelve a aplicar en vez de darla por hecha.
   let renovado: Servicio | null = null;
   try {
-    renovado = await deps.store.renovar(s.id, ventanaDeRenovacion(s, deps.ahora()), s.venceAt);
+    renovado = await deps.store.renovar(s.id, ventanaDeRenovacion(s, deps.ahora()), s.venceAt, { tipo: "renovacion", txId: tx.id });
   } catch (err) {
     console.error(`[vigencias] no se pudo extender ${s.id}:`, describe(err));
   }

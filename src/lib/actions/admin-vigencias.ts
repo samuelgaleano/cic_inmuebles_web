@@ -5,6 +5,7 @@ import { getAdminSession } from "@/lib/auth";
 import { correoPublicacionActiva } from "@/lib/servicios/correos";
 import { existeFicha, fijarPublicacionDeFicha } from "@/lib/servicios/ficha";
 import { defaultServiciosDeps, revisarVencimientos } from "@/lib/servicios/procesar";
+import { getRepository } from "@/lib/data";
 import { getServiciosStore } from "@/lib/servicios/store";
 import { sendEmail } from "@/lib/notifications/resend";
 import { ventanaDeActivacion, ventanaDeRenovacion } from "@/lib/servicios/vigencia";
@@ -22,6 +23,12 @@ const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 function refrescar() {
   revalidatePath("/admin/vigencias");
+}
+
+/** Id del inmueble de esa ficha (la llave foránea); null si no hay ficha. */
+async function idDeFicha(slug: string): Promise<string | null> {
+  if (!slug) return null;
+  return (await getRepository().properties.getBySlug(slug))?.id ?? null;
 }
 
 /** Empieza a contar la vigencia hoy; si hay ficha, la publica. Avisa al cliente por correo. */
@@ -44,10 +51,10 @@ export async function activarServicioAction(formData: FormData): Promise<void> {
     : [];
   const hasta = previos.map((o) => o.venceAt as string).sort().pop() ?? null;
   const { inicioAt, venceAt } = ventanaDeActivacion(ahora, s.dias, hasta);
-  const activo = await store.activar(id, { propertySlug: slug || null, inicioAt, venceAt });
+  const activo = await store.activar(id, { propertySlug: slug || null, propertyId: await idDeFicha(slug), inicioAt, venceAt });
   if (activo) {
     for (const o of previos) {
-      await store.marcarVencido(o.id, { forzar: true, ahora });
+      await store.marcarVencido(o.id, { forzar: true, ahora, sinPeriodo: true });
       await store.marcarAviso(o.id, "vencido");
     }
   }
@@ -69,7 +76,7 @@ export async function renovarServicioAction(formData: FormData): Promise<void> {
 
   if (s.propertySlug && !(await fijarPublicacionDeFicha(s.propertySlug, true))) return;
   const v = ventanaDeRenovacion(s, new Date());
-  const r = await store.renovar(id, v, s.venceAt); // null si otro envío ya la renovó
+  const r = await store.renovar(id, v, s.venceAt, { tipo: "suma_manual" }); // null si otro envío ya la renovó
   if (r) {
     const correo = correoPublicacionActiva(r);
     if (correo) await sendEmail(correo);
@@ -115,7 +122,7 @@ export async function asignarFichaAction(formData: FormData): Promise<void> {
   const slug = texto(formData.get("slug")).toLowerCase();
   if (!id || (slug && !SLUG.test(slug))) return;
   if (slug && !(await existeFicha(slug))) return; // un slug mal escrito dejaría el servicio sin poder despublicarse
-  await getServiciosStore().asignarFicha(id, slug || null);
+  await getServiciosStore().asignarFicha(id, slug || null, await idDeFicha(slug));
   refrescar();
 }
 

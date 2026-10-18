@@ -41,6 +41,8 @@ export async function vincularLead(crm: CrmStore, lead: Lead): Promise<VinculoLe
   const r = await contactoDe(crm, { nombre: lead.nombre, telefono: lead.telefono, email: lead.email, ciudad: lead.ciudad, origen: lead.fuente });
   if (!r) return null;
   const { contacto } = r;
+  // La llave foránea se asegura siempre, también para leads que ya se habían pasado antes de existir.
+  await crm.enlazarLead(lead.id, contacto.id).catch((err) => console.error("[crm] no se pudo enlazar el lead:", err instanceof Error ? err.message : err));
 
   const marca = `[lead:${lead.id}]`;
   const previas = await crm.listarActividades(contacto.id);
@@ -135,12 +137,21 @@ export async function vincularInmueble(crm: CrmStore, p: Property): Promise<Resu
 export type ResultadoServicio = "creado" | "existia" | "sin_datos";
 
 /** Un plan de publicación pagado deja a su comprador en el CRM, con la compra en su línea de tiempo. */
-export async function vincularServicio(crm: CrmStore, s: Servicio): Promise<ResultadoServicio> {
-  if (s.estado === "descartado") return "sin_datos";
+export async function vincularServicio(
+  crm: CrmStore,
+  s: Servicio,
+  /** Guarda la persona en el plan (llave foránea servicios_publicacion.contacto_id). */
+  asignarContacto?: (servicioId: string, contactoId: string) => Promise<void>,
+): Promise<ResultadoServicio> {
   const nombre = s.clienteNombre?.trim() || s.clienteEmail?.split("@")[0]?.trim();
   if (!nombre) return "sin_datos";
   const r = await contactoDe(crm, { nombre, telefono: s.clienteTelefono ?? undefined, email: s.clienteEmail ?? undefined, origen: "web" });
   if (!r) return "sin_datos";
+  if (asignarContacto && s.contactoId !== r.contacto.id) {
+    await asignarContacto(s.id, r.contacto.id).catch((err) => console.error("[crm] no se pudo enlazar el plan:", err instanceof Error ? err.message : err));
+  }
+  // Un plan descartado (prueba, reembolso) queda enlazado a su persona como historia, sin sumar a su seguimiento.
+  if (s.estado === "descartado") return "sin_datos";
 
   const marca = `[servicio:${s.id}]`;
   if ((await crm.listarActividades(r.contacto.id)).some((a) => a.detalle.includes(marca))) return "existia";
@@ -164,6 +175,7 @@ export interface ResumenSincronizacion {
 export async function sincronizarTodo(
   crm: CrmStore,
   datos: { propiedades: Property[]; leads: Lead[]; servicios: Servicio[] },
+  opciones: { asignarContactoAServicio?: (servicioId: string, contactoId: string) => Promise<void> } = {},
 ): Promise<ResumenSincronizacion> {
   const r: ResumenSincronizacion = {
     inmuebles: { creada: 0, existia: 0, actualizada: 0, sin_propietario: 0, sin_datos: 0, errores: 0 },
@@ -195,7 +207,7 @@ export async function sincronizarTodo(
   }
   for (const s of datos.servicios) {
     try {
-      const v = await vincularServicio(crm, s);
+      const v = await vincularServicio(crm, s, opciones.asignarContactoAServicio);
       if (v === "creado") r.servicios.creados += 1;
       else if (v === "existia") r.servicios.yaEstaban += 1;
       else r.servicios.omitidos += 1;

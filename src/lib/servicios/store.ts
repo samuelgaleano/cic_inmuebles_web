@@ -1,5 +1,5 @@
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/data/supabase/client";
-import type { EstadoServicio, Servicio, TipoAviso } from "./vigencia";
+import type { EstadoServicio, Periodo, Servicio, TipoAviso, TipoPeriodo } from "./vigencia";
 
 export interface NuevoServicio {
   txId: string;
@@ -9,6 +9,8 @@ export interface NuevoServicio {
   clienteEmail: string | null;
   clienteNombre: string | null;
   clienteTelefono: string | null;
+  /** Cuándo aprobó Wompi el pago, si se conoce. */
+  pagadoAt?: string | null;
 }
 
 /** La tabla no existe todavía (falta aplicar supabase/migrations/0004). */
@@ -29,19 +31,32 @@ export interface ServiciosStore {
   listarParaRevision(): Promise<Servicio[]>;
   obtener(id: string): Promise<Servicio | null>;
   /** Fija la ventana de vigencia y deja el servicio activo. Solo si sigue pendiente: un doble clic no activa dos veces. */
-  activar(id: string, v: { propertySlug?: string | null; inicioAt: string; venceAt: string }): Promise<Servicio | null>;
+  activar(id: string, v: { propertySlug?: string | null; propertyId?: string | null; inicioAt: string; venceAt: string }): Promise<Servicio | null>;
   /**
    * Extiende la vigencia y limpia los avisos para que se vuelvan a enviar. Solo si el vencimiento sigue
    * siendo `venceEsperado` (el que se leyó antes de calcular): así un doble envío no suma dos periodos.
+   * `origen` y `txId` quedan en el libro de periodos (por defecto, una renovación pagada).
    */
-  renovar(id: string, v: { inicioAt: string | null; venceAt: string }, venceEsperado: string | null): Promise<Servicio | null>;
+  renovar(
+    id: string,
+    v: { inicioAt: string | null; venceAt: string },
+    venceEsperado: string | null,
+    origen?: { tipo?: Extract<TipoPeriodo, "renovacion" | "suma_manual">; txId?: string | null },
+  ): Promise<Servicio | null>;
   /**
    * Pasa a vencido. Sin `forzar` solo si la fecha de vencimiento ya pasó (así una renovación
-   * hecha mientras corría el cron no se pisa). Con `forzar` vence ya y recorta vence_at a ahora.
+   * hecha mientras corría el cron no se pisa). Con `forzar` vence ya y recorta vence_at a ahora,
+   * y deja en el libro de periodos el tiempo que se quitó (salvo con `sinPeriodo`).
    */
-  marcarVencido(id: string, opts?: { forzar?: boolean; ahora?: Date }): Promise<void>;
+  marcarVencido(id: string, opts?: { forzar?: boolean; ahora?: Date; sinPeriodo?: boolean }): Promise<void>;
   marcarAviso(id: string, tipo: TipoAviso): Promise<void>;
-  asignarFicha(id: string, propertySlug: string | null): Promise<void>;
+  asignarFicha(id: string, propertySlug: string | null, propertyId?: string | null): Promise<void>;
+  /** Persona del CRM dueña del plan. */
+  asignarContacto(id: string, contactoId: string): Promise<void>;
+  /** Momento en que Wompi aprobó el pago (solo si todavía no se conocía). */
+  fijarPagadoAt(id: string, pagadoAt: string): Promise<void>;
+  /** Tramos de vigencia del plan, en el orden en que ocurrieron. */
+  periodos(servicioId: string): Promise<Periodo[]>;
   /** Saca de la lista un servicio sin reloj corriendo (pendiente o vencido); true si lo descartó. No borra nada. */
   descartar(id: string): Promise<boolean>;
   /** Deshace un descarte: vuelve a «pendiente» si nunca corrió su vigencia y a «vencido» si ya había corrido. */
@@ -65,10 +80,19 @@ type Row = {
   aviso_1d_at: string | null;
   aviso_vencido_at: string | null;
   created_at: string;
+  contacto_id?: string | null;
+  property_id?: string | null;
+  pagado_at?: string | null;
 };
 
+type PeriodoRow = { id: number; servicio_id: string; tipo: TipoPeriodo; desde: string; hasta: string; tx_id: string | null; created_at: string };
+
+function aPeriodo(r: PeriodoRow): Periodo {
+  return { id: Number(r.id), servicioId: r.servicio_id, tipo: r.tipo, desde: r.desde, hasta: r.hasta, txId: r.tx_id, createdAt: r.created_at };
+}
+
 const COLUMNAS =
-  "id, tx_id, reference, plan_id, dias, cliente_email, cliente_nombre, cliente_telefono, estado, property_slug, inicio_at, vence_at, aviso_7d_at, aviso_1d_at, aviso_vencido_at, created_at";
+  "id, tx_id, reference, plan_id, dias, cliente_email, cliente_nombre, cliente_telefono, estado, property_slug, inicio_at, vence_at, aviso_7d_at, aviso_1d_at, aviso_vencido_at, created_at, contacto_id, property_id, pagado_at";
 
 function aServicio(r: Row): Servicio {
   return {
@@ -88,6 +112,9 @@ function aServicio(r: Row): Servicio {
     aviso1dAt: r.aviso_1d_at,
     avisoVencidoAt: r.aviso_vencido_at,
     createdAt: r.created_at,
+    contactoId: r.contacto_id ?? null,
+    propertyId: r.property_id ?? null,
+    pagadoAt: r.pagado_at ?? null,
   };
 }
 
@@ -140,6 +167,7 @@ class SupabaseServiciosStore implements ServiciosStore {
         cliente_email: n.clienteEmail,
         cliente_nombre: n.clienteNombre,
         cliente_telefono: n.clienteTelefono,
+        ...(n.pagadoAt ? { pagado_at: n.pagadoAt } : {}),
       })
       .select(COLUMNAS)
       .single();
@@ -182,7 +210,17 @@ class SupabaseServiciosStore implements ServiciosStore {
     return data ? aServicio(data as Row) : null;
   }
 
-  async activar(id: string, v: { propertySlug?: string | null; inicioAt: string; venceAt: string }): Promise<Servicio | null> {
+  /** El libro de periodos nunca debe impedir la operación que registra (p. ej. si la tabla aún no existe). */
+  private async anotarPeriodo(servicioId: string, tipo: TipoPeriodo, desde: string, hasta: string, txId?: string | null): Promise<void> {
+    try {
+      const { error } = await getSupabaseAdmin().from("servicios_periodos").insert({ servicio_id: servicioId, tipo, desde, hasta, tx_id: txId ?? null });
+      if (error) console.error(`[servicios] no se pudo anotar el periodo (${tipo}): ${error.message}`);
+    } catch (err) {
+      console.error("[servicios] no se pudo anotar el periodo:", err instanceof Error ? err.message : err);
+    }
+  }
+
+  async activar(id: string, v: { propertySlug?: string | null; propertyId?: string | null; inicioAt: string; venceAt: string }): Promise<Servicio | null> {
     const patch: Record<string, unknown> = {
       estado: "activo",
       inicio_at: v.inicioAt,
@@ -192,6 +230,7 @@ class SupabaseServiciosStore implements ServiciosStore {
       aviso_vencido_at: null,
     };
     if (v.propertySlug !== undefined) patch.property_slug = v.propertySlug;
+    if (v.propertyId !== undefined) patch.property_id = v.propertyId;
     const { data, error } = await getSupabaseAdmin()
       .from("servicios_publicacion")
       .update(patch)
@@ -200,10 +239,16 @@ class SupabaseServiciosStore implements ServiciosStore {
       .select(COLUMNAS)
       .maybeSingle();
     if (error) falla("activar", error);
+    if (data) await this.anotarPeriodo(id, "activacion", v.inicioAt, v.venceAt, (data as Row).tx_id);
     return data ? aServicio(data as Row) : null;
   }
 
-  async renovar(id: string, v: { inicioAt: string | null; venceAt: string }, venceEsperado: string | null): Promise<Servicio | null> {
+  async renovar(
+    id: string,
+    v: { inicioAt: string | null; venceAt: string },
+    venceEsperado: string | null,
+    origen: { tipo?: Extract<TipoPeriodo, "renovacion" | "suma_manual">; txId?: string | null } = {},
+  ): Promise<Servicio | null> {
     const patch: Record<string, unknown> = {
       estado: "activo",
       vence_at: v.venceAt,
@@ -216,12 +261,20 @@ class SupabaseServiciosStore implements ServiciosStore {
     const condicionada = venceEsperado ? base.eq("vence_at", venceEsperado) : base.is("vence_at", null);
     const { data, error } = await condicionada.select(COLUMNAS).maybeSingle();
     if (error) falla("renovar", error);
+    // El tramo nuevo empieza donde terminaba el anterior (si seguía vigente) o ahora (si ya había vencido).
+    if (data) await this.anotarPeriodo(id, origen.tipo ?? "renovacion", v.inicioAt ?? venceEsperado ?? new Date().toISOString(), v.venceAt, origen.txId);
     return data ? aServicio(data as Row) : null;
   }
 
-  async marcarVencido(id: string, opts: { forzar?: boolean; ahora?: Date } = {}): Promise<void> {
+  async marcarVencido(id: string, opts: { forzar?: boolean; ahora?: Date; sinPeriodo?: boolean } = {}): Promise<void> {
     const ahora = (opts.ahora ?? new Date()).toISOString();
     const base = getSupabaseAdmin().from("servicios_publicacion");
+    if (opts.forzar && !opts.sinPeriodo) {
+      // Se anota el tiempo que se quita, leyendo antes cuánto le quedaba.
+      const previo = await base.select("vence_at").eq("id", id).maybeSingle();
+      const hasta = (previo.data as { vence_at: string | null } | null)?.vence_at;
+      if (hasta && new Date(hasta).getTime() > new Date(ahora).getTime()) await this.anotarPeriodo(id, "recorte", ahora, hasta);
+    }
     const { error } = opts.forzar
       ? await base.update({ estado: "vencido", vence_at: ahora }).eq("id", id)
       : await base.update({ estado: "vencido" }).eq("id", id).lte("vence_at", ahora);
@@ -236,9 +289,31 @@ class SupabaseServiciosStore implements ServiciosStore {
     if (error) falla("marcarAviso", error);
   }
 
-  async asignarFicha(id: string, propertySlug: string | null): Promise<void> {
-    const { error } = await getSupabaseAdmin().from("servicios_publicacion").update({ property_slug: propertySlug }).eq("id", id);
+  async asignarFicha(id: string, propertySlug: string | null, propertyId?: string | null): Promise<void> {
+    const patch: Record<string, unknown> = { property_slug: propertySlug };
+    if (propertyId !== undefined) patch.property_id = propertyId;
+    const { error } = await getSupabaseAdmin().from("servicios_publicacion").update(patch).eq("id", id);
     if (error) falla("asignarFicha", error);
+  }
+
+  async asignarContacto(id: string, contactoId: string): Promise<void> {
+    const { error } = await getSupabaseAdmin().from("servicios_publicacion").update({ contacto_id: contactoId }).eq("id", id);
+    if (error) falla("asignarContacto", error);
+  }
+
+  async fijarPagadoAt(id: string, pagadoAt: string): Promise<void> {
+    const { error } = await getSupabaseAdmin().from("servicios_publicacion").update({ pagado_at: pagadoAt }).eq("id", id).is("pagado_at", null);
+    if (error) falla("fijarPagadoAt", error);
+  }
+
+  async periodos(servicioId: string): Promise<Periodo[]> {
+    const { data, error } = await getSupabaseAdmin().from("servicios_periodos").select("id, servicio_id, tipo, desde, hasta, tx_id, created_at").eq("servicio_id", servicioId).order("id", { ascending: true });
+    if (error) {
+      // Sin la tabla (migración 0008 sin aplicar) la ficha se muestra igual, sin historial de tramos.
+      if (error.code === "42P01" || error.code === "PGRST205" || /schema cache|does not exist/i.test(error.message)) return [];
+      falla("periodos", error);
+    }
+    return ((data ?? []) as PeriodoRow[]).map(aPeriodo);
   }
 
   async descartar(id: string): Promise<boolean> {
@@ -269,8 +344,14 @@ class SupabaseServiciosStore implements ServiciosStore {
 export class MemoryServiciosStore implements ServiciosStore {
   filas: Servicio[] = [];
   renovaciones = new Map<string, string>();
+  libro: Periodo[] = [];
   private seq = 1;
+  private seqPeriodo = 1;
   now = () => Date.now();
+
+  private anotar(servicioId: string, tipo: TipoPeriodo, desde: string, hasta: string, txId?: string | null): void {
+    this.libro.push({ id: this.seqPeriodo++, servicioId, tipo, desde, hasta, txId: txId ?? null, createdAt: new Date(this.now()).toISOString() });
+  }
 
   async disponible(): Promise<boolean> {
     return true;
@@ -307,6 +388,9 @@ export class MemoryServiciosStore implements ServiciosStore {
       aviso1dAt: null,
       avisoVencidoAt: null,
       createdAt: new Date(this.now()).toISOString(),
+      contactoId: null,
+      propertyId: null,
+      pagadoAt: n.pagadoAt ?? null,
     };
     this.filas.push(servicio);
     return { servicio, creado: true };
@@ -324,28 +408,37 @@ export class MemoryServiciosStore implements ServiciosStore {
     return this.filas.find((s) => s.id === id) ?? null;
   }
 
-  async activar(id: string, v: { propertySlug?: string | null; inicioAt: string; venceAt: string }): Promise<Servicio | null> {
+  async activar(id: string, v: { propertySlug?: string | null; propertyId?: string | null; inicioAt: string; venceAt: string }): Promise<Servicio | null> {
     const s = this.filas.find((x) => x.id === id);
     if (!s || s.estado !== "pendiente_publicar") return null;
     Object.assign(s, { estado: "activo", inicioAt: v.inicioAt, venceAt: v.venceAt, aviso7dAt: null, aviso1dAt: null, avisoVencidoAt: null });
     if (v.propertySlug !== undefined) s.propertySlug = v.propertySlug;
+    if (v.propertyId !== undefined) s.propertyId = v.propertyId;
+    this.anotar(id, "activacion", v.inicioAt, v.venceAt, s.txId);
     return s;
   }
 
-  async renovar(id: string, v: { inicioAt: string | null; venceAt: string }, venceEsperado: string | null): Promise<Servicio | null> {
+  async renovar(
+    id: string,
+    v: { inicioAt: string | null; venceAt: string },
+    venceEsperado: string | null,
+    origen: { tipo?: Extract<TipoPeriodo, "renovacion" | "suma_manual">; txId?: string | null } = {},
+  ): Promise<Servicio | null> {
     const s = this.filas.find((x) => x.id === id);
     const igual = (a: string | null, b: string | null) => (a && b ? new Date(a).getTime() === new Date(b).getTime() : a === b);
     if (!s || !igual(s.venceAt, venceEsperado)) return null;
     Object.assign(s, { estado: "activo", venceAt: v.venceAt, aviso7dAt: null, aviso1dAt: null, avisoVencidoAt: null });
     if (v.inicioAt) s.inicioAt = v.inicioAt;
+    this.anotar(id, origen.tipo ?? "renovacion", v.inicioAt ?? venceEsperado ?? new Date(this.now()).toISOString(), v.venceAt, origen.txId);
     return s;
   }
 
-  async marcarVencido(id: string, opts: { forzar?: boolean; ahora?: Date } = {}): Promise<void> {
+  async marcarVencido(id: string, opts: { forzar?: boolean; ahora?: Date; sinPeriodo?: boolean } = {}): Promise<void> {
     const s = this.filas.find((x) => x.id === id);
     if (!s) return;
     const ahora = opts.ahora ?? new Date(this.now());
     if (opts.forzar) {
+      if (!opts.sinPeriodo && s.venceAt && new Date(s.venceAt).getTime() > ahora.getTime()) this.anotar(id, "recorte", ahora.toISOString(), s.venceAt);
       s.estado = "vencido";
       s.venceAt = ahora.toISOString();
     } else if (s.venceAt && new Date(s.venceAt).getTime() <= ahora.getTime()) {
@@ -362,9 +455,25 @@ export class MemoryServiciosStore implements ServiciosStore {
     if (tipo === "vencido") s.avisoVencidoAt = ahora;
   }
 
-  async asignarFicha(id: string, propertySlug: string | null): Promise<void> {
+  async asignarFicha(id: string, propertySlug: string | null, propertyId?: string | null): Promise<void> {
     const s = this.filas.find((x) => x.id === id);
-    if (s) s.propertySlug = propertySlug;
+    if (!s) return;
+    s.propertySlug = propertySlug;
+    if (propertyId !== undefined) s.propertyId = propertyId;
+  }
+
+  async asignarContacto(id: string, contactoId: string): Promise<void> {
+    const s = this.filas.find((x) => x.id === id);
+    if (s) s.contactoId = contactoId;
+  }
+
+  async fijarPagadoAt(id: string, pagadoAt: string): Promise<void> {
+    const s = this.filas.find((x) => x.id === id);
+    if (s && !s.pagadoAt) s.pagadoAt = pagadoAt;
+  }
+
+  async periodos(servicioId: string): Promise<Periodo[]> {
+    return this.libro.filter((p) => p.servicioId === servicioId).sort((a, b) => a.id - b.id);
   }
 
   async descartar(id: string): Promise<boolean> {
