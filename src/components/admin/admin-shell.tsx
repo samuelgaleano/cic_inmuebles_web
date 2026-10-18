@@ -12,6 +12,7 @@ import {
   Home,
   Inbox,
   LogOut,
+  Users,
 } from "lucide-react";
 import { Logo } from "@/components/brand/brand-mark";
 import { logoutAction } from "@/lib/actions/auth";
@@ -21,6 +22,7 @@ const nav = [
   { href: "/admin", label: "Dashboard", icon: Home, exact: true },
   { href: "/admin/inmuebles", label: "Inmuebles", icon: Building2 },
   { href: "/admin/leads", label: "Leads", icon: Inbox },
+  { href: "/admin/crm", label: "CRM", icon: Users },
   { href: "/admin/vigencias", label: "Vigencias", icon: CalendarClock },
   { href: "/admin/agenda", label: "Agenda", icon: CalendarDays },
   { href: "/admin/plantillas", label: "Plantillas", icon: FileText },

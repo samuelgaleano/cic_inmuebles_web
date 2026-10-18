@@ -33,6 +33,11 @@ function espia(ruta: string): unknown {
   });
 }
 vi.mock("@/lib/data", () => ({ getRepository: () => espia("repo") }));
+vi.mock("@/lib/crm/store", () => ({
+  getCrmStore: () => espia("crm"),
+  CrmNoDisponibleError: class extends Error {},
+  CrmStoreError: class extends Error {},
+}));
 vi.mock("@/lib/integrations/drive", () => ({
   isDriveConfigured: () => true,
   ensurePropertyArchive: async () => {
@@ -54,6 +59,7 @@ vi.mock("@/lib/services/drive-import", () => ({
 
 import { createSessionToken } from "@/lib/auth/session";
 import * as agenda from "./admin-agenda";
+import * as crm from "./admin-crm";
 import * as drive from "./admin-drive";
 import * as leads from "./admin-leads";
 import * as properties from "./admin-properties";
@@ -100,7 +106,7 @@ function invocar(nombre: string, fn: (...args: unknown[]) => Promise<unknown>): 
   }
 }
 
-const modulos = { agenda, drive, leads, properties, sheets, templates };
+const modulos = { agenda, crm, drive, leads, properties, sheets, templates };
 const acciones = Object.entries(modulos).flatMap(([modulo, m]) =>
   Object.entries(m)
     .filter(([, v]) => typeof v === "function")
@@ -124,7 +130,7 @@ afterEach(() => {
 
 describe("acciones del panel sin sesion", () => {
   it("hay acciones que revisar (si esto falla, cambio la forma de exportarlas)", () => {
-    expect(acciones.length).toBeGreaterThanOrEqual(17);
+    expect(acciones.length).toBeGreaterThanOrEqual(29);
   });
 
   it.each(acciones)("%s redirige al login y no toca datos", async (_id, nombre, fn) => {

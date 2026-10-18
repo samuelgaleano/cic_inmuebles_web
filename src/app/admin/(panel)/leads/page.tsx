@@ -1,6 +1,8 @@
 import { MessageCircle, Trash2 } from "lucide-react";
 import { getRepository } from "@/lib/data";
 import { deleteLeadAction } from "@/lib/actions/admin-leads";
+import { pasarLeadAlCrmAction } from "@/lib/actions/admin-crm";
+import { BotonEnviar } from "@/components/admin/boton-enviar";
 import { LeadStatusForm } from "@/components/admin/lead-status-form";
 import { LEAD_INTENT_LABELS } from "@/lib/domain";
 import { enlaceWhatsApp } from "@/lib/utils/telefono";
@@ -68,6 +70,12 @@ export default async function AdminLeadsPage() {
                 <td className="px-4 py-3"><LeadStatusForm id={l.id} estado={l.estado} /></td>
                 <td className="px-4 py-3">
                   <div className="flex items-center justify-end gap-1">
+                    <form action={pasarLeadAlCrmAction}>
+                      <input type="hidden" name="leadId" value={l.id} />
+                      <BotonEnviar className="rounded-lg border border-line bg-white px-2.5 py-1.5 text-xs font-semibold text-ink-soft transition-colors hover:border-ink hover:text-ink">
+                        Al CRM
+                      </BotonEnviar>
+                    </form>
                     <a
                       href={waLink(l.telefono)}
                       target="_blank"
