@@ -6,6 +6,7 @@ import { getRepository } from "@/lib/data";
 import { sendLeadNotification } from "@/lib/notifications/email";
 import { whatsappLink } from "@/lib/config/site";
 import type { Lead, LeadInput } from "@/lib/domain";
+import { esSpamProbable } from "@/lib/leads/spam";
 import { normalizarTelefono } from "@/lib/utils/telefono";
 import { LEAD_INTENT_LABELS } from "@/lib/domain";
 
@@ -146,6 +147,13 @@ export async function createLeadAction(
   }
 
   const data = parsed.data;
+
+  // Segunda capa anti-spam: ofertas de SEO, videos o «indexar tu dominio» (dos señales a la vez).
+  // Igual que el honeypot: éxito idéntico al real, sin guardar ni avisar, y sin datos personales en el registro.
+  if (esSpamProbable({ nombre: data.nombre, email: data.email || undefined, mensaje: data.mensaje, tipoTelefono: normalizarTelefono(data.telefono)?.tipo })) {
+    console.warn("[leads] envío descartado por parecer spam");
+    return { status: "success", message: mensajeExito(data.tipo) };
+  }
 
   const input: LeadInput = {
     tipo: data.tipo,

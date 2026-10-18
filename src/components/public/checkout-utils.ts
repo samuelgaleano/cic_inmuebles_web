@@ -13,6 +13,15 @@ export type DatosPago = {
   redirectUrl: string;
 };
 
+/**
+ * Teléfono colombiano sin prefijo de país: Wompi guarda «573012679392» y la pasarela ya agrega +57 por su cuenta,
+ * así que sin esto quedaría «+57 57 301…». Solo se quita el 57 cuando sobra (12 dígitos que empiezan en 57).
+ */
+export function telefonoNacional(t: string): string {
+  const d = t.replace(/\D/g, "");
+  return d.length === 12 && d.startsWith("57") ? d.slice(2) : d;
+}
+
 export const DATOS_VACIOS: DatosComprador = { nombre: "", email: "", telefono: "" };
 
 /** Clave de sessionStorage: los datos sirven para cambiar de plan sin reescribirlos y se borran al cerrar la pestaña. */
@@ -34,7 +43,7 @@ export function leerDatosGuardados(crudo: string | null): DatosComprador | null 
 // Web Checkout de Wompi (página completa, https://docs.wompi.co/docs/colombia/widget-checkout-web/):
 // mismos datos y misma firma de integridad que ya entrega el servidor, sin ventana flotante.
 export function urlPaginaCompleta(d: DatosPago, f: DatosComprador): string {
-  const telefono = f.telefono.replace(/\D/g, "");
+  const telefono = telefonoNacional(f.telefono);
   const q = new URLSearchParams({
     "public-key": d.publicKey,
     currency: d.currency,

@@ -6,7 +6,7 @@ import { CreditCard, Loader2, ShieldCheck, X } from "lucide-react";
 import { formatPrice } from "@/lib/utils/format";
 import { buttonVariants } from "@/components/ui/button";
 import { COMERCIO_EN_PASARELA } from "@/lib/config/plans";
-import { CLAVE_DATOS, DATOS_VACIOS, esDatosPago, esperaDeSeguimiento, leerDatosGuardados, urlPaginaCompleta, type DatosComprador } from "./checkout-utils";
+import { CLAVE_DATOS, DATOS_VACIOS, esDatosPago, esperaDeSeguimiento, leerDatosGuardados, telefonoNacional, urlPaginaCompleta, type DatosComprador } from "./checkout-utils";
 
 type WidgetResult = { transaction?: { id?: string; status?: string } | null };
 
@@ -215,7 +215,7 @@ export function PlanCheckout({
   const [lenta, setLenta] = useState(false);
   const [cerrada, setCerrada] = useState<string | null>(null);
   const [form, setForm] = useState<DatosComprador>(() =>
-    renovacion ? { nombre: renovacion.nombre, email: renovacion.email, telefono: renovacion.telefono } : DATOS_VACIOS,
+    renovacion ? { nombre: renovacion.nombre, email: renovacion.email, telefono: telefonoNacional(renovacion.telefono) } : DATOS_VACIOS,
   );
   const dialogRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -357,7 +357,7 @@ export function PlanCheckout({
         customerData: {
           email: form.email,
           fullName: form.nombre,
-          phoneNumber: form.telefono.replace(/\D/g, ""),
+          phoneNumber: telefonoNacional(form.telefono),
           phoneNumberPrefix: "+57",
         },
       });
@@ -425,7 +425,7 @@ export function PlanCheckout({
         className={buttonVariants({ variant: "primary", size: "md", className: "w-full justify-center" })}
       >
         <CreditCard className="h-4 w-4" />
-        Contratar por {formatPrice(precioCOP)}
+        {renovacion ? "Renovar" : "Contratar"} por {formatPrice(precioCOP)}
       </button>
       {/* Siempre montada: así el lector de pantalla anuncia el aviso cuando aparece. */}
       <p role="status" className={cerrada ? "mt-2 text-center text-[13px] leading-snug text-ink-soft" : "sr-only"}>
@@ -447,7 +447,7 @@ export function PlanCheckout({
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 id={titleId} className="text-[1.25rem] font-semibold tracking-[-0.02em]">
-                  Contratar {planNombre}
+                  {renovacion ? "Renovar" : "Contratar"} {planNombre}
                 </h3>
                 <p className="tnum mt-1 text-[1.75rem] font-semibold tracking-[-0.03em]">{formatPrice(precioCOP)}</p>
               </div>

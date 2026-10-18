@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { esDatosPago, leerDatosGuardados, urlPaginaCompleta } from "./checkout-utils";
+import { esDatosPago, leerDatosGuardados, telefonoNacional, urlPaginaCompleta } from "./checkout-utils";
 
 const PAGO = {
   currency: "COP",
@@ -38,5 +38,14 @@ describe("checkout-utils", () => {
     expect(esDatosPago({ ...PAGO, signature: undefined })).toBe(false);
     expect(esDatosPago({ ok: false, error: "x" })).toBe(false);
     expect(esDatosPago(null)).toBe(false);
+  });
+
+  it("el teléfono con 57 que guarda Wompi se normaliza para no duplicar el prefijo", () => {
+    expect(telefonoNacional("573012679392")).toBe("3012679392");
+    expect(telefonoNacional("+57 301 267 9392")).toBe("3012679392");
+    expect(telefonoNacional("3012679392")).toBe("3012679392");
+    expect(telefonoNacional("5712345")).toBe("5712345"); // un fijo corto que empieza en 57 no se toca
+    const u = new URL(urlPaginaCompleta(PAGO, { nombre: "M", email: "m@x.co", telefono: "573012679392" }));
+    expect(u.searchParams.get("customer-data:phone-number")).toBe("3012679392");
   });
 });
