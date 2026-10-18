@@ -49,6 +49,9 @@ export interface WompiTransaction {
   /** Datos que la persona escribió en nuestro formulario y viajan como customerData; pueden faltar. */
   customerName?: string | null;
   customerPhone?: string | null;
+  /** Cuándo se creó y cuándo terminó la transacción en Wompi (ISO), para mostrar la hora real del pago. */
+  createdAt?: string;
+  finalizedAt?: string;
 }
 
 /** Los ids de Wompi tienen la forma "1292-1602113476-10985". */
@@ -64,6 +67,8 @@ type ApiTransaction = {
   currency?: string;
   customer_email?: string | null;
   customer_data?: { full_name?: string | null; phone_number?: string | null } | null;
+  created_at?: string;
+  finalized_at?: string | null;
 };
 
 function toTransaction(d: ApiTransaction | undefined): WompiTransaction | null {
@@ -77,6 +82,8 @@ function toTransaction(d: ApiTransaction | undefined): WompiTransaction | null {
     customerEmail: d.customer_email ?? null,
     customerName: d.customer_data?.full_name ?? null,
     customerPhone: d.customer_data?.phone_number ?? null,
+    ...(d.created_at ? { createdAt: d.created_at } : {}),
+    ...(d.finalized_at ? { finalizedAt: d.finalized_at } : {}),
   };
 }
 

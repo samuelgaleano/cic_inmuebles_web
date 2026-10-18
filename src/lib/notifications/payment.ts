@@ -8,8 +8,26 @@ export interface PaymentNotice {
   amountInCents?: number;
   planNombre?: string;
   customerEmail?: string | null;
+  customerName?: string | null;
+  customerPhone?: string | null;
+  /** Hora en que Wompi terminó la transacción (ISO). */
+  pagadoEn?: string;
   /** false si el monto cobrado no corresponde al precio del plan. */
   montoCoincide?: boolean;
+}
+
+function horaBogota(iso: string): string {
+  const f = new Date(iso);
+  if (Number.isNaN(f.getTime())) return iso;
+  return new Intl.DateTimeFormat("es-CO", {
+    timeZone: "America/Bogota",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(f);
 }
 
 /**
@@ -33,7 +51,14 @@ export async function sendPaymentNotification(p: PaymentNotice): Promise<boolean
     `Monto: ${monto}`,
     `Referencia: ${p.reference}`,
     p.transactionId ? `Transacción Wompi: ${p.transactionId}` : null,
-    p.customerEmail ? `Cliente: ${p.customerEmail}` : null,
+    p.pagadoEn ? `Pagado el: ${horaBogota(p.pagadoEn)} (hora de Bogotá)` : null,
+    p.customerName ? `Cliente: ${p.customerName}` : null,
+    p.customerPhone ? `Teléfono: ${p.customerPhone}` : null,
+    p.customerEmail ? `Correo: ${p.customerEmail}` : null,
+    "",
+    p.status === "APPROVED"
+      ? "Qué sigue: escríbele por WhatsApp para recibir los datos y las fotos, publica la ficha y activa su vigencia en /admin/vigencias (el reloj empieza al activarla)."
+      : null,
   ]
     .filter(Boolean)
     .join("\n");

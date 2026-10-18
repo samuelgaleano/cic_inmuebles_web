@@ -94,6 +94,19 @@ export const ETIQUETA_ESTADO: Record<EstadoServicio, string> = {
   vencido: "Vencido",
 };
 
+/** Fecha y hora en Bogotá: «17 de octubre de 2026, 11:08 p. m.» (Colombia no tiene horario de verano). */
+export function fechaHora(iso: string): string {
+  return new Intl.DateTimeFormat("es-CO", {
+    timeZone: "America/Bogota",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(new Date(iso));
+}
+
 /** Fecha larga en hora de Bogotá: «sábado 14 de noviembre de 2026». */
 export function fechaLarga(iso: string): string {
   return new Intl.DateTimeFormat("es-CO", {

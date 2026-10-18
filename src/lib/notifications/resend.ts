@@ -7,6 +7,8 @@ export interface CorreoResend {
   to: string;
   subject: string;
   text: string;
+  /** Versión con diseño; el texto sigue yendo como respaldo (correo multiparte). */
+  html?: string;
   /** A dónde llegan las respuestas (el remitente de Resend no tiene buzón). */
   replyTo?: string | null;
   /** Clave de idempotencia de Resend: el mismo envío repetido no genera un segundo correo. */
@@ -34,6 +36,7 @@ export async function sendEmail(msg: CorreoResend): Promise<boolean> {
         to: [msg.to],
         subject: msg.subject,
         text: msg.text,
+        ...(msg.html ? { html: msg.html } : {}),
         ...(msg.replyTo ? { reply_to: msg.replyTo } : {}),
       }),
     });

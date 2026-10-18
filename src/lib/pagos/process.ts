@@ -197,6 +197,9 @@ async function notifyOnce(tx: WompiTransaction, c: Classified & { estado: "ok" |
     amountInCents: tx.amountInCents,
     planNombre: c.plan.nombre,
     customerEmail: tx.customerEmail,
+    customerName: tx.customerName,
+    customerPhone: tx.customerPhone,
+    pagadoEn: tx.finalizedAt ?? tx.createdAt,
     montoCoincide: c.amountOk,
   });
 
