@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { ComparadorVista } from "@/components/public/comparador-vista";
-import { getPublicInventory } from "@/lib/data/public-inventory";
+import { getPublicInventoryOrThrow } from "@/lib/data/public-inventory";
 import { construirIndice } from "@/lib/search/indice";
 
 // La selección vive en la URL de cada visitante: no se indexa.
@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 export const revalidate = 21600;
 
 export default async function CompararPage() {
-  const indice = construirIndice(await getPublicInventory());
+  const indice = construirIndice(await getPublicInventoryOrThrow());
 
   return (
     <>

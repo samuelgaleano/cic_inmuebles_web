@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { FavoritosVista } from "@/components/public/favoritos-vista";
-import { getPublicInventory } from "@/lib/data/public-inventory";
+import { getPublicInventoryOrThrow } from "@/lib/data/public-inventory";
 import { construirIndice } from "@/lib/search/indice";
 
 // Es una lista personal (vive en el navegador de cada visitante): no se indexa.
@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 export const revalidate = 21600;
 
 export default async function FavoritosPage() {
-  const indice = construirIndice(await getPublicInventory());
+  const indice = construirIndice(await getPublicInventoryOrThrow());
 
   return (
     <>

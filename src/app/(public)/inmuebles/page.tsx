@@ -3,14 +3,14 @@ import Link from "next/link";
 import { Catalogo } from "@/components/public/catalogo";
 import { JsonLd } from "@/components/seo/json-ld";
 import { propertyUrl, siteConfig } from "@/lib/config/site";
-import { getPublicInventory } from "@/lib/data/public-inventory";
+import { getPublicInventoryOrThrow } from "@/lib/data/public-inventory";
 import { construirIndice, contextoDe, sugerencias } from "@/lib/search/indice";
 import { agruparPorSector, sectorPath } from "@/lib/seo/sectores";
 import { recortarEnPalabra } from "@/lib/seo/textos-seo";
 import { titularInventario } from "@/lib/seo/titular";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const t = titularInventario(await getPublicInventory());
+  const t = titularInventario(await getPublicInventoryOrThrow());
   const donde = t.sectores.length > 0 ? `${t.lugar}: ${t.sectores.slice(0, 3).join(", ")}` : t.lugar;
   return {
     title: t.titulo,
@@ -34,7 +34,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export const revalidate = 21600;
 
 export default async function InmueblesPage() {
-  const todos = await getPublicInventory();
+  const todos = await getPublicInventoryOrThrow();
   const indice = construirIndice(todos);
   const ctx = contextoDe(todos);
   const titular = titularInventario(todos);

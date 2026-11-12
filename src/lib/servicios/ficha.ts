@@ -18,7 +18,7 @@ function revalidar(slug: string) {
 /**
  * Refresca las páginas públicas. Desde la página de retorno del pago esto corre durante el render, donde
  * Next no permite revalidar: se intenta después de responder y, si tampoco se puede, las páginas se
- * renuevan solas al cumplirse su caché (1 h). La escritura en la base ya quedó hecha en cualquier caso.
+ * renuevan solas al cumplirse su caché (hasta 6 h). La escritura en la base ya quedó hecha en cualquier caso.
  */
 function refrescarPaginas(slug: string) {
   try {
