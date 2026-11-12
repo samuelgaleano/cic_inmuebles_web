@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { WompiTransaction } from "@/lib/integrations/wompi";
-import { esperaDeSeguimiento } from "@/components/public/checkout-utils";
+import { esperaDeSeguimiento, proximaEsperaPendiente } from "@/components/public/checkout-utils";
 import { confirmarPorReferencia, INTERVALO_MINIMO_MS, reiniciarLimite } from "./estado";
 import { MemoryPagosStore } from "./memory-store";
 import type { ProcessDeps } from "./process";
@@ -104,11 +104,20 @@ describe("confirmarPorReferencia", () => {
 });
 
 describe("calendario de consultas del navegador", () => {
-  it("5 s al inicio, luego 10 s, luego 20 s, y se detiene a los 20 minutos", () => {
+  it("5 s al inicio, luego 15 s, luego 45 s, y se detiene a los 20 minutos", () => {
     expect(esperaDeSeguimiento(0)).toBe(5_000);
     expect(esperaDeSeguimiento(119_000)).toBe(5_000);
-    expect(esperaDeSeguimiento(120_000)).toBe(10_000);
-    expect(esperaDeSeguimiento(300_000)).toBe(20_000);
+    expect(esperaDeSeguimiento(120_000)).toBe(15_000);
+    expect(esperaDeSeguimiento(300_000)).toBe(45_000);
     expect(esperaDeSeguimiento(20 * 60_000)).toBeNull();
+  });
+});
+
+describe("pantalla de pago pendiente", () => {
+  it("consulta cada 30 s al inicio y cada 60 s después", () => {
+    expect(proximaEsperaPendiente(0)).toBe(30_000);
+    expect(proximaEsperaPendiente(1)).toBe(30_000);
+    expect(proximaEsperaPendiente(2)).toBe(60_000);
+    expect(proximaEsperaPendiente(9)).toBe(60_000);
   });
 });

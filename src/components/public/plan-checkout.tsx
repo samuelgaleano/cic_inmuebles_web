@@ -169,6 +169,14 @@ function seguirPago(reference: string): () => void {
   };
   const turno = async () => {
     if (detenido) return;
+    // Con la pestaña oculta no se consulta (cada consulta es una invocación): se retoma al volver, y el webhook
+    // de Wompi y la conciliación diaria registran el pago igual.
+    if (document.visibilityState === "hidden") {
+      const espera = esperaDeSeguimiento(Date.now() - inicio);
+      if (espera === null) return;
+      timer = window.setTimeout(turno, espera);
+      return;
+    }
     try {
       const res = await fetch(`/api/pagos/wompi/estado?ref=${encodeURIComponent(reference)}`, { cache: "no-store" });
       const d = (await res.json().catch(() => null)) as { final?: boolean; estado?: string } | null;
