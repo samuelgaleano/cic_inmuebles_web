@@ -60,7 +60,7 @@ function armar(s: Servicio, asunto: string, b: Omit<BloqueCorreo, "saludo">): Co
 /** Enlace que abre los planes con el plan y los datos precargados. */
 export function enlaceDeRenovacion(s: Servicio): string {
   const token = tokenDeRenovacion(s.id, { venceAt: s.venceAt });
-  return token ? `${siteConfig.url}/publica/agente?renovar=${token}` : `${siteConfig.url}/publica/agente`;
+  return token ? `${siteConfig.url}/publica/agente/renovar?renovar=${token}` : `${siteConfig.url}/publica/agente`;
 }
 
 function nombreDePlan(s: Servicio): string {

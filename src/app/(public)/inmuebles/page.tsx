@@ -31,7 +31,7 @@ export async function generateMetadata(): Promise<Metadata> {
 // Página estática (ISR): NO lee `searchParams`. Leerlos la volvía dinámica y cada visita, rastreo de bot o URL con
 // ?q= distinto ejecutaba una función con una consulta completa. Ahora el HTML sale del CDN y el navegador aplica
 // los filtros de la URL (catalogo.tsx). El panel la renueva al instante (revalidatePath + etiqueta `inventario`).
-export const revalidate = 3600;
+export const revalidate = 21600;
 
 export default async function InmueblesPage() {
   const todos = await getPublicInventory();

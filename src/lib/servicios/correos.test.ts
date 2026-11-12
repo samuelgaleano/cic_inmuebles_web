@@ -66,7 +66,7 @@ describe("correos al cliente: plantilla con la marca", () => {
 
   it("el botón de renovación lleva al enlace firmado y el HTML escapa lo que escribió la persona", () => {
     const c = correoDeAviso(servicio({ clienteNombre: "<b>Ana</b> & Co" }), "7d")!;
-    expect(c.html).toMatch(/href="https:\/\/www\.cicinmuebles\.com\/publica\/agente\?renovar=[^"]+"/);
+    expect(c.html).toMatch(/href="https:\/\/www\.cicinmuebles\.com\/publica\/agente\/renovar\?renovar=[^"]+"/);
     expect(c.html).not.toContain("<b>Ana</b>");
     expect(escapeHtml(`a<b>"c"&'d'`)).toBe("a&lt;b&gt;&quot;c&quot;&amp;&#39;d&#39;");
   });

@@ -2,12 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft, Check, ChevronDown, MessageCircle } from "lucide-react";
 import { PlanCheckout } from "@/components/public/plan-checkout";
-import { PagoResultado, type PagoEstadoVisible } from "@/components/public/pago-resultado";
 import { JsonLd } from "@/components/seo/json-ld";
 import { COMERCIO_EN_PASARELA, getPlan, PLANS, type Plan, type PlanGrupo } from "@/lib/config/plans";
-import { isWompiConfigured, planIdFromReference } from "@/lib/integrations/wompi";
-import { confirmFromRedirect } from "@/lib/pagos/process";
-import { getPagosStore, isPagosStoreConfigured } from "@/lib/pagos/store";
+import { isWompiConfigured } from "@/lib/integrations/wompi";
+import { isPagosStoreConfigured } from "@/lib/pagos/store";
 import { getServiciosStore } from "@/lib/servicios/store";
 import { servicioDeToken } from "@/lib/servicios/token";
 import { buttonVariants } from "@/components/ui/button";
@@ -15,10 +13,8 @@ import { formatPrice } from "@/lib/utils/format";
 import { siteConfig, whatsappLink } from "@/lib/config/site";
 import { cn } from "@/lib/utils/cn";
 
-type SearchParams = Promise<{ pago?: string; ref?: string; id?: string; renovar?: string }>;
-
 /** Datos del servicio que se renueva, tomados del enlace firmado del correo. */
-interface Renovacion {
+export interface Renovacion {
   planId: string;
   nombre: string;
   email: string;
@@ -27,16 +23,13 @@ interface Renovacion {
   token: string;
 }
 
-const ESTADOS_VISIBLES = new Set<string>(["APPROVED", "PENDING", "DECLINED", "VOIDED", "ERROR"]);
-const esEstadoVisible = (s: string): s is PagoEstadoVisible => ESTADOS_VISIBLES.has(s);
-
 // El precio sale de plans.ts (fuente única de verdad) para que la descripción
 // no quede desactualizada al cambiar la tarifa.
 const pagables = PLANS.filter((p) => p.audience === "agente" && p.mode === "pago");
 const desdeCOP = Math.min(...pagables.map((p) => p.precioCOP));
 const contenido = PLANS.find((p) => p.id === "contenido-profesional");
 
-const METADATA_PLANES: Metadata = {
+export const METADATA_PLANES: Metadata = {
   title: "Planes para agentes e inmobiliarias",
   description:
     `Publica tus inmuebles en CIC: alianza por resultados desde ${formatPrice(desdeCOP)}, ` +
@@ -50,17 +43,6 @@ const METADATA_PLANES: Metadata = {
     images: [siteConfig.ogImage],
   },
 };
-
-export async function generateMetadata({ searchParams }: { searchParams: SearchParams }): Promise<Metadata> {
-  const sp = await searchParams;
-  if (sp.pago !== "procesado") return METADATA_PLANES;
-  // La pantalla de retorno es personal y efímera: título propio y fuera del índice.
-  return {
-    title: "Estado de tu pago",
-    robots: { index: false, follow: false },
-    alternates: { canonical: "/publica/agente" },
-  };
-}
 
 /** El eje de decisión: pagar por inmueble o por paquete de espacios. */
 const GRUPOS: { id: PlanGrupo; titulo: string; descripcion: string }[] = [
@@ -157,68 +139,28 @@ function equivalencia(plan: Plan): { porInmuebleMes: number; mensualAnual?: numb
   };
 }
 
-export default async function AgentePlanesPage({ searchParams }: { searchParams: SearchParams }) {
-  const sp = await searchParams;
+/**
+ * Lee el enlace firmado del correo de renovación y devuelve el servicio que se renueva (o null si el
+ * token no sirve). Solo lo usa /publica/agente/renovar: la página de planes base no depende de la URL.
+ */
+export async function cargarRenovacion(token: string | undefined): Promise<Renovacion | null> {
+  if (typeof token !== "string") return null;
+  const servicioId = servicioDeToken(token);
+  if (!servicioId) return null;
+  try {
+    const s = await getServiciosStore().obtener(servicioId);
+    if (s && s.estado !== "descartado" && getPlan(s.planId)?.mode === "pago") {
+      return { planId: s.planId, nombre: s.clienteNombre ?? "", email: s.clienteEmail ?? "", telefono: s.clienteTelefono ?? "", token };
+    }
+  } catch {
+    // sin la tabla o sin red, la página de planes funciona igual
+  }
+  return null;
+}
+
+/** Vista de planes y precios. Se comparte entre la página estática y la de renovación. */
+export async function VistaPlanes({ renovacion = null }: { renovacion?: Renovacion | null }) {
   const wompiOn = isWompiConfigured();
-
-  // Retorno del widget: Wompi agrega ?id=<transacción>. Se confirma con la API
-  // (fuente de verdad) y se muestra el estado real; la notificación al negocio
-  // es idempotente, así que recargar esta página no duplica avisos.
-  if (sp.pago === "procesado") {
-    const retorno =
-      sp.id && sp.ref && wompiOn && isPagosStoreConfigured() ? await confirmFromRedirect(sp.id, sp.ref) : null;
-    // Un status nuevo de Wompi que no conozcamos se trata como "en proceso": nunca como aprobado.
-    const estado: PagoEstadoVisible = !retorno?.found ? "DESCONOCIDO" : esEstadoVisible(retorno.status) ? retorno.status : "PENDING";
-    const reference = retorno?.found ? retorno.reference : sp.ref;
-    const planId = reference ? planIdFromReference(reference) : undefined;
-    const plan = planId ? getPlan(planId) : undefined;
-    const actualUrl = `/publica/agente?pago=procesado${sp.ref ? `&ref=${encodeURIComponent(sp.ref)}` : ""}${sp.id ? `&id=${encodeURIComponent(sp.id)}` : ""}`;
-    // Una renovación pagada desde el correo no vuelve a pedir fotos ni datos: su vigencia solo se extiende.
-    let esRenovacion = false;
-    if (retorno?.found && isPagosStoreConfigured()) {
-      try {
-        esRenovacion = Boolean((await getPagosStore().getReference(retorno.reference))?.renuevaServicioId);
-      } catch {
-        esRenovacion = false;
-      }
-    }
-
-    return (
-      <>
-        <div className="wrap pt-8">
-          <Link href="/publica/agente" className="link-arrow py-2 text-[15px]">
-            <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Volver a los planes
-          </Link>
-        </div>
-        <div className="wrap pb-28 pt-8">
-          <PagoResultado
-            estado={estado}
-            plan={plan}
-            amountInCents={retorno?.found ? retorno.amountInCents : undefined}
-            reference={reference}
-            actualUrl={actualUrl}
-            esRenovacion={esRenovacion}
-          />
-        </div>
-      </>
-    );
-  }
-
-  // Enlace de renovación del correo: abre el plan que vence con los datos precargados.
-  let renovacion: Renovacion | null = null;
-  if (typeof sp.renovar === "string") {
-    const servicioId = servicioDeToken(sp.renovar);
-    if (servicioId) {
-      try {
-        const s = await getServiciosStore().obtener(servicioId);
-        if (s && s.estado !== "descartado" && getPlan(s.planId)?.mode === "pago") {
-          renovacion = { planId: s.planId, nombre: s.clienteNombre ?? "", email: s.clienteEmail ?? "", telefono: s.clienteTelefono ?? "", token: sp.renovar };
-        }
-      } catch {
-        renovacion = null; // sin la tabla o sin red, la página de planes funciona igual
-      }
-    }
-  }
 
   // Los avisos de vencimiento solo se prometen si el registro de vigencias funciona (migración 0004).
   const avisosActivos = isPagosStoreConfigured() && (await getServiciosStore().disponible());

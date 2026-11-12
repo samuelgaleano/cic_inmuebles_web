@@ -7,7 +7,7 @@ import type { PublicProperty } from "@/lib/domain";
 /**
  * Lectura del inventario público con DOS capas de caché:
  *  - `unstable_cache` (caché de datos de Next, persistente entre solicitudes y regeneraciones, con la etiqueta
- *    `inventario` y vigencia de 1 h): home, catálogo, fichas, sectores, comparar, favoritos y sitemap comparten
+ *    `inventario` y vigencia de 6 h): home, catálogo, fichas, sectores, comparar, favoritos y sitemap comparten
  *    una sola consulta a Supabase en lugar de hacer una cada una. Las rutas que escriben inmuebles la
  *    invalidan con `invalidarInventario()` (src/lib/data/inventario-tag.ts).
  *  - `cache()` de React: deduplica dentro de un mismo render.

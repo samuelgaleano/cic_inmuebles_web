@@ -7,8 +7,13 @@ import { revalidateTag } from "next/cache";
  */
 export const INVENTARIO_TAG = "inventario";
 
-/** Segundos que dura la lectura compartida del inventario aunque nadie la invalide. */
-export const INVENTARIO_REVALIDATE_S = 3600;
+/**
+ * Segundos que dura la lectura compartida del inventario aunque nadie la invalide (6 h). Es la red de seguridad
+ * para cambios hechos fuera del panel (p. ej. editar filas directo en Supabase); el panel invalida al instante.
+ * Las páginas con `revalidate` heredan el MENOR de sus lecturas, por eso todas usan 21600 (literal: Next exige
+ * valores estáticos en `revalidate`).
+ */
+export const INVENTARIO_REVALIDATE_S = 21600;
 
 /**
  * Marca el inventario como vencido: la siguiente solicitud vuelve a leer Supabase UNA vez y todas las

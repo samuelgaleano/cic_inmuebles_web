@@ -59,6 +59,14 @@ const nextConfig: NextConfig = {
       ? [{ protocol: "https", hostname: "res.cloudinary.com", pathname: `/${cloudinaryCloud}/**` }]
       : [],
   },
+  // Enlaces antiguos (pagos en curso y correos de renovación ya enviados) hacia las rutas nuevas. Se resuelven
+  // en el enrutador, sin ejecutar la página.
+  async redirects() {
+    return [
+      { source: "/publica/agente", has: [{ type: "query", key: "pago", value: "procesado" }], destination: "/publica/agente/pago", permanent: false },
+      { source: "/publica/agente", has: [{ type: "query", key: "renovar" }], destination: "/publica/agente/renovar", permanent: false },
+    ];
+  },
   async headers() {
     return [
       {

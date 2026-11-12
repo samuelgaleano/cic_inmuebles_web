@@ -90,6 +90,6 @@ export async function POST(req: Request) {
     signature,
     plan: { id: plan.id, nombre: plan.nombre, precioCOP: plan.precioCOP },
     // Wompi agrega ?id=<transacción> al volver; la página confirma con la API.
-    redirectUrl: `${appUrl()}/publica/agente?pago=procesado&ref=${encodeURIComponent(reference)}`,
+    redirectUrl: `${appUrl()}/publica/agente/pago?ref=${encodeURIComponent(reference)}`,
   });
 }

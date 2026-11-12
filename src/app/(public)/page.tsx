@@ -61,7 +61,7 @@ const SIN_FOTO_GRANDE = ["puente-largo-alhambra"];
 
 // Red de seguridad: regenera la página cada hora aunque falle la
 // revalidación bajo demanda del panel admin.
-export const revalidate = 3600;
+export const revalidate = 21600;
 
 export default async function HomePage() {
   // Disponibles primero, luego en proceso y vendidos (orden del repositorio). Si la base de datos

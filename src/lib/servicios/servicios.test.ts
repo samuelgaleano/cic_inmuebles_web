@@ -115,7 +115,7 @@ describe("correos", () => {
     expect(c.subject).toBe("Tu publicación vence en 7 días");
     expect(c.text).toContain("Alianza por resultados");
     expect(c.text).toContain("/inmuebles/bella-suiza");
-    expect(c.text).toMatch(/\/publica\/agente\?renovar=00000000-0000-4000-8000-000000000001\.\d{10}\.[0-9a-f]{32}/);
+    expect(c.text).toMatch(/\/publica\/agente\/renovar\?renovar=00000000-0000-4000-8000-000000000001\.\d{10}\.[0-9a-f]{32}/);
     expect(c.replyTo).toBeTruthy();
     expect(c.text).toContain("Hola Marta,");
     expect(c.text).not.toMatch(/[—–]/);

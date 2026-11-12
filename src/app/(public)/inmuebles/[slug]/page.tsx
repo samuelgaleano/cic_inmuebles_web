@@ -30,9 +30,9 @@ import { agruparPorSector, encontrarSector, sectorPath } from "@/lib/seo/sectore
 import { encabezadoFicha, recortarEnPalabra } from "@/lib/seo/textos-seo";
 import { ogImageUrl } from "@/lib/utils/image-loader";
 
-// La ficha dura 24 h en la caché: los cambios del panel la invalidan al instante (revalidatePublic + etiqueta
+// La ficha dura 6 h en la caché: los cambios del panel la invalidan al instante (revalidatePublic + etiqueta
 // `inventario`), así que el tiempo es solo la red de seguridad. Regenerarla cada hora costaba una función por ficha.
-export const revalidate = 86400;
+export const revalidate = 21600;
 
 // Estado del inmueble → disponibilidad schema.org ("en_proceso" NO es InStock).
 const SCHEMA_AVAILABILITY: Record<PropertyStatus, string> = {

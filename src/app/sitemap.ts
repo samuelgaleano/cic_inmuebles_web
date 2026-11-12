@@ -4,8 +4,8 @@ import type { PublicProperty } from "@/lib/domain";
 import { propertyUrl, siteConfig } from "@/lib/config/site";
 import { agruparPorSector, sectorPath } from "@/lib/seo/sectores";
 
-// Regeneración horaria; el panel además lo revalida al publicar, editar o borrar.
-export const revalidate = 3600;
+// Regeneración cada 6 h; el panel además lo revalida al publicar, editar o borrar.
+export const revalidate = 21600;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // siteConfig.url ya viene normalizada sin barra final.

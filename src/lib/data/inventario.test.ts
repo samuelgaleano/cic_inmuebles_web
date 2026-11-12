@@ -21,7 +21,7 @@ describe("caché del inventario público", () => {
     listPublic.mockReset();
   });
 
-  it("la lectura se envuelve en la caché de datos con la etiqueta `inventario` y 1 h de vigencia", () => {
+  it("la lectura se envuelve en la caché de datos con la etiqueta `inventario` y 6 h de vigencia", () => {
     expect(unstableCache).toHaveBeenCalledTimes(1);
     const [, , opciones] = unstableCache.mock.calls[0] as unknown as [unknown, unknown, { tags: string[]; revalidate: number }];
     expect(opciones.tags).toEqual([INVENTARIO_TAG]);
