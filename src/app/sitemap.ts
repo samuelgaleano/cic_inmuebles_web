@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { getRepository } from "@/lib/data";
+import { getPublicInventoryOrThrow } from "@/lib/data/public-inventory";
 import type { PublicProperty } from "@/lib/domain";
 import { propertyUrl, siteConfig } from "@/lib/config/site";
 import { agruparPorSector, sectorPath } from "@/lib/seo/sectores";
@@ -12,7 +12,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = siteConfig.url;
   // Sin try/catch a propósito: si la base de datos falla al regenerar, Next sigue sirviendo el sitemap
   // anterior en vez de cachear uno sin fichas.
-  const properties: PublicProperty[] = await getRepository().properties.listPublic();
+  const properties: PublicProperty[] = await getPublicInventoryOrThrow();
 
   // Última modificación real del catálogo: el inmueble editado más reciente.
   // Aplica a la home y al listado, cuyo contenido cambia con el catálogo.

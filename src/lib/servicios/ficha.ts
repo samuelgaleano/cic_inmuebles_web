@@ -1,10 +1,14 @@
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { getRepository } from "@/lib/data";
+import { invalidarInventario } from "@/lib/data/inventario-tag";
 
 function revalidar(slug: string) {
+  invalidarInventario();
   revalidatePath("/");
   revalidatePath("/inmuebles");
+  revalidatePath("/comparar");
+  revalidatePath("/favoritos");
   revalidatePath(`/inmuebles/${slug}`);
   revalidatePath("/sitemap.xml");
   revalidatePath("/inmuebles/sector/[sector]", "page");

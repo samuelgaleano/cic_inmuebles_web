@@ -14,7 +14,6 @@ import { RejillaInmuebles } from "@/components/public/rejilla-inmuebles";
 import { SimuladorCuota } from "@/components/public/simulador-cuota";
 import { VideoYoutube } from "@/components/public/video-youtube";
 import { JsonLd } from "@/components/seo/json-ld";
-import { getRepository } from "@/lib/data";
 import {
   PROPERTY_TYPE_LABELS,
   type PropertyMedia,
@@ -26,13 +25,14 @@ import { ordenarDescripcion } from "@/lib/ficha/descripcion";
 import { contextoDePrecio, fraseContexto } from "@/lib/ficha/valor";
 import { formatArea, formatPrice, formatPriceOrConsult } from "@/lib/utils/format";
 import { propertyUrl, siteConfig } from "@/lib/config/site";
-import { getPublicInventoryOrThrow } from "@/lib/data/public-inventory";
+import { getPublicInventoryOrThrow, getPublicPropertyBySlug } from "@/lib/data/public-inventory";
 import { agruparPorSector, encontrarSector, sectorPath } from "@/lib/seo/sectores";
 import { encabezadoFicha, recortarEnPalabra } from "@/lib/seo/textos-seo";
 import { ogImageUrl } from "@/lib/utils/image-loader";
 
-// La ficha se regenera cada hora aunque el panel no la revalide (antes quedaba semanas en la caché del CDN).
-export const revalidate = 3600;
+// La ficha dura 24 h en la caché: los cambios del panel la invalidan al instante (revalidatePublic + etiqueta
+// `inventario`), así que el tiempo es solo la red de seguridad. Regenerarla cada hora costaba una función por ficha.
+export const revalidate = 86400;
 
 // Estado del inmueble → disponibilidad schema.org ("en_proceso" NO es InStock).
 const SCHEMA_AVAILABILITY: Record<PropertyStatus, string> = {
@@ -60,7 +60,7 @@ const ACCOMMODATION_TYPES = new Set(["Apartment", "House"]);
 
 export async function generateStaticParams() {
   try {
-    const properties = await getRepository().properties.listPublic();
+    const properties = await getPublicInventoryOrThrow();
     return properties.map((p) => ({ slug: p.slug }));
   } catch (err) {
     // Si la base de datos no está disponible en build, generamos bajo demanda.
@@ -112,7 +112,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const property = await getRepository().properties.getPublicBySlug(slug);
+  const property = await getPublicPropertyBySlug(slug);
   if (!property) return { title: "Inmueble no encontrado" };
 
   const images = property.medios.filter((m) => m.type === "image").map((m) => m.url);
@@ -165,7 +165,7 @@ export default async function PropertyDetailPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const property = await getRepository().properties.getPublicBySlug(slug);
+  const property = await getPublicPropertyBySlug(slug);
   if (!property) notFound();
 
   // Si la base de datos falla al regenerar, Next conserva la versión anterior en vez de cachear una ficha sin contexto.

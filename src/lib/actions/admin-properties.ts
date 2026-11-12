@@ -7,6 +7,7 @@ import { z } from "zod";
 import { getCrmStore } from "@/lib/crm/store";
 import { vincularInmueble } from "@/lib/crm/vinculos";
 import { getRepository } from "@/lib/data";
+import { invalidarInventario } from "@/lib/data/inventario-tag";
 import { ensurePropertyArchive, isDriveConfigured } from "@/lib/integrations/drive";
 import { isSheetsConfigured, syncAllPropertiesToSheet, syncPropertyToSheet } from "@/lib/integrations/sheets";
 import {
@@ -28,8 +29,13 @@ function mediaProviderFor(url: string): MediaProvider {
 
 /** Revalida las rutas públicas afectadas para mantener el catálogo sincronizado. */
 function revalidatePublic(...slugs: (string | undefined)[]) {
+  // Etiqueta `inventario`: vence la lectura compartida de Supabase (home, catálogo, fichas, sectores,
+  // comparar, favoritos y sitemap la usan) y la siguiente visita la renueva UNA vez para todas.
+  invalidarInventario();
   revalidatePath("/");
   revalidatePath("/inmuebles");
+  revalidatePath("/comparar");
+  revalidatePath("/favoritos");
   // La ficha nueva y la anterior: renombrar un inmueble cambia su URL y la vieja no debe quedar viva.
   for (const slug of new Set(slugs.filter(Boolean))) revalidatePath(`/inmuebles/${slug}`);
   revalidatePath("/sitemap.xml");

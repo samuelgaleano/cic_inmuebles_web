@@ -12,7 +12,8 @@ export const metadata: Metadata = {
   robots: { index: false, follow: true },
 };
 
-export const revalidate = 300;
+// 24 h: el contenido depende del navegador de cada visitante; el catálogo se renueva al editar (etiqueta `inventario`).
+export const revalidate = 86400;
 
 export default async function FavoritosPage() {
   const indice = construirIndice(await getPublicInventory());
