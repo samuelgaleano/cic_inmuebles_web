@@ -1,10 +1,29 @@
 import type { MetadataRoute } from "next";
 import { siteConfig } from "@/lib/config/site";
 
-// Crawlers de IA nombrados explícitamente: hoy con la misma política que el
-// resto (todo público salvo /admin), pero visibles y auditables para poder
-// ajustar el acceso por bot cuando haga falta.
+// Crawlers de IA nombrados explícitamente: misma política que el resto pero con
+// pausa entre solicitudes (la respetan los que cumplen el estándar), visibles y
+// auditables para poder ajustar el acceso por bot cuando haga falta.
 const AI_CRAWLERS = ["GPTBot", "ClaudeBot", "PerplexityBot", "Google-Extended"];
+const RETARDO_IA_S = 10;
+
+/**
+ * Lo que ningún rastreador debe pedir: cada URL aquí es una invocación de función en Vercel y no aporta al índice.
+ *  - /admin y /api: privados o sin contenido.
+ *  - /comparar y /favoritos: dependen del navegador de cada visitante (ya son noindex).
+ *  - /inmuebles?*: variantes filtradas del catálogo (espacio de URLs casi infinito); el canonical es /inmuebles,
+ *    que sigue permitido. El patrón `/inmuebles?*` no coincide con `/inmuebles` ni con `/inmuebles/<slug>`.
+ *  - /publica/agente/pago y /renovar: pantallas personales de retorno de pago y renovación.
+ */
+export const RUTAS_SIN_RASTREO = [
+  "/admin",
+  "/api/",
+  "/comparar",
+  "/favoritos",
+  "/inmuebles?*",
+  "/publica/agente/pago",
+  "/publica/agente/renovar",
+];
 
 export default function robots(): MetadataRoute.Robots {
   return {
@@ -12,13 +31,13 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "*",
         allow: "/",
-        // El panel admin (Fase 1b) no debe indexarse
-        disallow: ["/admin"],
+        disallow: RUTAS_SIN_RASTREO,
       },
       ...AI_CRAWLERS.map((userAgent) => ({
         userAgent,
         allow: "/",
-        disallow: ["/admin"],
+        disallow: RUTAS_SIN_RASTREO,
+        crawlDelay: RETARDO_IA_S,
       })),
     ],
     sitemap: `${siteConfig.url}/sitemap.xml`,

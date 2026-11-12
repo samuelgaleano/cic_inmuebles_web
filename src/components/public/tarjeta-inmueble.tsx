@@ -103,6 +103,7 @@ export function TarjetaInmueble({
         <h3 className={cn("mt-1 text-[1.25rem] font-semibold leading-snug tracking-[-0.02em]", vendido && "text-muted")}>
           <Link
             href={`/inmuebles/${datos.slug}`}
+            prefetch={false}
             className="rounded-sm after:absolute after:inset-0 after:content-['']"
           >
             {datos.titulo}

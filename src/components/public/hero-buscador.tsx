@@ -64,6 +64,7 @@ export function HeroBuscador({
                   <li key={item.slug}>
                     <Link
                       href={`/inmuebles/${item.slug}`}
+                      prefetch={false}
                       className="group flex items-center gap-4 p-3 pr-5 transition-colors hover:bg-surface"
                     >
                       <span className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-surface">
@@ -87,6 +88,7 @@ export function HeroBuscador({
               </ul>
               <Link
                 href={destino({ ...ESTADO_VACIO, texto })}
+                prefetch={false}
                 className="flex items-center justify-between border-t border-line px-5 py-3.5 text-[15px] font-medium text-brand-700 transition-colors hover:bg-surface"
               >
                 <span>
