@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { construirIndice, contextoDe, MAX_INDICE, sugerencias, type ItemIndice } from "./indice";
+import { construirIndice, contextoDe, MAX_INDICE, MAX_TEXTO_INDICE, sugerencias, type ItemIndice } from "./indice";
 import type { PublicProperty } from "@/lib/domain";
 
 const prop = (n: number, extra: Partial<PublicProperty> = {}): PublicProperty =>
@@ -29,6 +29,11 @@ describe("construirIndice", () => {
     expect(x.portada).toBe("https://x/y.jpg");
     expect(x.texto).toContain("chimenea");
     expect(x.texto).not.toMatch(/[^\w ñ]/);
+  });
+
+  it("recorta el texto de búsqueda de cada inmueble para aligerar el HTML", () => {
+    const [x] = construirIndice([prop(1, { descripcion: "terraza ".repeat(500) })]);
+    expect(x.texto.length).toBeLessThanOrEqual(MAX_TEXTO_INDICE);
   });
 
   it("recorta el catálogo enviado al navegador", () => {
