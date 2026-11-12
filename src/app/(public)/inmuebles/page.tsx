@@ -5,8 +5,6 @@ import { JsonLd } from "@/components/seo/json-ld";
 import { propertyUrl, siteConfig } from "@/lib/config/site";
 import { getPublicInventory } from "@/lib/data/public-inventory";
 import { construirIndice, contextoDe, sugerencias } from "@/lib/search/indice";
-import { buscar } from "@/lib/search/motor";
-import { leerParams } from "@/lib/search/url";
 import { agruparPorSector, sectorPath } from "@/lib/seo/sectores";
 import { recortarEnPalabra } from "@/lib/seo/textos-seo";
 import { titularInventario } from "@/lib/seo/titular";
@@ -30,30 +28,28 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-type SearchParams = Record<string, string | string[] | undefined>;
+// Página estática (ISR): NO lee `searchParams`. Leerlos la volvía dinámica y cada visita, rastreo de bot o URL con
+// ?q= distinto ejecutaba una función con una consulta completa. Ahora el HTML sale del CDN y el navegador aplica
+// los filtros de la URL (catalogo.tsx). El panel la renueva al instante (revalidatePath + etiqueta `inventario`).
+export const revalidate = 3600;
 
-export default async function InmueblesPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  const inicial = leerParams(await searchParams);
-
+export default async function InmueblesPage() {
   const todos = await getPublicInventory();
   const indice = construirIndice(todos);
   const ctx = contextoDe(todos);
   const titular = titularInventario(todos);
   const sectores = agruparPorSector(todos);
 
-  // Mismo motor que usa el navegador: el HTML del servidor coincide con el primer render del cliente.
-  const visibles = buscar(indice, inicial, ctx).resultados;
-
-  // Datos estructurados (schema.org): lista de lo que muestra esta vista. Se omite
-  // cuando no hay resultados (un ItemList vacío no aporta).
+  // Datos estructurados (schema.org): el catálogo completo (la vista base, la que se indexa). Se omite
+  // cuando no hay inmuebles (un ItemList vacío no aporta).
   const jsonLd =
-    visibles.length > 0
+    indice.length > 0
       ? {
           "@context": "https://schema.org",
           "@type": "ItemList",
           name: titular.titulo,
-          numberOfItems: visibles.length,
-          itemListElement: visibles.map(({ item }, i) => ({
+          numberOfItems: indice.length,
+          itemListElement: indice.map((item, i) => ({
             "@type": "ListItem",
             position: i + 1,
             name: [item.titulo, item.sector, item.ciudad].filter(Boolean).join(" · "),
@@ -75,7 +71,7 @@ export default async function InmueblesPage({ searchParams }: { searchParams: Pr
         </p>
       </header>
 
-      <Catalogo indice={indice} ctx={ctx} sugerencias={sugerencias(indice)} inicial={inicial} />
+      <Catalogo indice={indice} ctx={ctx} sugerencias={sugerencias(indice)} />
 
       {sectores.length > 0 && (
         <nav aria-labelledby="por-sector" className="wrap mt-24">

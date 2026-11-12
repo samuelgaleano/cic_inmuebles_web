@@ -30,25 +30,35 @@ export function Catalogo({
   indice,
   ctx,
   sugerencias,
-  inicial,
 }: {
   indice: ItemIndice[];
   ctx: ContextoBusqueda;
   sugerencias: string[];
-  inicial: EstadoBusqueda;
 }) {
-  const [estado, setEstado] = useState<EstadoBusqueda>(inicial);
+  // La página es estática: el servidor siempre entrega el catálogo completo y el navegador aplica los
+  // filtros que traiga la URL (enlaces compartidos ?q=…) justo después de hidratar.
+  const [estado, setEstado] = useState<EstadoBusqueda>(ESTADO_VACIO);
+  const [hidratado, setHidratado] = useState(false);
   const busqueda = useMemo(() => buscar(indice, estado, ctx), [indice, estado, ctx]);
+
+  useEffect(() => {
+    const desdeUrl = leerParams(new URLSearchParams(window.location.search));
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- leer la URL solo es posible en el navegador
+    if (aQuery(desdeUrl)) setEstado(desdeUrl);
+    setHidratado(true);
+  }, []);
 
   // La URL refleja la búsqueda (enlace compartible) sin pasar por el servidor.
   useEffect(() => {
+    // Antes de leer la URL inicial no se escribe: se borrarían los filtros del enlace recibido.
+    if (!hidratado) return;
     const t = setTimeout(() => {
       const deseada = aQuery(estado);
       const actual = aQuery(leerParams(new URLSearchParams(window.location.search)));
       if (deseada !== actual) window.history.replaceState(null, "", `/inmuebles${deseada}`);
     }, 350);
     return () => clearTimeout(t);
-  }, [estado]);
+  }, [estado, hidratado]);
 
   const chips: ChipVista[] = [
     ...busqueda.interpretacion.chips
