@@ -8,11 +8,14 @@ export function WhatsAppButton({
   message,
   label = "Escríbenos por WhatsApp",
   size = "md",
+  variant = "whatsapp",
   className,
 }: {
   message: string;
   label?: string;
   size?: "sm" | "md" | "lg";
+  /** "outline" cuando comparte espacio con otro botón principal (un solo protagonista por bloque). */
+  variant?: "whatsapp" | "outline";
   className?: string;
 }) {
   return (
@@ -20,9 +23,9 @@ export function WhatsAppButton({
       href={whatsappLink(message)}
       target="_blank"
       rel="noopener noreferrer"
-      className={cn(buttonVariants({ variant: "whatsapp", size }), className)}
+      className={cn(buttonVariants({ variant, size }), className)}
     >
-      <MessageCircle className="h-4 w-4" />
+      <MessageCircle className={cn("h-4 w-4", variant === "outline" && "text-[#128C4A]")} aria-hidden />
       {label}
     </a>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { ArrowRight, MessageCircle } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { siteConfig, whatsappLink } from "@/lib/config/site";
@@ -11,6 +12,7 @@ import { buscar, ESTADO_VACIO, type EstadoBusqueda, type Manual } from "@/lib/se
 import { aQuery, leerParams } from "@/lib/search/url";
 import { Buscador, Sugerencias, type ChipVista } from "./buscador";
 import { HojaFiltros } from "./hoja-filtros";
+import { LeadForm } from "./lead-form";
 import { TarjetaInmueble } from "./tarjeta-inmueble";
 
 /** Un chip de la frase queda sin efecto cuando el visitante fijó ese mismo campo a mano. */
@@ -30,25 +32,35 @@ export function Catalogo({
   indice,
   ctx,
   sugerencias,
-  inicial,
 }: {
   indice: ItemIndice[];
   ctx: ContextoBusqueda;
   sugerencias: string[];
-  inicial: EstadoBusqueda;
 }) {
-  const [estado, setEstado] = useState<EstadoBusqueda>(inicial);
+  // La página es estática: el servidor siempre entrega el catálogo completo y el navegador aplica los
+  // filtros que traiga la URL (enlaces compartidos ?q=…) justo después de hidratar.
+  const [estado, setEstado] = useState<EstadoBusqueda>(ESTADO_VACIO);
+  const [hidratado, setHidratado] = useState(false);
   const busqueda = useMemo(() => buscar(indice, estado, ctx), [indice, estado, ctx]);
+
+  useEffect(() => {
+    const desdeUrl = leerParams(new URLSearchParams(window.location.search));
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- leer la URL solo es posible en el navegador
+    if (aQuery(desdeUrl)) setEstado(desdeUrl);
+    setHidratado(true);
+  }, []);
 
   // La URL refleja la búsqueda (enlace compartible) sin pasar por el servidor.
   useEffect(() => {
+    // Antes de leer la URL inicial no se escribe: se borrarían los filtros del enlace recibido.
+    if (!hidratado) return;
     const t = setTimeout(() => {
       const deseada = aQuery(estado);
       const actual = aQuery(leerParams(new URLSearchParams(window.location.search)));
       if (deseada !== actual) window.history.replaceState(null, "", `/inmuebles${deseada}`);
     }, 350);
     return () => clearTimeout(t);
-  }, [estado]);
+  }, [estado, hidratado]);
 
   const chips: ChipVista[] = [
     ...busqueda.interpretacion.chips
@@ -68,6 +80,7 @@ export function Catalogo({
   ];
 
   const { resultados, relajaciones } = busqueda;
+  const loQueBusca = estado.texto.trim() || chips.map((c) => c.etiqueta).join(", ") || "un inmueble";
   const hayCriterios = chips.length > 0;
   const total = indice.length;
 
@@ -109,6 +122,13 @@ export function Catalogo({
             </li>
           ))}
         </ul>
+        {/* Enlace cruzado al embudo de vendedores: quien mira el catálogo a veces también tiene uno para vender. */}
+        <p className="mt-16 text-center text-[15px] text-muted">
+          ¿Tienes un inmueble para vender?{" "}
+          <Link href="/vender" className="font-medium text-ink underline underline-offset-4 hover:text-brand-700">
+            Lo publicamos sin costo inicial
+          </Link>
+        </p>
         </>
       ) : (
         <div className="mx-auto mt-16 max-w-xl text-center">
@@ -135,18 +155,36 @@ export function Catalogo({
               </ul>
             </>
           ) : (
-            <p className="mt-3 text-muted">El catálogo es corto a propósito y cambia seguido.</p>
+            <p className="mt-3 text-muted">El portafolio es corto y cambia seguido. Déjanos lo que buscas y te escribimos cuando llegue.</p>
           )}
+          {/* Quien no encontró lo que busca es el lead más valioso del catálogo: tres salidas, de más a menos directa. */}
           <a
-            href={whatsappLink(
-              `Hola ${siteConfig.name}, busco un inmueble${estado.texto ? `: «${estado.texto}»` : ""}. ¿Me avisan cuando llegue algo así?`,
-            )}
+            href={whatsappLink(`Hola ${siteConfig.name}, busco un inmueble: «${loQueBusca}». ¿Me avisan cuando llegue algo así?`)}
             target="_blank"
             rel="noopener noreferrer"
-            className={buttonVariants({ variant: "outline", size: "lg", className: "mt-8" })}
+            className={buttonVariants({ variant: "primary", size: "lg", className: "mt-8" })}
           >
             <MessageCircle className="h-5 w-5" aria-hidden /> Avísenme cuando llegue uno
           </a>
+          <details className="mx-auto mt-6 max-w-md text-left">
+            <summary className="cursor-pointer text-center text-[15px] font-medium text-ink-soft underline underline-offset-4 hover:text-brand-700">
+              Prefiero dejar mis datos
+            </summary>
+            <LeadForm
+              tipo="comprador"
+              intencion="info"
+              mensajeInicial={`Avísenme si llega: ${loQueBusca}`}
+              submitLabel="Avísenme"
+              className="mt-5"
+            />
+          </details>
+          <button
+            type="button"
+            onClick={() => setEstado(ESTADO_VACIO)}
+            className="mt-6 text-[15px] font-medium text-ink-soft underline underline-offset-4 hover:text-brand-700"
+          >
+            Ver los {indice.length} inmuebles publicados
+          </button>
         </div>
       )}
     </div>

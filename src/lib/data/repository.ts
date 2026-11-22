@@ -48,6 +48,8 @@ export interface PropertyRepository {
 export interface LeadRepository {
   create(input: LeadInput): Promise<Lead>;
   list(): Promise<Lead[]>;
+  /** Cuántos leads llegaron desde ese instante (tope de avisos por correo). */
+  countSince(iso: string): Promise<number>;
   updateStatus(id: string, estado: LeadStatus): Promise<Lead | null>;
   remove(id: string): Promise<boolean>;
 }

@@ -105,7 +105,7 @@ export function SiteFooter() {
             <Link href="/privacidad" className="inline-block py-1.5 transition-colors hover:text-ink">
               Política de tratamiento de datos
             </Link>
-            <Link href="/admin/login" className="inline-block py-1.5 transition-colors hover:text-ink">
+            <Link href="/admin/login" prefetch={false} className="inline-block py-1.5 transition-colors hover:text-ink">
               Acceso del equipo
             </Link>
           </div>

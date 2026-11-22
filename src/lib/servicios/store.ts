@@ -51,6 +51,8 @@ export interface ServiciosStore {
   marcarVencido(id: string, opts?: { forzar?: boolean; ahora?: Date; sinPeriodo?: boolean }): Promise<void>;
   marcarAviso(id: string, tipo: TipoAviso): Promise<void>;
   asignarFicha(id: string, propertySlug: string | null, propertyId?: string | null): Promise<void>;
+  /** Un inmueble cambió de dirección (se renombró): sus planes siguen la ficha nueva. Devuelve cuántos movió. */
+  renombrarFicha(slugAnterior: string, slugNuevo: string): Promise<number>;
   /** Persona del CRM dueña del plan. */
   asignarContacto(id: string, contactoId: string): Promise<void>;
   /** Momento en que Wompi aprobó el pago (solo si todavía no se conocía). */
@@ -296,6 +298,16 @@ class SupabaseServiciosStore implements ServiciosStore {
     if (error) falla("asignarFicha", error);
   }
 
+  async renombrarFicha(slugAnterior: string, slugNuevo: string): Promise<number> {
+    const { data, error } = await getSupabaseAdmin()
+      .from("servicios_publicacion")
+      .update({ property_slug: slugNuevo })
+      .eq("property_slug", slugAnterior)
+      .select("id");
+    if (error) falla("renombrarFicha", error);
+    return data?.length ?? 0;
+  }
+
   async asignarContacto(id: string, contactoId: string): Promise<void> {
     const { error } = await getSupabaseAdmin().from("servicios_publicacion").update({ contacto_id: contactoId }).eq("id", id);
     if (error) falla("asignarContacto", error);
@@ -460,6 +472,16 @@ export class MemoryServiciosStore implements ServiciosStore {
     if (!s) return;
     s.propertySlug = propertySlug;
     if (propertyId !== undefined) s.propertyId = propertyId;
+  }
+
+  async renombrarFicha(slugAnterior: string, slugNuevo: string): Promise<number> {
+    let n = 0;
+    for (const s of this.filas) {
+      if (s.propertySlug !== slugAnterior) continue;
+      s.propertySlug = slugNuevo;
+      n++;
+    }
+    return n;
   }
 
   async asignarContacto(id: string, contactoId: string): Promise<void> {

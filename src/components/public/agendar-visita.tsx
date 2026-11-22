@@ -64,7 +64,7 @@ export function AgendarVisita({
         {vendido ? "Pídenos opciones parecidas y te avisamos cuando llegue una." : `${titulo} · ${precio}`}
       </p>
 
-      {!vendido && <div role="tablist" aria-label="Qué quieres hacer" className="mt-5 grid grid-cols-2 rounded-full bg-surface p-1">
+      {!vendido && <div role="radiogroup" aria-label="Qué quieres hacer" className="mt-5 grid grid-cols-2 rounded-full bg-surface p-1">
         {(
           [
             ["visita", "Agendar visita"],
@@ -74,8 +74,8 @@ export function AgendarVisita({
           <button
             key={id}
             type="button"
-            role="tab"
-            aria-selected={modo === id}
+            role="radio"
+            aria-checked={modo === id}
             onClick={() => setModo(id)}
             className={cn(
               "h-10 rounded-full text-[14px] font-medium transition-colors duration-200",
@@ -91,7 +91,7 @@ export function AgendarVisita({
         <div className="mt-6">
           <fieldset className="min-w-0">
             <legend className="text-[14px] font-medium">¿Qué día te queda bien?</legend>
-            <div className="-mx-1 mt-3 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="-mx-1 mt-3 flex gap-2 overflow-x-auto px-1 pb-1 [mask-image:linear-gradient(to_right,#000_85%,transparent)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {dias.length === 0
                 ? Array.from({ length: 5 }, (_, i) => <span key={i} className="h-[4.25rem] w-[3.75rem] shrink-0 rounded-2xl bg-surface" aria-hidden />)
                 : dias.map((d) => {

@@ -41,7 +41,7 @@ export async function GET(req: Request) {
   try {
     result = await runDriveImport();
   } catch (err) {
-    console.error("[cron/sync] la importación desde Drive falló:", err);
+    console.error("[cron/sync] la importación desde Drive falló:", err instanceof Error ? err.message : err);
     result = { ran: true, ok: false, message: "La importación desde Drive lanzó un error." };
   }
   if (result.ok === false) {
@@ -56,7 +56,7 @@ export async function GET(req: Request) {
     try {
       await syncAllPropertiesToSheet(await getRepository().properties.list());
     } catch (err) {
-      console.error("[cron/sync] Sheets:", err);
+      console.error("[cron/sync] Sheets:", err instanceof Error ? err.message : err);
       fallos.push("Sincronización con Google Sheets: falló.");
     }
   }

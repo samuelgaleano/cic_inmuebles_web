@@ -7,6 +7,8 @@ import { z } from "zod";
 import { getCrmStore } from "@/lib/crm/store";
 import { vincularInmueble } from "@/lib/crm/vinculos";
 import { getRepository } from "@/lib/data";
+import { getServiciosStore } from "@/lib/servicios/store";
+import { invalidarInventario } from "@/lib/data/inventario-tag";
 import { ensurePropertyArchive, isDriveConfigured } from "@/lib/integrations/drive";
 import { isSheetsConfigured, syncAllPropertiesToSheet, syncPropertyToSheet } from "@/lib/integrations/sheets";
 import {
@@ -28,8 +30,13 @@ function mediaProviderFor(url: string): MediaProvider {
 
 /** Revalida las rutas públicas afectadas para mantener el catálogo sincronizado. */
 function revalidatePublic(...slugs: (string | undefined)[]) {
+  // Etiqueta `inventario`: vence la lectura compartida de Supabase (home, catálogo, fichas, sectores,
+  // comparar, favoritos y sitemap la usan) y la siguiente visita la renueva UNA vez para todas.
+  invalidarInventario();
   revalidatePath("/");
   revalidatePath("/inmuebles");
+  revalidatePath("/comparar");
+  revalidatePath("/favoritos");
   // La ficha nueva y la anterior: renombrar un inmueble cambia su URL y la vieja no debe quedar viva.
   for (const slug of new Set(slugs.filter(Boolean))) revalidatePath(`/inmuebles/${slug}`);
   revalidatePath("/sitemap.xml");
@@ -222,6 +229,9 @@ export async function updatePropertyAction(
     const updated = await getRepository().properties.update(id, input);
     if (!updated) return { error: "El inmueble no existe." };
     slug = updated.slug;
+    // Renombrar cambia la URL: los planes guardan la ficha por su dirección y, sin esto, la vigencia
+    // dejaría de encontrarla al vencer (la ficha seguiría publicada sin plan).
+    if (slugAnterior && slugAnterior !== slug) await getServiciosStore().renombrarFicha(slugAnterior, slug);
     if (isSheetsConfigured()) await syncPropertyToSheet(updated);
     await enlazarConCrm(updated);
   } catch (err) {

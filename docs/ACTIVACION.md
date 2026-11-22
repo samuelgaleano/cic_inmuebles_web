@@ -41,7 +41,7 @@ Con esto, el botón "Subir imágenes" del panel sube directo a Cloudinary.
 ```
 RESEND_API_KEY=re_...
 RESEND_FROM="CIC Inmuebles <no-reply@tudominio.com>"
-LEADS_NOTIFICATION_EMAIL=cc.inmuebles@gmail.com
+LEADS_NOTIFICATION_EMAIL=cic.inmuebles@gmail.com
 ```
 Sin la API key, los leads se registran en consola (no se pierden, pero no se
 envía correo).
@@ -49,7 +49,7 @@ envía correo).
 ## 5. Google Drive — archivo por inmueble (opcional)
 1. Google Cloud Console → crea una **cuenta de servicio** y una **clave JSON**.
 2. Habilita la **Google Drive API**.
-3. Crea una carpeta raíz en el Drive de `cc.inmuebles@gmail.com` y **compártela**
+3. Crea una carpeta raíz en el Drive de `cic.inmuebles@gmail.com` y **compártela**
    con el correo de la cuenta de servicio (permiso de editor). Copia su ID
    (de la URL de la carpeta).
 ```
@@ -65,7 +65,7 @@ Al crear un inmueble se generará su carpeta `Título – Ciudad` con el documen
 NEXT_PUBLIC_SITE_URL=https://cicinmuebles.com
 NEXT_PUBLIC_WHATSAPP=573000000000      # solo dígitos, con código de país
 NEXT_PUBLIC_PHONE_DISPLAY=+57 300 000 0000
-NEXT_PUBLIC_CONTACT_EMAIL=cc.inmuebles@gmail.com
+NEXT_PUBLIC_CONTACT_EMAIL=cic.inmuebles@gmail.com
 ```
 
 ## Despliegue en Vercel

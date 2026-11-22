@@ -63,16 +63,22 @@ export function urlPaginaCompleta(d: DatosPago, f: DatosComprador): string {
 }
 
 /**
- * Cada cuánto consulta la página el estado de un pago en curso: cada 5 s los primeros 2 minutos, cada 10 s
- * hasta los 5 y cada 20 s hasta los 20 (Nequi y PSE pueden tardar). Pasado ese tiempo se deja de consultar:
+ * Cada cuánto consulta la página el estado de un pago en curso: cada 5 s los primeros 2 minutos, cada 15 s
+ * hasta los 5 y cada 45 s hasta los 20 (Nequi y PSE pueden tardar). Cada consulta es una invocación de función
+ * con una llamada a Wompi, por eso el ritmo se afloja pronto. Pasado ese tiempo se deja de consultar:
  * la conciliación diaria y el botón «Volver al comercio» siguen cubriendo el caso.
  */
 export const SEGUIMIENTO_MAX_MS = 20 * 60_000;
 export function esperaDeSeguimiento(transcurridoMs: number): number | null {
   if (transcurridoMs >= SEGUIMIENTO_MAX_MS) return null;
   if (transcurridoMs < 2 * 60_000) return 5_000;
-  if (transcurridoMs < 5 * 60_000) return 10_000;
-  return 20_000;
+  if (transcurridoMs < 5 * 60_000) return 15_000;
+  return 45_000;
+}
+
+/** Pausa antes de la consulta número `vuelta` (0, 1, …) de la pantalla de pago pendiente: 30 s al inicio, 60 s después. */
+export function proximaEsperaPendiente(vuelta: number): number {
+  return vuelta < 2 ? 30_000 : 60_000;
 }
 
 /** Una respuesta del servidor sirve para abrir la pasarela solo si trae todo lo necesario. */

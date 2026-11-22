@@ -6,7 +6,7 @@ consultarse de forma continua, no para leerse una vez.
 
 > **Sitio en producción:** https://www.cicinmuebles.com
 > **Modelo:** inmobiliaria boutique, **solo venta**, enfocada en Bogotá y Colombia.
-> **Contacto del negocio:** WhatsApp/tel. +57 324 907 1717 · cc.inmuebles@gmail.com
+> **Contacto del negocio:** WhatsApp/tel. +57 324 907 1717 · cic.inmuebles@gmail.com
 
 ---
 

@@ -18,7 +18,8 @@ export interface CorreoResend {
 export async function sendEmail(msg: CorreoResend): Promise<boolean> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
-    console.warn(`[correo] no enviado: falta RESEND_API_KEY (asunto: ${msg.subject.slice(0, 60)})`);
+    // Sin el asunto: el de un lead lleva el nombre de la persona (Ley 1581).
+    console.warn("[correo] no enviado: falta RESEND_API_KEY");
     return false;
   }
 
@@ -41,7 +42,8 @@ export async function sendEmail(msg: CorreoResend): Promise<boolean> {
       }),
     });
     if (!res.ok) {
-      console.error("[correo] Resend respondió", res.status, (await res.text()).slice(0, 200));
+      // Solo el estado: el cuerpo del error puede repetir la dirección de destino.
+      console.error("[correo] Resend respondió", res.status);
       return false;
     }
     return true;

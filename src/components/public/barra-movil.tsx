@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { MessageCircle } from "lucide-react";
+import { siteConfig, whatsappLink } from "@/lib/config/site";
 import { cn } from "@/lib/utils/cn";
 
 /**
@@ -8,7 +10,19 @@ import { cn } from "@/lib/utils/cn";
  * Aparece cuando el visitante pasa el encabezado y se oculta mientras la
  * tarjeta de contacto ya está en pantalla (no estorba lo que ya muestra).
  */
-export function BarraMovil({ titulo, precio, ancla = "#visita" }: { titulo: string; precio: string; ancla?: string }) {
+export function BarraMovil({
+  titulo,
+  precio,
+  codigo,
+  url,
+  ancla = "#visita",
+}: {
+  titulo: string;
+  precio: string;
+  codigo?: string;
+  url?: string;
+  ancla?: string;
+}) {
   const [pasoEncabezado, setPasoEncabezado] = useState(false);
   const [contactoVisible, setContactoVisible] = useState(false);
   const centinela = useRef<HTMLDivElement>(null);
@@ -48,12 +62,24 @@ export function BarraMovil({ titulo, precio, ancla = "#visita" }: { titulo: stri
             <p className="truncate text-[13px] text-muted">{titulo}</p>
             <p className="tnum text-[1.0625rem] font-semibold tracking-[-0.01em]">{precio}</p>
           </div>
-          <a
-            href={ancla}
-            className="inline-flex h-11 shrink-0 items-center rounded-full bg-brand-700 px-6 text-[15px] font-medium text-white transition-colors hover:bg-brand-800 active:scale-[0.97]"
-          >
-            Agendar visita
-          </a>
+          <div className="flex shrink-0 gap-2">
+            {/* En la ficha el botón flotante se oculta en móvil: WhatsApp vive aquí, con el código del inmueble. */}
+            <a
+              href={whatsappLink(`Hola ${siteConfig.name}, me interesa «${titulo}»${codigo ? ` (código ${codigo})` : ""}.${url ? ` ${url}` : ""}`)}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Escribir por WhatsApp sobre este inmueble"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-[#25D366] text-ink transition-transform active:scale-[0.97]"
+            >
+              <MessageCircle className="h-5 w-5" aria-hidden />
+            </a>
+            <a
+              href={ancla}
+              className="inline-flex h-11 items-center rounded-full bg-brand-700 px-5 text-[15px] font-medium text-white transition-colors hover:bg-brand-800 active:scale-[0.97]"
+            >
+              Agendar visita
+            </a>
+          </div>
         </div>
       </div>
     </>

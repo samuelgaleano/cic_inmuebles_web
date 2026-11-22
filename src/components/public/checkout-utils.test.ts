@@ -7,7 +7,7 @@ const PAGO = {
   reference: "CIC-alianza-90-123456-1700000000000",
   publicKey: "pub_test_x",
   signature: "abc",
-  redirectUrl: "https://www.cicinmuebles.com/publica/agente?pago=procesado&ref=CIC-alianza-90-123456-1700000000000",
+  redirectUrl: "https://www.cicinmuebles.com/publica/agente/pago?ref=CIC-alianza-90-123456-1700000000000",
 };
 
 describe("checkout-utils", () => {

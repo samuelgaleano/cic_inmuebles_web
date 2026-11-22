@@ -183,3 +183,24 @@ describe("vínculos del CRM", () => {
     expect(r.inmuebles).toMatchObject({ errores: 1, creada: 1 });
   });
 });
+
+describe("emparejar por correo y reactivar archivados", () => {
+  it("un plan pagado sin teléfono se une a la persona que ya tenía ese correo, aunque traiga otro nombre", async () => {
+    const crm = new MemoryCrmStore();
+    const { contacto } = await crm.crearContacto({ nombre: "Juan Villa", telefono: "300 111 2233", telefonoE164: "+573001112233", email: "Juan_Villa@Correo.co", origen: "web" });
+    const s = { id: "s-1", estado: "activo", planId: "alianza-90", dias: 90, clienteNombre: "Distribuciones JS", clienteEmail: "juan_villa@correo.co", clienteTelefono: null, createdAt: new Date().toISOString() } as unknown as Servicio;
+    expect(await vincularServicio(crm, s)).toBe("creado");
+    const todos = await crm.listarContactos({ incluirArchivados: true });
+    expect(todos).toHaveLength(1);
+    expect(todos[0].id).toBe(contacto.id);
+  });
+
+  it("un lead nuevo de alguien archivado lo vuelve a la lista", async () => {
+    const crm = new MemoryCrmStore();
+    const { contacto } = await crm.crearContacto({ nombre: "Ana", telefono: "300 999 8877", telefonoE164: "+573009998877", origen: "web" });
+    await crm.archivarContacto(contacto.id, true);
+    const lead = { id: "lead-arch", tipo: "comprador", nombre: "Ana", telefono: "300 999 8877", fuente: "web", estado: "nuevo", creadoEn: new Date().toISOString() } as unknown as Lead;
+    await vincularLead(crm, lead);
+    expect((await crm.obtenerContacto(contacto.id))?.archivado).toBe(false);
+  });
+});

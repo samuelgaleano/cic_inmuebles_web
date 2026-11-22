@@ -33,9 +33,12 @@ export function HeroVitrina({ items, resumen, className }: { items: DatosTarjeta
               <div className="vitrina-img absolute inset-0">
                 <SafeImage
                   src={p.portada!}
-                  alt=""
+                  alt={`${PROPERTY_TYPE_LABELS[p.tipo]} en ${lugar || p.titulo}`}
                   fill
-                  fetchPriority={i === 0 ? "high" : undefined}
+                  // La primera foto es el LCP de la portada: sin loading="eager" Next la deja diferida
+                  // aunque tenga fetchPriority alto (producción la servía con loading="lazy").
+                  loading={i === 0 ? "eager" : "lazy"}
+                  fetchPriority={i === 0 ? "high" : "low"}
                   sizes="(max-width: 1024px) 92vw, 540px"
                   className="object-cover"
                 />

@@ -1,13 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { crear, avisar, getPublicBySlug } = vi.hoisted(() => ({
+const { crear, avisar, getPublicBySlug, contar } = vi.hoisted(() => ({
   crear: vi.fn(),
+  contar: vi.fn(async () => 0),
   avisar: vi.fn(),
   getPublicBySlug: vi.fn(),
 }));
 
 vi.mock("@/lib/data", () => ({
-  getRepository: () => ({ leads: { create: crear }, properties: { getPublicBySlug } }),
+  getRepository: () => ({ leads: { create: crear, countSince: contar }, properties: { getPublicBySlug } }),
 }));
 vi.mock("@/lib/notifications/email", () => ({ sendLeadNotification: avisar }));
 // `after` solo existe dentro de una petición real: aquí corre al instante.
@@ -120,5 +121,21 @@ describe("createLeadAction", () => {
     const r = await createLeadAction({ status: "idle" }, form({ ...valido, nombre: "x".repeat(100_000) }));
     expect(r.status).toBe("error");
     expect(r.errors?.nombre).toBeTruthy();
+  });
+});
+
+describe("tope de avisos por correo", () => {
+  it("con más de 40 leads en 24 h el lead se guarda pero no se envía el aviso", async () => {
+    avisar.mockClear();
+    crear.mockResolvedValueOnce({ id: "l-tope", tipo: "comprador", nombre: "Ana", telefono: "3001234567", estado: "nuevo", creadoEn: new Date().toISOString() });
+    contar.mockResolvedValueOnce(41);
+    const fd = new FormData();
+    fd.set("tipo", "comprador");
+    fd.set("nombre", "Ana Gómez");
+    fd.set("telefono", "300 123 4567");
+    fd.set("fuente", "web");
+    const r = await createLeadAction({ status: "idle" }, fd);
+    expect(r.status).toBe("success");
+    expect(avisar).not.toHaveBeenCalled();
   });
 });

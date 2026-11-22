@@ -13,9 +13,9 @@ export interface ServiciosDeps {
   store: ServiciosStore;
   enviarCorreo: (m: CorreoSaliente) => Promise<boolean>;
   /** false si no se pudo despublicar (se reintenta al día siguiente). */
-  despublicarFicha: (slug: string) => Promise<boolean>;
+  despublicarFicha: (slug: string, propertyId?: string | null) => Promise<boolean>;
   /** false si no se pudo volver a publicar la ficha de una renovación pagada. */
-  publicarFicha: (slug: string) => Promise<boolean>;
+  publicarFicha: (slug: string, propertyId?: string | null) => Promise<boolean>;
   alertar: (asunto: string, texto: string) => Promise<boolean>;
   ahora: () => Date;
 }
@@ -24,12 +24,15 @@ export function defaultServiciosDeps(): ServiciosDeps {
   return {
     store: getServiciosStore(),
     enviarCorreo: (m) => sendEmail(m),
-    despublicarFicha: (slug) => fijarPublicacionDeFicha(slug, false),
-    publicarFicha: (slug) => fijarPublicacionDeFicha(slug, true),
+    despublicarFicha: (slug, propertyId) => fijarPublicacionDeFicha(slug, false, propertyId),
+    publicarFicha: (slug, propertyId) => fijarPublicacionDeFicha(slug, true, propertyId),
     alertar: (asunto, texto) => sendPagosAlert(asunto, texto),
     ahora: () => new Date(),
   };
 }
+
+/** Error de una renovación cuya alerta a CIC ya salió (para no avisar dos veces). */
+class RenovacionYaAvisada extends Error {}
 
 function describe(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -54,6 +57,16 @@ export async function registrarServicioDePago(
       if (await aplicarRenovacionPagada(tx, plan, opts.renuevaServicioId, deps)) return;
     } catch (err) {
       console.error(`[vigencias] renovación de ${tx.id} sin aplicar (se reintenta):`, describe(err));
+      // El aviso del pago ya salió y la conciliación diaria no vuelve sobre pagos avisados: sin esta alerta
+      // la renovación pagada podía quedarse sin aplicar y sin que nadie lo supiera.
+      if (alertarSiFalla && !(err instanceof RenovacionYaAvisada)) {
+        await deps
+          .alertar(
+            "Renovación pagada sin aplicar",
+            [`Transacción Wompi: ${tx.id}`, `Plan: ${plan.nombre}`, `Servicio: ${opts.renuevaServicioId}`, "", `Error: ${describe(err)}`, "Renuévala a mano en /admin/vigencias si no se aplica sola."].join("\n"),
+          )
+          .catch(() => false);
+      }
       return;
     }
   }
@@ -133,9 +146,9 @@ async function aplicarRenovacionPagada(tx: WompiTransaction, plan: Plan, servici
         [`Transacción Wompi: ${tx.id}`, `Plan: ${plan.nombre}`, `Servicio: ${s.id}`, "", "Se reintenta sola; si persiste, renuévala a mano en /admin/vigencias."].join("\n"),
       )
       .catch(() => false);
-    throw new Error(`renovación de ${s.id} sin aplicar`);
+    throw new RenovacionYaAvisada(`renovación de ${s.id} sin aplicar`);
   }
-  const fichaOk = !s.propertySlug || (await deps.publicarFicha(s.propertySlug));
+  const fichaOk = !s.propertySlug || (await deps.publicarFicha(s.propertySlug, s.propertyId));
   if (!fichaOk) {
     await deps
       .alertar(
@@ -222,7 +235,7 @@ export async function revisarVencimientos(deps: ServiciosDeps = defaultServicios
       }
       if (accion.vencer) {
         // Primero se despublica: si falla, el servicio sigue activo y se reintenta mañana.
-        if (s.propertySlug && !(await deps.despublicarFicha(s.propertySlug))) {
+        if (s.propertySlug && !(await deps.despublicarFicha(s.propertySlug, s.propertyId))) {
           r.fallos += 1;
           lineas.push(`NO SE PUDO despublicar ${s.propertySlug} (${plan}). Se reintenta mañana. Cliente: ${quien}`);
           continue;

@@ -214,7 +214,7 @@ funcionar):
 3. **Cloudinary**: `cloud name` + API key/secret (+ upload preset opcional).
 4. **Resend**: API key + dominio verificado para el remitente (o usar Gmail SMTP).
 5. **Google Cloud**: cuenta de servicio con acceso al Drive de
-   `cc.inmuebles@gmail.com` + ID de la carpeta raíz.
+   `cic.inmuebles@gmail.com` + ID de la carpeta raíz.
 6. **WhatsApp**: número de la empresa (para enlaces `wa.me` y, después, la API).
 
 Todas las variables están documentadas en [`.env.example`](../.env.example).

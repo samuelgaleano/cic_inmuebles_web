@@ -26,6 +26,16 @@ const desdeAgentesCOP = Math.min(
 
 export const metadata: Metadata = {
   alternates: { canonical: "/" },
+  // El openGraph de una página reemplaza entero al del layout: se repite aquí para sumar og:url.
+  openGraph: {
+    type: "website",
+    locale: "es_CO",
+    siteName: siteConfig.name,
+    url: siteConfig.url,
+    title: `${siteConfig.name} — ${siteConfig.tagline}`,
+    description: siteConfig.description,
+    images: [siteConfig.ogImage],
+  },
 };
 
 /** "Bella Suiza, Calleja y Gilmar" (máximo `max` nombres, el resto en "más sectores"). */
@@ -61,7 +71,7 @@ const SIN_FOTO_GRANDE = ["puente-largo-alhambra"];
 
 // Red de seguridad: regenera la página cada hora aunque falle la
 // revalidación bajo demanda del panel admin.
-export const revalidate = 3600;
+export const revalidate = 21600;
 
 export default async function HomePage() {
   // Disponibles primero, luego en proceso y vendidos (orden del repositorio). Si la base de datos
@@ -124,7 +134,7 @@ export default async function HomePage() {
 
             <p className="t-lead anim-sube mt-6 max-w-xl" style={{ "--d": "520ms" } as React.CSSProperties}>
               {titular.ciudad && sectores
-                ? `Vendemos apartamentos y casas y gestionamos inmuebles en Colombia. Hoy el portafolio está en ${titular.ciudad}, en ${sectores}: cada inmueble, visitado y verificado por nosotros. ¿Vendes el tuyo? Te acompañamos de principio a fin.`
+                ? `Hoy el portafolio está en ${titular.ciudad}: ${sectores}. Cada inmueble lo visitamos y verificamos nosotros, y te respondemos directo por WhatsApp.`
                 : "Te ayudamos a vender tu inmueble de forma rápida y segura. Encuentra el tuyo en un portafolio corto, visitado y verificado por nosotros."}
             </p>
 
@@ -135,10 +145,20 @@ export default async function HomePage() {
               </Link>
               <WhatsAppButton
                 size="lg"
+                variant="outline"
                 label="Hablar con un asesor"
                 message={`Hola ${siteConfig.name}, quiero ver inmuebles y me gustaría hablar con un asesor.`}
               />
             </div>
+            {/* El vendedor tiene su propia puerta desde el primer pliegue, sin mezclar su mensaje con el del comprador. */}
+            <Link
+              href="/vender"
+              className="anim-sube mt-5 inline-flex items-center gap-1.5 text-[15px] font-medium text-ink-soft underline-offset-4 hover:text-brand-700 hover:underline"
+              style={{ "--d": "700ms" } as React.CSSProperties}
+            >
+              ¿Vendes el tuyo? Sin costo inicial, 3% solo al cerrar
+              <ArrowRight className="h-4 w-4" aria-hidden />
+            </Link>
           </div>
 
           <div className="anim-sube min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1" style={{ "--d": "380ms" } as React.CSSProperties}>

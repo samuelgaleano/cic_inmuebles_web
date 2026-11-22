@@ -68,7 +68,7 @@ const siteJsonLd = {
       "@id": `${siteConfig.url}/#website`,
       name: siteConfig.name,
       url: siteConfig.url,
-      inLanguage: "es",
+      inLanguage: "es-CO",
       publisher: { "@id": ORG_ID },
       potentialAction: {
         "@type": "SearchAction",

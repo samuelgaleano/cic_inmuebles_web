@@ -71,8 +71,9 @@ export function TarjetaInmueble({
         {datos.portada ? (
           <SafeImage
             src={datos.portada}
-            alt=""
+            alt={`${PROPERTY_TYPE_LABELS[datos.tipo]} en ${lugar || datos.titulo}`}
             fill
+            loading={prioridad ? "eager" : undefined}
             fetchPriority={prioridad ? "high" : undefined}
             sizes={proporcion === "4/5" ? "(max-width: 640px) 72vw, 344px" : "(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 380px"}
             className={cn(
@@ -103,6 +104,7 @@ export function TarjetaInmueble({
         <h3 className={cn("mt-1 text-[1.25rem] font-semibold leading-snug tracking-[-0.02em]", vendido && "text-muted")}>
           <Link
             href={`/inmuebles/${datos.slug}`}
+            prefetch={false}
             className="rounded-sm after:absolute after:inset-0 after:content-['']"
           >
             {datos.titulo}

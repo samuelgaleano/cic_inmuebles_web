@@ -1,3 +1,5 @@
+import { getCrmStore } from "@/lib/crm/store";
+import { vincularInmueble } from "@/lib/crm/vinculos";
 import { getRepository } from "@/lib/data";
 import {
   drivePublicImageUrl,
@@ -240,6 +242,10 @@ export async function runDriveImport(): Promise<DriveImportState> {
       };
 
       const prop = await repo.properties.create(input);
+      // El propietario del documento de la carpeta entra al CRM como vendedor, igual que al guardar desde el panel.
+      await vincularInmueble(getCrmStore(), prop).catch((err) =>
+        console.error(`[drive-import] "${folder.name}" no se pudo enlazar con el CRM:`, err instanceof Error ? err.message : err),
+      );
       created.push({ id: prop.id, titulo: prop.titulo, slug: prop.slug, fotos: medios.length });
     } catch (err) {
       console.error(`[drive-import] Error en "${folder.name}":`, err);
@@ -249,6 +255,11 @@ export async function runDriveImport(): Promise<DriveImportState> {
 
   const walk = async (folder: DriveFolder, ctx: Ctx, depth: number) => {
     if (depth > MAX_DEPTH || IGNORE_RE.test(folder.name)) return;
+    // Ya importada: se salta ANTES de listar su contenido (eran 2 llamadas a Drive por inmueble cada día).
+    if (importedFolderIds.has(folder.id)) {
+      skipped++;
+      return;
+    }
 
     const ctx2: Ctx = { ...ctx };
     const est = estadoFromFolderName(folder.name);

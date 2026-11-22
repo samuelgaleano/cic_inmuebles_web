@@ -115,7 +115,7 @@ describe("correos", () => {
     expect(c.subject).toBe("Tu publicación vence en 7 días");
     expect(c.text).toContain("Alianza por resultados");
     expect(c.text).toContain("/inmuebles/bella-suiza");
-    expect(c.text).toMatch(/\/publica\/agente\?renovar=00000000-0000-4000-8000-000000000001\.\d{10}\.[0-9a-f]{32}/);
+    expect(c.text).toMatch(/\/publica\/agente\/renovar\?renovar=00000000-0000-4000-8000-000000000001\.\d{10}\.[0-9a-f]{32}/);
     expect(c.replyTo).toBeTruthy();
     expect(c.text).toContain("Hola Marta,");
     expect(c.text).not.toMatch(/[—–]/);
@@ -222,7 +222,7 @@ describe("revisarVencimientos", () => {
     // al día siguiente ya pasó la gracia: se despublica y no se repite el aviso
     d.ahora = () => new Date(AHORA.getTime() + DIA);
     const r2 = await revisarVencimientos(d);
-    expect(d.despublicarFicha).toHaveBeenCalledWith("bella-suiza");
+    expect((d.despublicarFicha as ReturnType<typeof vi.fn>).mock.calls[0][0]).toBe("bella-suiza");
     expect(s.estado).toBe("vencido");
     expect(r2).toMatchObject({ vencidos: 1, avisosEnviados: 0 });
   });
@@ -230,7 +230,7 @@ describe("revisarVencimientos", () => {
   it("al vencer despublica la ficha, marca vencido y avisa; la alerta a CIC lista al cliente", async () => {
     const { d, s } = await conServicio({ venceAt: new Date(AHORA.getTime() - 2 * DIA).toISOString() });
     const r = await revisarVencimientos(d);
-    expect(d.despublicarFicha).toHaveBeenCalledWith("bella-suiza");
+    expect((d.despublicarFicha as ReturnType<typeof vi.fn>).mock.calls[0][0]).toBe("bella-suiza");
     expect(s.estado).toBe("vencido");
     expect(r).toMatchObject({ vencidos: 1, avisosEnviados: 1 });
     expect(d.alertar).toHaveBeenCalledTimes(1);
@@ -366,7 +366,7 @@ describe("renovación pagada desde el enlace del correo", () => {
     await registrarServicioDePago(RENOV, getPlan("alianza-90")!, d, { renuevaServicioId: s.id });
     expect(d.mem.filas).toHaveLength(1);
     expect(diasRestantes(s.venceAt!, AHORA)).toBe(95);
-    expect(d.publicarFicha).toHaveBeenCalledWith("bella-suiza");
+    expect((d.publicarFicha as ReturnType<typeof vi.fn>).mock.calls[0][0]).toBe("bella-suiza");
     expect(d.enviarCorreo).toHaveBeenCalledTimes(1);
     expect((d.enviarCorreo as ReturnType<typeof vi.fn>).mock.calls[0][0].subject).toBe("Renovamos tu publicación");
   });
@@ -488,5 +488,26 @@ describe("panel y cron: condiciones contra dobles envíos", () => {
     const c = correoDeAviso(servicio({ planId: "paquete-5", propertySlug: null, venceAt: new Date(AHORA.getTime() - 1000).toISOString() }), "vencido")!;
     expect(c.text).not.toMatch(/la desactivamos/);
     expect(c.text).toMatch(/coordinar/);
+  });
+});
+
+describe("ficha renombrada y fallos de renovación", () => {
+  it("renombrar una ficha mueve sus planes a la dirección nueva y la vigencia la sigue encontrando", async () => {
+    const d = deps();
+    d.mem.filas.push(servicio({ propertySlug: "bella-suiza", propertyId: "prop-1", venceAt: new Date(AHORA.getTime() - 3 * DIA).toISOString() }));
+    d.mem.filas.push(servicio({ id: "otro", txId: "tx-2", propertySlug: "otra-ficha" }));
+    expect(await d.mem.renombrarFicha("bella-suiza", "bella-suiza-norte")).toBe(1);
+    expect(d.mem.filas[0].propertySlug).toBe("bella-suiza-norte");
+    expect(d.mem.filas[1].propertySlug).toBe("otra-ficha");
+    await revisarVencimientos(d);
+    expect(d.despublicarFicha).toHaveBeenCalledWith("bella-suiza-norte", "prop-1");
+  });
+
+  it("si la renovación pagada no se puede ni leer, avisa a CIC una sola vez", async () => {
+    const d = deps();
+    d.mem.obtener = vi.fn().mockRejectedValue(new Error("base caída"));
+    await registrarServicioDePago({ ...TX, id: "7777-1610641025-33333" }, getPlan("alianza-90")!, d, { renuevaServicioId: "x" });
+    expect(d.alertar).toHaveBeenCalledTimes(1);
+    expect((d.alertar as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatch(/sin aplicar/);
   });
 });

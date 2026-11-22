@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
+import { redirect, unstable_rethrow } from "next/navigation";
 import { exigirAdmin } from "@/lib/auth";
 import { CrmNoDisponibleError, CrmStoreError, getCrmStore } from "@/lib/crm/store";
 import { leerPorcentaje, leerPrecio, validarContacto } from "@/lib/crm/reglas";
@@ -57,6 +57,9 @@ function refrescar(contactoId?: string) {
 
 /** Convierte un fallo del almacén en un mensaje para la pantalla. */
 function mensajeDe(err: unknown): string {
+  // Un `volver()` (redirect) dentro del try llega aquí como error: se deja pasar en vez de mostrar
+  // «No se pudo guardar» sobre el mensaje correcto.
+  unstable_rethrow(err);
   if (err instanceof CrmNoDisponibleError) return "Falta crear las tablas del CRM (migración 0007 en Supabase).";
   if (err instanceof CrmStoreError) {
     if (/captación vigente|captaci.n vigente|captaciones_property_vigente/i.test(err.message)) return "Ese inmueble ya tiene una captación vigente.";

@@ -150,6 +150,10 @@ class MemoryLeadRepository implements LeadRepository {
     return [...this.leads];
   }
 
+  async countSince(iso: string): Promise<number> {
+    return this.leads.filter((l) => l.creadoEn >= iso).length;
+  }
+
   async updateStatus(id: string, estado: LeadStatus): Promise<Lead | null> {
     const lead = this.leads.find((l) => l.id === id);
     if (!lead) return null;

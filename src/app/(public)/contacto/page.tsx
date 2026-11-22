@@ -4,9 +4,8 @@ import { WhatsAppButton } from "@/components/public/whatsapp-button";
 import { siteConfig } from "@/lib/config/site";
 
 export const metadata: Metadata = {
-  title: "Contacto",
-  description:
-    "Contáctanos. Resolvemos tus dudas sobre inmuebles en venta, visitas y alianzas con agentes inmobiliarios.",
+  title: `Contacto: WhatsApp ${siteConfig.phoneDisplay}`,
+  description: `Escríbenos por WhatsApp al ${siteConfig.phoneDisplay} o a ${siteConfig.email}. Inmuebles en venta en Bogotá, visitas y alianzas con agentes.`,
   alternates: { canonical: "/contacto" },
   openGraph: {
     title: "Contacto | CIC Inmuebles",

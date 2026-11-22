@@ -1,18 +1,18 @@
 import type { MetadataRoute } from "next";
-import { getRepository } from "@/lib/data";
+import { getPublicInventoryOrThrow } from "@/lib/data/public-inventory";
 import type { PublicProperty } from "@/lib/domain";
 import { propertyUrl, siteConfig } from "@/lib/config/site";
 import { agruparPorSector, sectorPath } from "@/lib/seo/sectores";
 
-// Regeneración horaria; el panel además lo revalida al publicar, editar o borrar.
-export const revalidate = 3600;
+// Regeneración cada 6 h; el panel además lo revalida al publicar, editar o borrar.
+export const revalidate = 21600;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // siteConfig.url ya viene normalizada sin barra final.
   const base = siteConfig.url;
   // Sin try/catch a propósito: si la base de datos falla al regenerar, Next sigue sirviendo el sitemap
   // anterior en vez de cachear uno sin fichas.
-  const properties: PublicProperty[] = await getRepository().properties.listPublic();
+  const properties: PublicProperty[] = await getPublicInventoryOrThrow();
 
   // Última modificación real del catálogo: el inmueble editado más reciente.
   // Aplica a la home y al listado, cuyo contenido cambia con el catálogo.

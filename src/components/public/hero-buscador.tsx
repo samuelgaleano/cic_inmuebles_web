@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, MessageCircle } from "lucide-react";
+import { siteConfig, whatsappLink } from "@/lib/config/site";
 import { SafeImage } from "@/components/ui/safe-image";
 import type { ItemIndice } from "@/lib/search/indice";
 import { quitarSpans, type ContextoBusqueda } from "@/lib/search/interpretar";
@@ -64,6 +65,7 @@ export function HeroBuscador({
                   <li key={item.slug}>
                     <Link
                       href={`/inmuebles/${item.slug}`}
+                      prefetch={false}
                       className="group flex items-center gap-4 p-3 pr-5 transition-colors hover:bg-surface"
                     >
                       <span className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-surface">
@@ -87,6 +89,7 @@ export function HeroBuscador({
               </ul>
               <Link
                 href={destino({ ...ESTADO_VACIO, texto })}
+                prefetch={false}
                 className="flex items-center justify-between border-t border-line px-5 py-3.5 text-[15px] font-medium text-brand-700 transition-colors hover:bg-surface"
               >
                 <span>
@@ -117,8 +120,17 @@ export function HeroBuscador({
                   ))}
                 </ul>
               ) : (
-                <p className="mt-1 text-[15px] text-muted">Prueba con otras palabras, o escríbenos y te ayudamos a encontrarlo.</p>
+                <p className="mt-1 text-[15px] text-muted">Prueba con otras palabras, o cuéntanos qué buscas y te avisamos cuando llegue.</p>
               )}
+              {/* Quien declaró lo que busca y no lo encontró es el lead más caliente: no se va sin salida. */}
+              <a
+                href={whatsappLink(`Hola ${siteConfig.name}, busco: «${texto.trim()}». ¿Me avisan cuando llegue algo así?`)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-brand-700 px-5 text-[15px] font-medium text-white transition-colors hover:bg-brand-800"
+              >
+                <MessageCircle className="h-4 w-4" aria-hidden /> Avísenme cuando llegue uno
+              </a>
             </div>
           )}
         </div>

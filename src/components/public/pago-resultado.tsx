@@ -195,7 +195,7 @@ export function PagoResultado({ estado, plan, amountInCents, reference, actualUr
         </dl>
       )}
 
-      {estado === "PENDING" && <AutoActualizar />}
+      {estado === "PENDING" && <AutoActualizar referencia={reference} />}
 
       <h2 className="mt-10 text-[1.0625rem] font-semibold tracking-[-0.01em]">{c.pasosTitulo}</h2>
       <ol className="mt-3 space-y-2.5">

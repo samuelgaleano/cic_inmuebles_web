@@ -20,7 +20,8 @@ export interface ItemIndice extends Buscable {
 
 /** Tope de elementos que se envían al navegador. */
 export const MAX_INDICE = 120;
-const MAX_TEXTO = 900;
+/** Caracteres de texto de búsqueda por inmueble (viaja dos veces en el HTML: render y payload RSC). */
+export const MAX_TEXTO_INDICE = 300;
 
 export function construirIndice(props: PublicProperty[]): ItemIndice[] {
   return props.slice(0, MAX_INDICE).map((p) => {
@@ -34,7 +35,7 @@ export function construirIndice(props: PublicProperty[]): ItemIndice[] {
       portada: getCoverMedia(p)?.url,
       administracion: p.administracion,
       actualizadoEn: p.actualizadoEn,
-      texto: b.texto.slice(0, MAX_TEXTO),
+      texto: b.texto.slice(0, MAX_TEXTO_INDICE),
     };
   });
 }

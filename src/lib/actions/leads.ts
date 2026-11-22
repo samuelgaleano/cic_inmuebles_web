@@ -22,7 +22,7 @@ import { LEAD_INTENT_LABELS } from "@/lib/domain";
 
 const leadSchema = z.object({
   tipo: z.enum(["comprador", "vendedor"]),
-  nombre: z.string().trim().min(2, "Ingresa tu nombre").max(120),
+  nombre: z.string().trim().min(2, "Escribe tu nombre para saber cómo llamarte").max(120),
   // Un teléfono de verdad (celular o fijo de Colombia, o internacional con "+"): "-------" ya no pasa.
   telefono: z
     .string()
@@ -30,7 +30,7 @@ const leadSchema = z.object({
     .max(24, "Ingresa un teléfono válido")
     .refine((v) => normalizarTelefono(v) !== null, "Ingresa un celular o teléfono válido, por ejemplo 300 123 4567"),
   email: z
-    .union([z.string().trim().email("Correo inválido").max(160), z.literal("")])
+    .union([z.string().trim().email("Revisa el correo; debe verse como nombre@correo.com").max(160), z.literal("")])
     .optional(),
   mensaje: z.string().trim().max(1000).optional(),
   intencion: z.enum(["visita", "info"]).optional(),
@@ -47,6 +47,9 @@ const leadSchema = z.object({
 function mensajeExito(tipo: unknown): string {
   return tipo === "vendedor" ? "¡Gracias! Recibimos los datos de tu inmueble." : "¡Listo! Recibimos tu solicitud.";
 }
+
+/** Más leads que esto en 24 h es tráfico anómalo: se dejan de enviar avisos por correo (no se pierden leads). */
+const TOPE_AVISOS_LEADS_DIA = 40;
 
 /** Campos visibles que se devuelven en el estado de error para repoblar el formulario. */
 const VISIBLE_FIELDS = ["nombre", "telefono", "email", "ciudad", "tipoInmueble", "preferencia", "mensaje"] as const;
@@ -142,7 +145,7 @@ export async function createLeadAction(
     }
     return {
       status: "error",
-      message: "Revisa los datos marcados.",
+      message: "Falta corregir un dato. Te lo marcamos en rojo.",
       errors,
       values: visibleValues(raw),
     };
@@ -177,7 +180,8 @@ export async function createLeadAction(
   try {
     lead = await getRepository().leads.create(input);
   } catch (err) {
-    console.error("[leads] Error al crear lead:", err);
+    // Solo el código del error: el objeto de Postgres puede traer la fila con datos personales (Ley 1581).
+    console.error("[leads] Error al crear lead:", (err as { code?: string })?.code ?? (err instanceof Error ? err.message : "desconocido"));
     return {
       status: "error",
       message: "No pudimos registrar tu solicitud. Intenta de nuevo o escríbenos por WhatsApp.",
@@ -199,9 +203,16 @@ export async function createLeadAction(
   });
   after(async () => {
     try {
+      // Tope diario de avisos: una ráfaga de spam que pase el filtro no puede agotar la cuota gratuita de
+      // Resend, que comparten los avisos de pagos y vigencias. Los leads se siguen guardando y se ven en el panel.
+      const desde = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      if ((await getRepository().leads.countSince(desde)) > TOPE_AVISOS_LEADS_DIA) {
+        console.warn(`[leads] más de ${TOPE_AVISOS_LEADS_DIA} leads en 24 h: aviso por correo omitido (el lead quedó en el panel)`);
+        return;
+      }
       await sendLeadNotification(lead);
     } catch (err) {
-      console.error("[leads] Error al avisar por correo:", err);
+      console.error("[leads] Error al avisar por correo:", err instanceof Error ? err.message : "desconocido");
     }
   });
 

@@ -7,8 +7,36 @@ import { createLeadAction, type LeadFormState } from "@/lib/actions/leads";
 import { buttonVariants } from "@/components/ui/button";
 import type { LeadIntent, LeadType } from "@/lib/domain";
 import { cn } from "@/lib/utils/cn";
+import { whatsappLink } from "@/lib/config/site";
 
 const initialState: LeadFormState = { status: "idle" };
+
+const CAMPOS_VISIBLES = ["nombre", "telefono", "email", "ciudad", "tipoInmueble", "preferencia", "mensaje"] as const;
+
+/**
+ * Si la pestaña quedó abierta durante un despliegue, Next ya no encuentra la acción
+ * ("Failed to find Server Action", visto en producción en /contacto) y la llamada lanza.
+ * Sin esto el visitante pierde lo que escribió; con esto conserva los campos y tiene
+ * WhatsApp como salida inmediata.
+ */
+async function enviarConRespaldo(prev: LeadFormState, formData: FormData): Promise<LeadFormState> {
+  try {
+    return await createLeadAction(prev, formData);
+  } catch {
+    const values: NonNullable<LeadFormState["values"]> = {};
+    for (const campo of CAMPOS_VISIBLES) {
+      const v = formData.get(campo);
+      if (typeof v === "string" && v !== "") values[campo] = v;
+    }
+    const nombre = values.nombre ? `Hola, soy ${values.nombre}. ` : "Hola. ";
+    return {
+      status: "error",
+      message: "No pudimos enviar tu solicitud: la página se actualizó mientras la llenabas. Recárgala y vuelve a enviar, o escríbenos por WhatsApp.",
+      values,
+      whatsappUrl: whatsappLink(`${nombre}${values.mensaje ?? "Quiero más información."}`),
+    };
+  }
+}
 
 // 16 px: por debajo de eso iOS Safari hace zoom al enfocar el campo. Borde de 3,4:1 (WCAG 1.4.11).
 const campo =
@@ -26,6 +54,8 @@ interface LeadFormProps {
   preferencia?: string;
   /** El día y la franja se eligen aparte (chips): no mostrar el campo de texto libre. */
   sinPreferenciaLibre?: boolean;
+  /** Texto con el que arranca el mensaje (p. ej. lo que buscó y no encontró). */
+  mensajeInicial?: string;
   className?: string;
 }
 
@@ -38,9 +68,10 @@ export function LeadForm({
   submitLabel,
   preferencia,
   sinPreferenciaLibre,
+  mensajeInicial,
   className,
 }: LeadFormProps) {
-  const [state, formAction, isPending] = useActionState(createLeadAction, initialState);
+  const [state, formAction, isPending] = useActionState(enviarConRespaldo, initialState);
   const formId = useId();
   const formRef = useRef<HTMLFormElement>(null);
   const successRef = useRef<HTMLDivElement>(null);
@@ -63,7 +94,15 @@ export function LeadForm({
     (first ?? formRef.current?.querySelector<HTMLElement>("input:not([type=hidden])"))?.focus();
   }, [state]);
 
+  const isSeller = variant === "vendedor";
+
   if (state.status === "success") {
+    // Qué pasa ahora, según lo que pidió: la duda que más frena después de enviar.
+    const siguiente = isSeller
+      ? "Te escribimos al número que dejaste para conocer tu inmueble y agendar la visita de fotos."
+      : intencion === "visita"
+        ? "Te escribimos para confirmar el horario de la visita."
+        : "Te escribimos con la información que pediste.";
     return (
       <div
         ref={successRef}
@@ -74,7 +113,7 @@ export function LeadForm({
         <CheckCircle2 className="mx-auto h-9 w-9 text-brand-700" aria-hidden />
         <p className="mt-3 text-[1.125rem] font-semibold tracking-[-0.01em]">{state.message}</p>
         <p className="mt-1 text-[15px] text-muted">
-          Un asesor te contacta para confirmar. Si quieres, adelanta la conversación por WhatsApp.
+          {siguiente} Si quieres, adelanta la conversación por WhatsApp.
         </p>
         {state.whatsappUrl && (
           <a
@@ -90,12 +129,11 @@ export function LeadForm({
     );
   }
 
-  const isSeller = variant === "vendedor";
   const err = (field: string) => state.errors?.[field];
   const val = (field: keyof NonNullable<LeadFormState["values"]>) => state.values?.[field];
 
   return (
-    <form ref={formRef} action={formAction} className={cn("space-y-4", className)}>
+    <form ref={formRef} action={formAction} noValidate className={cn("space-y-4", className)}>
       <input type="hidden" name="tipo" value={tipo} />
       <input type="hidden" name="fuente" value="web" />
       {intencion && <input type="hidden" name="intencion" value={intencion} />}
@@ -217,7 +255,7 @@ export function LeadForm({
           name="mensaje"
           rows={isSeller ? 3 : 2}
           maxLength={1000}
-          defaultValue={val("mensaje")}
+          defaultValue={val("mensaje") ?? mensajeInicial}
           placeholder={isSeller ? "Cuéntanos sobre tu inmueble" : "¿En qué te ayudamos?"}
           className={cn(campo, "py-3")}
         />
@@ -247,10 +285,10 @@ export function LeadForm({
         className={buttonVariants({ variant: "primary", size: "lg", className: "w-full" })}
       >
         {isPending && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
-        {isPending ? "Enviando…" : (submitLabel ?? (isSeller ? "Quiero vender mi inmueble" : "Enviar y abrir WhatsApp"))}
+        {isPending ? "Enviando…" : (submitLabel ?? (isSeller ? "Quiero vender mi inmueble" : "Enviar solicitud"))}
       </button>
       <p className="text-center text-[13px] leading-snug text-muted">
-        Al enviar, registramos tu solicitud y abrimos WhatsApp para contactarte. Al enviar aceptas la{" "}
+        Guardamos tu solicitud y te dejamos WhatsApp con el mensaje listo, por si quieres adelantarlo. Al enviar aceptas la{" "}
         <Link href="/privacidad" className="font-medium text-ink-soft underline underline-offset-2 hover:text-brand-700">
           política de tratamiento de datos
         </Link>

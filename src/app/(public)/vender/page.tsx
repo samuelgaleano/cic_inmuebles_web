@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { ChevronDown } from "lucide-react";
 import { LeadForm } from "@/components/public/lead-form";
 import { WhatsAppButton } from "@/components/public/whatsapp-button";
@@ -6,9 +7,9 @@ import { JsonLd } from "@/components/seo/json-ld";
 import { siteConfig } from "@/lib/config/site";
 
 export const metadata: Metadata = {
-  title: "Vende tu inmueble",
+  title: "Vende tu apartamento o casa en Bogotá sin costo inicial",
   description:
-    "Vende tu apartamento o casa con CIC Inmuebles: fotos, visitas y negociación a cargo nuestro. Comisión del 3 % solo al cerrar la venta.",
+    "Vende tu apartamento o casa con CIC Inmuebles: fotos, visitas y negociación a cargo nuestro. Comisión del 3% solo al cerrar la venta.",
   alternates: { canonical: "/vender" },
   openGraph: {
     title: "Vende tu inmueble | CIC Inmuebles",
@@ -21,10 +22,14 @@ export const metadata: Metadata = {
 
 // Preguntas frecuentes reales del proceso. Formato pregunta-respuesta:
 // cada respuesta es un pasaje autocontenible citable por buscadores e IAs.
-const faqs = [
+const faqs: { q: string; a: string; enlace?: { href: string; texto: string } }[] = [
   {
     q: "¿Cómo publico mi inmueble con CIC Inmuebles?",
     a: "Déjanos los datos básicos en el formulario (toma menos de un minuto) o escríbenos por WhatsApp. Un asesor te contacta, visitamos y verificamos el inmueble, tomamos fotos profesionales y lo publicamos en nuestro portafolio.",
+  },
+  {
+    q: "¿Cuánto cuesta vender mi inmueble con CIC Inmuebles?",
+    a: "No pagas nada al empezar. Cobramos una comisión del 3% del precio de venta, y solo cuando se cierra la venta.",
   },
   {
     q: "¿Qué hace CIC Inmuebles durante la venta?",
@@ -37,6 +42,7 @@ const faqs = [
   {
     q: "¿Trabajan con agentes inmobiliarios?",
     a: "Sí. Si eres agente y tienes un inmueble para vender, hacemos alianza: tú lo traes, nosotros lo promocionamos y gestionamos, y compartimos la comisión 50/50.",
+    enlace: { href: "/publica/agente", texto: "Ver planes para agentes" },
   },
   {
     q: "¿Cómo los contacto?",
@@ -56,7 +62,7 @@ const faqJsonLd = {
 
 const beneficios = [
   { t: "Mayor exposición", d: "Publicamos tu inmueble en nuestro catálogo y canales digitales." },
-  { t: "Presentación profesional", d: "Fotos, descripción y ficha optimizada para vender más rápido." },
+  { t: "Presentación profesional", d: "Fotos, video y una ficha completa con precio por m²." },
   { t: "Gestión completa", d: "Atendemos interesados, coordinamos visitas y acompañamos la negociación." },
   { t: "Acompañamiento legal", d: "Te guiamos en la promesa de compraventa y el cierre." },
 ];
@@ -87,6 +93,21 @@ export default function VenderPage() {
           >
             <h2 className="text-[1.375rem] font-semibold tracking-[-0.02em]">Cuéntanos sobre tu inmueble</h2>
             <p className="mt-1 text-[15px] text-muted">Solo necesitamos lo básico para contactarte. Toma menos de un minuto.</p>
+            {/* Qué pasa después de enviar: la duda que más frena a un propietario. */}
+            <ol className="mt-5 space-y-2 text-[14px] text-ink-soft">
+              {[
+                "Nos dejas tus datos.",
+                "Visitamos y fotografiamos el inmueble.",
+                "Lo publicamos y atendemos a los interesados; pagas el 3% solo si se vende.",
+              ].map((paso, i) => (
+                <li key={paso} className="flex gap-3">
+                  <span className="tnum flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface text-[13px] font-semibold text-brand-700">
+                    {i + 1}
+                  </span>
+                  <span className="pt-0.5">{paso}</span>
+                </li>
+              ))}
+            </ol>
             <div className="mt-6">
               <LeadForm tipo="vendedor" variant="vendedor" submitLabel="Quiero vender mi inmueble" />
             </div>
@@ -129,7 +150,17 @@ export default function VenderPage() {
                     {f.q}
                     <ChevronDown className="h-5 w-5 shrink-0 text-muted transition-transform duration-300 group-open:rotate-180" aria-hidden />
                   </summary>
-                  <p className="max-w-2xl pb-6 leading-relaxed text-muted">{f.a}</p>
+                  <p className="max-w-2xl pb-6 leading-relaxed text-muted">
+                    {f.a}
+                    {f.enlace && (
+                      <>
+                        {" "}
+                        <Link href={f.enlace.href} className="font-medium text-brand-700 underline underline-offset-4">
+                          {f.enlace.texto}
+                        </Link>
+                      </>
+                    )}
+                  </p>
                 </details>
               ))}
             </div>

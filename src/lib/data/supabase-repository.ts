@@ -55,10 +55,11 @@ const PROPERTY_SELECT = "*, property_media(*)";
  * catálogo, reutilizando exactamente la misma lógica.
  */
 class SupabasePropertyRepository implements PropertyRepository {
-  private async fetchAll(): Promise<Property[]> {
-    const { data, error } = await getSupabaseAdmin()
-      .from("properties")
-      .select(PROPERTY_SELECT);
+  private async fetchAll(soloPublicados = false): Promise<Property[]> {
+    let q = getSupabaseAdmin().from("properties").select(PROPERTY_SELECT);
+    // El filtro viaja en la consulta: la lectura pública no trae borradores ni sus fotos.
+    if (soloPublicados) q = q.eq("publicado", true);
+    const { data, error } = await q;
     if (error) throw error;
     return (data ?? []).map(propertyRowToDomain);
   }
@@ -69,7 +70,7 @@ class SupabasePropertyRepository implements PropertyRepository {
   }
 
   async listPublic(filters?: PropertyFilters): Promise<PublicProperty[]> {
-    const items = await this.list(filters);
+    const items = (await this.fetchAll(true)).filter((p) => matchesFilters(p, filters)).sort(sortByRelevance);
     return items.filter((p) => p.publicado).map(toPublicProperty);
   }
 
@@ -209,6 +210,15 @@ class SupabaseLeadRepository implements LeadRepository {
       .order("created_at", { ascending: false });
     if (error) throw error;
     return (data ?? []).map(leadRowToDomain);
+  }
+
+  async countSince(iso: string): Promise<number> {
+    const { count, error } = await getSupabaseAdmin()
+      .from("leads")
+      .select("id", { count: "exact", head: true })
+      .gte("created_at", iso);
+    if (error) throw error;
+    return count ?? 0;
   }
 
   async updateStatus(id: string, estado: LeadStatus): Promise<Lead | null> {

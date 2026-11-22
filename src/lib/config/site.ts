@@ -28,7 +28,8 @@ export const siteConfig = {
   // Contacto público (número fijo del negocio, igual en toda la página).
   // Mismo correo que la tarjeta del negocio, ADMIN_EMAIL y los avisos de
   // leads/pagos (antes decía "cc.inmuebles@gmail.com" por un typo de una letra).
-  email: process.env.NEXT_PUBLIC_CONTACT_EMAIL ?? "cic.inmuebles@gmail.com",
+  // Fijo en código, como el teléfono: una variable de entorno vieja podría volver a traer el typo en silencio.
+  email: "cic.inmuebles@gmail.com",
   // WhatsApp: formato internacional sin "+", solo dígitos (para enlaces wa.me)
   whatsapp: "573249071717",
   // Enlace de llamada (tel:) en formato internacional con "+"

@@ -28,9 +28,13 @@ export interface CrmStore {
   crearContacto(input: ContactoInput): Promise<{ contacto: Contacto; creado: boolean }>;
   actualizarContacto(id: string, patch: Partial<ContactoInput>): Promise<Contacto | null>;
   archivarContacto(id: string, archivado: boolean): Promise<void>;
+  /** Persona con ese correo (sin distinguir mayúsculas), archivada o no. */
+  buscarPorEmail(email: string): Promise<Contacto | null>;
 
   // Vendedores
   listarCaptaciones(contactoId?: string): Promise<Captacion[]>;
+  /** La captación no descartada de un inmueble (hay a lo sumo una), sin traer la tabla entera. */
+  captacionVigenteDe(propertyId: string): Promise<Captacion | null>;
   crearCaptacion(input: CaptacionInput): Promise<Captacion>;
   actualizarCaptacion(id: string, patch: Partial<CaptacionInput>): Promise<Captacion | null>;
 
@@ -290,12 +294,34 @@ class SupabaseCrmStore implements CrmStore {
     if (error) falla("archivarContacto", error);
   }
 
+  async buscarPorEmail(email: string): Promise<Contacto | null> {
+    // Comodines de ILIKE escapados: el correo se compara completo (un "_" de juan_villa@… es literal).
+    const limpio = email.trim().replace(/[%_\\]/g, "\\$&");
+    if (!limpio) return null;
+    const { data, error } = await this.db().from("contactos").select(COLS_CONTACTO).ilike("email", limpio).order("created_at").limit(1);
+    if (error) falla("buscarPorEmail", error);
+    const fila = (data ?? [])[0] as ContactoRow | undefined;
+    return fila ? aContacto(fila) : null;
+  }
+
   async listarCaptaciones(contactoId?: string): Promise<Captacion[]> {
     let c = this.db().from("captaciones").select(COLS_CAPTACION).order("created_at", { ascending: false }).limit(1000);
     if (contactoId) c = c.eq("contacto_id", contactoId);
     const { data, error } = await c;
     if (error) falla("listarCaptaciones", error);
     return ((data ?? []) as CaptacionRow[]).map(aCaptacion);
+  }
+
+  async captacionVigenteDe(propertyId: string): Promise<Captacion | null> {
+    const { data, error } = await this.db()
+      .from("captaciones")
+      .select(COLS_CAPTACION)
+      .eq("property_id", propertyId)
+      .neq("estado", "descartada")
+      .limit(1);
+    if (error) falla("captacionVigenteDe", error);
+    const fila = (data ?? [])[0] as CaptacionRow | undefined;
+    return fila ? aCaptacion(fila) : null;
   }
 
   async crearCaptacion(input: CaptacionInput): Promise<Captacion> {
@@ -476,6 +502,11 @@ export class MemoryCrmStore implements CrmStore {
     if (c) c.archivado = archivado;
   }
 
+  async buscarPorEmail(email: string): Promise<Contacto | null> {
+    const e = email.trim().toLowerCase();
+    return (e && this.contactos.find((c) => c.email?.toLowerCase() === e)) || null;
+  }
+
   private conComision(c: Omit<Captacion, "comisionValor"> & { comisionValor?: number }): Captacion {
     const v = comisionValor(c.precioEsperado, c.comisionPct);
     const { comisionValor: _viejo, ...resto } = c;
@@ -484,6 +515,10 @@ export class MemoryCrmStore implements CrmStore {
 
   async listarCaptaciones(contactoId?: string): Promise<Captacion[]> {
     return this.captaciones.filter((c) => !contactoId || c.contactoId === contactoId);
+  }
+
+  async captacionVigenteDe(propertyId: string): Promise<Captacion | null> {
+    return this.captaciones.find((c) => c.propertyId === propertyId && c.estado !== "descartada") ?? null;
   }
 
   async crearCaptacion(input: CaptacionInput): Promise<Captacion> {

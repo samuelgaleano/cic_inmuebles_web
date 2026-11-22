@@ -14,7 +14,7 @@ const desdeCOP = Math.min(
 );
 
 export const metadata: Metadata = {
-  title: "Publica tu inmueble · Trabaja con nosotros",
+  title: "Publica tu inmueble en Bogotá: propietarios y agentes",
   description:
     "Publica, promociona o vende tu inmueble con CIC Inmuebles. Alternativas para propietarios y para agentes e inmobiliarias, con comisión compartida y planes de publicación.",
   alternates: { canonical: "/publica" },

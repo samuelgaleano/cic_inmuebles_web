@@ -22,7 +22,8 @@ function mal(error: string, status: number) {
 /** Solo el propio sitio prepara pagos: si el navegador declara otro origen, se rechaza. */
 function origenAjeno(req: Request): boolean {
   const origen = req.headers.get("origin");
-  if (!origen) return false; // sin cabecera Origin (algunos clientes) no se puede afirmar nada
+  // El checkout llama con fetch POST desde el navegador, que siempre envía Origin: sin ella es un script.
+  if (!origen) return true;
   try {
     return new URL(origen).host !== new URL(req.url).host;
   } catch {
@@ -90,6 +91,6 @@ export async function POST(req: Request) {
     signature,
     plan: { id: plan.id, nombre: plan.nombre, precioCOP: plan.precioCOP },
     // Wompi agrega ?id=<transacción> al volver; la página confirma con la API.
-    redirectUrl: `${appUrl()}/publica/agente?pago=procesado&ref=${encodeURIComponent(reference)}`,
+    redirectUrl: `${appUrl()}/publica/agente/pago?ref=${encodeURIComponent(reference)}`,
   });
 }

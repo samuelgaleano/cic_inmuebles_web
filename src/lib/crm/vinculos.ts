@@ -11,7 +11,10 @@ import type { Contacto, EstadoCaptacion } from "./tipos";
  * usa tanto a mano (botón «Sincronizar») como solo, cada vez que llega un lead, se paga un plan o se guarda un inmueble.
  */
 
-/** Persona del CRM para estos datos: por teléfono si lo hay y, si no, por nombre exacto entre los que tampoco lo tienen. */
+/**
+ * Persona del CRM para estos datos: por teléfono si lo hay; si no, por correo (los compradores de planes suelen
+ * traer correo y no teléfono, y con otro nombre legal) y, por último, por nombre exacto entre los que no tienen teléfono.
+ */
 async function contactoDe(
   crm: CrmStore,
   datos: { nombre: string; telefono?: string; email?: string; ciudad?: string; origen: Contacto["origen"] },
@@ -22,6 +25,10 @@ async function contactoDe(
   const v = completo.ok ? completo : validarContacto({ ...base, notas: datos.telefono ? `Teléfono recibido (no válido): ${datos.telefono}` : undefined });
   if (!v.ok) return null;
 
+  if (!v.valor.telefonoE164 && v.valor.email) {
+    const porCorreo = await crm.buscarPorEmail(v.valor.email);
+    if (porCorreo) return { contacto: porCorreo, creado: false };
+  }
   if (!v.valor.telefonoE164) {
     const clave = sinTildes(v.valor.nombre);
     const mismo = (await crm.listarContactos({ q: v.valor.nombre, incluirArchivados: true })).find((c) => !c.telefonoE164 && sinTildes(c.nombre) === clave);
@@ -41,6 +48,10 @@ export async function vincularLead(crm: CrmStore, lead: Lead): Promise<VinculoLe
   const r = await contactoDe(crm, { nombre: lead.nombre, telefono: lead.telefono, email: lead.email, ciudad: lead.ciudad, origen: lead.fuente });
   if (!r) return null;
   const { contacto } = r;
+  // Si la persona estaba archivada y vuelve a escribir, vuelve a la lista: si no, su lead quedaría colgado de alguien invisible.
+  if (contacto.archivado) {
+    await crm.archivarContacto(contacto.id, false).catch((err) => console.error("[crm] no se pudo desarchivar:", err instanceof Error ? err.message : err));
+  }
   // La llave foránea se asegura siempre, también para leads que ya se habían pasado antes de existir.
   await crm.enlazarLead(lead.id, contacto.id).catch((err) => console.error("[crm] no se pudo enlazar el lead:", err instanceof Error ? err.message : err));
 
@@ -66,7 +77,9 @@ export async function vincularLead(crm: CrmStore, lead: Lead): Promise<VinculoLe
       potencial: false,
       estado: "activa",
     });
-    if (lead.propertyId) await crm.proponer(b.id, lead.propertyId).catch(() => undefined);
+    if (lead.propertyId) {
+      await crm.proponer(b.id, lead.propertyId).catch((err) => console.warn("[crm] no se pudo proponer el inmueble del lead:", err instanceof Error ? err.message : err));
+    }
   }
   const intencion = lead.intencion === "visita" ? "quiere agendar una visita" : lead.intencion === "info" ? "pidió más información" : "dejó sus datos";
   const nota = {
@@ -98,8 +111,7 @@ export async function vincularInmueble(crm: CrmStore, p: Property): Promise<Resu
   const dueno = p.propietario;
   if (!dueno?.nombre?.trim()) return "sin_propietario";
 
-  const existentes = await crm.listarCaptaciones();
-  const vigente = existentes.find((c) => c.propertyId === p.id && c.estado !== "descartada");
+  const vigente = await crm.captacionVigenteDe(p.id);
   const deseado = estadoCaptacionDe(p);
   if (vigente) {
     const automatico: EstadoCaptacion[] = ["nueva", "en_gestion", "publicada"];

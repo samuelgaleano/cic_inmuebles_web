@@ -13,9 +13,9 @@ import { titularInventario } from "@/lib/seo/titular";
 import { formatPriceCompact } from "@/lib/utils/format";
 import { ogImageUrl } from "@/lib/utils/image-loader";
 
-// Mismo ritmo que la home: se regenera cada hora aunque el panel no revalide
+// Mismo ritmo que la home: se regenera cada 6 h aunque el panel no revalide
 // (y `revalidatePublic()` la invalida antes, ver src/lib/actions/admin-properties.ts).
-export const revalidate = 3600;
+export const revalidate = 21600;
 
 // Build: si Supabase falla justo aquí, se generan cero páginas de sector (no
 // rompe el build); se recuperan solas en la siguiente revalidación.

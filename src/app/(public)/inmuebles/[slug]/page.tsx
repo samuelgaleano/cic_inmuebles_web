@@ -14,7 +14,6 @@ import { RejillaInmuebles } from "@/components/public/rejilla-inmuebles";
 import { SimuladorCuota } from "@/components/public/simulador-cuota";
 import { VideoYoutube } from "@/components/public/video-youtube";
 import { JsonLd } from "@/components/seo/json-ld";
-import { getRepository } from "@/lib/data";
 import {
   PROPERTY_TYPE_LABELS,
   type PropertyMedia,
@@ -26,13 +25,14 @@ import { ordenarDescripcion } from "@/lib/ficha/descripcion";
 import { contextoDePrecio, fraseContexto } from "@/lib/ficha/valor";
 import { formatArea, formatPrice, formatPriceOrConsult } from "@/lib/utils/format";
 import { propertyUrl, siteConfig } from "@/lib/config/site";
-import { getPublicInventoryOrThrow } from "@/lib/data/public-inventory";
+import { getPublicInventoryOrThrow, getPublicPropertyBySlug } from "@/lib/data/public-inventory";
 import { agruparPorSector, encontrarSector, sectorPath } from "@/lib/seo/sectores";
 import { encabezadoFicha, recortarEnPalabra } from "@/lib/seo/textos-seo";
 import { ogImageUrl } from "@/lib/utils/image-loader";
 
-// La ficha se regenera cada hora aunque el panel no la revalide (antes quedaba semanas en la caché del CDN).
-export const revalidate = 3600;
+// La ficha dura 6 h en la caché: los cambios del panel la invalidan al instante (revalidatePublic + etiqueta
+// `inventario`), así que el tiempo es solo la red de seguridad. Regenerarla cada hora costaba una función por ficha.
+export const revalidate = 21600;
 
 // Estado del inmueble → disponibilidad schema.org ("en_proceso" NO es InStock).
 const SCHEMA_AVAILABILITY: Record<PropertyStatus, string> = {
@@ -60,7 +60,7 @@ const ACCOMMODATION_TYPES = new Set(["Apartment", "House"]);
 
 export async function generateStaticParams() {
   try {
-    const properties = await getRepository().properties.listPublic();
+    const properties = await getPublicInventoryOrThrow();
     return properties.map((p) => ({ slug: p.slug }));
   } catch (err) {
     // Si la base de datos no está disponible en build, generamos bajo demanda.
@@ -112,7 +112,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const property = await getRepository().properties.getPublicBySlug(slug);
+  const property = await getPublicPropertyBySlug(slug);
   if (!property) return { title: "Inmueble no encontrado" };
 
   const images = property.medios.filter((m) => m.type === "image").map((m) => m.url);
@@ -165,7 +165,7 @@ export default async function PropertyDetailPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const property = await getRepository().properties.getPublicBySlug(slug);
+  const property = await getPublicPropertyBySlug(slug);
   if (!property) notFound();
 
   // Si la base de datos falla al regenerar, Next conserva la versión anterior en vez de cachear una ficha sin contexto.
@@ -221,42 +221,58 @@ export default async function PropertyDetailPage({
   const fichaUrl = propertyUrl(property.slug);
   const parecidos = similares(property, todos);
 
-  // Datos estructurados (schema.org): la ficha como oferta inmobiliaria
-  // (Offer + itemOffered, no Product: Google no admite Product para finca raíz)
-  // + migas de pan. El seller enlaza al nodo de organización del layout (@id).
+  // Datos estructurados (schema.org): la ficha como aviso inmobiliario (RealEstateListing) con su oferta
+  // (Offer + itemOffered, no Product: Google no admite Product para finca raíz) + migas de pan con el sector.
+  // El seller enlaza al nodo de organización del layout (@id). La dirección exacta nunca se publica.
   const schemaType = SCHEMA_ITEM_TYPE[property.tipo];
   const esVivienda = ACCOMMODATION_TYPES.has(schemaType);
+  const meta = propertyMeta(property);
+  const offer = {
+    "@type": "Offer",
+    name: property.titulo,
+    description: meta.description,
+    sku: property.codigo,
+    category: PROPERTY_TYPE_LABELS[property.tipo],
+    url: fichaUrl,
+    // Un precio sin cargar (0) no se publica como oferta de $0.
+    ...(property.precio > 0 && { price: property.precio, priceCurrency: "COP" }),
+    availability: SCHEMA_AVAILABILITY[property.estado],
+    seller: { "@id": `${siteConfig.url}/#org` },
+    ...(images.length > 0 && { image: images.slice(0, 3).map((m) => m.url) }),
+    itemOffered: {
+      "@type": schemaType,
+      name: property.titulo,
+      ...(esVivienda && c.habitaciones != null && { numberOfBedrooms: c.habitaciones }),
+      ...(esVivienda && c.banos != null && { numberOfBathroomsTotal: c.banos }),
+      ...(esVivienda &&
+        c.area != null && {
+          floorSize: { "@type": "QuantitativeValue", value: c.area, unitCode: "MTK" },
+        }),
+      ...(ubicacion.ciudad && {
+        address: {
+          "@type": "PostalAddress",
+          addressLocality: ubicacion.ciudad,
+          addressCountry: "CO",
+        },
+      }),
+      ...(ubicacion.sector && {
+        containedInPlace: { "@type": "Place", name: [ubicacion.sector, ubicacion.ciudad].filter(Boolean).join(", ") },
+      }),
+    },
+  };
   const jsonLd = [
     {
       "@context": "https://schema.org",
-      "@type": "Offer",
-      name: property.titulo,
-      description: propertyMeta(property).description,
-      sku: property.codigo,
-      category: PROPERTY_TYPE_LABELS[property.tipo],
+      "@type": "RealEstateListing",
+      "@id": `${fichaUrl}#aviso`,
       url: fichaUrl,
-      // Un precio sin cargar (0) no se publica como oferta de $0.
-      ...(property.precio > 0 && { price: property.precio, priceCurrency: "COP" }),
-      availability: SCHEMA_AVAILABILITY[property.estado],
-      seller: { "@id": `${siteConfig.url}/#org` },
-      ...(images.length > 0 && { image: images.slice(0, 3).map((m) => m.url) }),
-      itemOffered: {
-        "@type": schemaType,
-        name: property.titulo,
-        ...(esVivienda && c.habitaciones != null && { numberOfBedrooms: c.habitaciones }),
-        ...(esVivienda && c.banos != null && { numberOfBathroomsTotal: c.banos }),
-        ...(esVivienda &&
-          c.area != null && {
-            floorSize: { "@type": "QuantitativeValue", value: c.area, unitCode: "MTK" },
-          }),
-        ...(ubicacion.ciudad && {
-          address: {
-            "@type": "PostalAddress",
-            addressLocality: ubicacion.ciudad,
-            addressCountry: "CO",
-          },
-        }),
-      },
+      name: property.titulo,
+      description: meta.description,
+      inLanguage: "es-CO",
+      ...(property.creadoEn && { datePosted: property.creadoEn }),
+      ...(property.actualizadoEn && { dateModified: property.actualizadoEn }),
+      ...(images[0] && { primaryImageOfPage: images[0].url }),
+      offers: offer,
     },
     {
       "@context": "https://schema.org",
@@ -264,7 +280,8 @@ export default async function PropertyDetailPage({
       itemListElement: [
         { "@type": "ListItem", position: 1, name: "Inicio", item: siteConfig.url },
         { "@type": "ListItem", position: 2, name: "Inmuebles", item: `${siteConfig.url}/inmuebles` },
-        { "@type": "ListItem", position: 3, name: property.titulo, item: fichaUrl },
+        ...(sector ? [{ "@type": "ListItem", position: 3, name: sector.nombre, item: `${siteConfig.url}${sectorPath(sector)}` }] : []),
+        { "@type": "ListItem", position: sector ? 4 : 3, name: property.titulo, item: fichaUrl },
       ],
     },
   ];
@@ -403,7 +420,7 @@ export default async function PropertyDetailPage({
         </section>
       )}
 
-      {property.estado !== "vendido" && <BarraMovil titulo={property.titulo} precio={formatPriceOrConsult(property.precio)} />}
+      {property.estado !== "vendido" && <BarraMovil titulo={property.titulo} precio={formatPriceOrConsult(property.precio)} codigo={property.codigo} url={fichaUrl} />}
     </>
   );
 }
