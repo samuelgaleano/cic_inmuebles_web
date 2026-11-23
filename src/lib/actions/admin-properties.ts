@@ -8,7 +8,7 @@ import { getCrmStore } from "@/lib/crm/store";
 import { vincularInmueble } from "@/lib/crm/vinculos";
 import { getRepository } from "@/lib/data";
 import { getServiciosStore } from "@/lib/servicios/store";
-import { invalidarInventario } from "@/lib/data/inventario-tag";
+import { revalidarCatalogoPublico } from "@/lib/data/inventario-tag";
 import { ensurePropertyArchive, isDriveConfigured } from "@/lib/integrations/drive";
 import { isSheetsConfigured, syncAllPropertiesToSheet, syncPropertyToSheet } from "@/lib/integrations/sheets";
 import {
@@ -32,19 +32,8 @@ function mediaProviderFor(url: string): MediaProvider {
 function revalidatePublic(...slugs: (string | undefined)[]) {
   // Etiqueta `inventario`: vence la lectura compartida de Supabase (home, catálogo, fichas, sectores,
   // comparar, favoritos y sitemap la usan) y la siguiente visita la renueva UNA vez para todas.
-  invalidarInventario();
-  revalidatePath("/");
-  revalidatePath("/inmuebles");
-  revalidatePath("/comparar");
-  revalidatePath("/favoritos");
-  // La ficha nueva y la anterior: renombrar un inmueble cambia su URL y la vieja no debe quedar viva.
-  for (const slug of new Set(slugs.filter(Boolean))) revalidatePath(`/inmuebles/${slug}`);
-  revalidatePath("/sitemap.xml");
-  // Cambiar sector, ciudad o estado (vendido) mueve el conteo y la
-  // indexabilidad de la página de sector; sin esto queda hasta 1h desfasada
-  // (su `revalidate = 3600`) y puede seguir enlazando una ficha ya cambiada.
-  revalidatePath("/inmuebles/sector/[sector]", "page");
-  revalidatePath("/admin/inmuebles");
+  // Lo mismo usa el CRM al registrar una venta (src/lib/data/inventario-tag.ts).
+  revalidarCatalogoPublico(...slugs);
 }
 
 const num = (v: FormDataEntryValue | null): number | undefined => {

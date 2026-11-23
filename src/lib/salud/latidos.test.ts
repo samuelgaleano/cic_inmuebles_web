@@ -1,9 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { estadoDeLatido, MAX_SIN_LATIDO_MS } from "./latidos";
+import { estadoDeLatido, LATIDOS, MAX_SIN_LATIDO_MS } from "./latidos";
 
 const AHORA = new Date("2026-11-23T12:00:00.000Z");
 const hace = (ms: number) => new Date(AHORA.getTime() - ms).toISOString();
 const HORA = 3_600_000;
+
+describe("LATIDOS", () => {
+  it("vigila los tres crons diarios (sync, pagos/vigencias y resumen del CRM)", () => {
+    expect([...LATIDOS]).toEqual(["cron-sync", "cron-diario", "cron-crm"]);
+  });
+  it("el latido del CRM sigue las mismas reglas", () => {
+    expect(estadoDeLatido({ nombre: "cron-crm", okAt: hace(HORA), falloAt: null }, AHORA)).toBe("ok");
+    expect(estadoDeLatido({ nombre: "cron-crm", okAt: hace(30 * HORA), falloAt: hace(5 * HORA) }, AHORA)).toBe("con-fallos");
+  });
+});
 
 describe("estadoDeLatido", () => {
   it("sin registro es «sin-dato» (primer día), no un fallo", () => {

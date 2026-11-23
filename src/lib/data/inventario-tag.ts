@@ -1,4 +1,4 @@
-import { revalidateTag } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 
 /**
  * Etiqueta de la caché persistente del inventario público (ver public-inventory.ts).
@@ -23,4 +23,22 @@ export const INVENTARIO_REVALIDATE_S = 21600;
  */
 export function invalidarInventario(): void {
   revalidateTag(INVENTARIO_TAG, { expire: 0 });
+}
+
+/**
+ * Inventario vencido y rutas públicas afectadas revalidadas, para cuando un inmueble cambia (incluido pasar a
+ * vendido desde el CRM). `slugs`: la ficha actual y, si se renombró, la anterior (la URL vieja no debe quedar viva).
+ */
+export function revalidarCatalogoPublico(...slugs: (string | undefined)[]): void {
+  invalidarInventario();
+  revalidatePath("/");
+  revalidatePath("/inmuebles");
+  revalidatePath("/comparar");
+  revalidatePath("/favoritos");
+  for (const slug of new Set(slugs.filter(Boolean))) revalidatePath(`/inmuebles/${slug}`);
+  revalidatePath("/sitemap.xml");
+  // Cambiar sector, ciudad o estado (vendido) mueve el conteo y la indexabilidad de la página de sector;
+  // sin esto queda hasta 1h desfasada (su `revalidate = 3600`) y puede seguir enlazando una ficha ya cambiada.
+  revalidatePath("/inmuebles/sector/[sector]", "page");
+  revalidatePath("/admin/inmuebles");
 }

@@ -16,11 +16,19 @@ export interface CorreoResend {
 }
 
 export async function sendEmail(msg: CorreoResend): Promise<boolean> {
+  return (await sendEmailConEstado(msg)).ok;
+}
+
+/**
+ * Igual que `sendEmail`, pero devuelve también el estado HTTP de Resend (0 si no hubo respuesta).
+ * Sirve para distinguir un 409 de idempotencia (esa clave ya se usó: el correo ya salió) de un fallo real.
+ */
+export async function sendEmailConEstado(msg: CorreoResend): Promise<{ ok: boolean; status: number }> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
     // Sin el asunto: el de un lead lleva el nombre de la persona (Ley 1581).
     console.warn("[correo] no enviado: falta RESEND_API_KEY");
-    return false;
+    return { ok: false, status: 0 };
   }
 
   try {
@@ -44,11 +52,11 @@ export async function sendEmail(msg: CorreoResend): Promise<boolean> {
     if (!res.ok) {
       // Solo el estado: el cuerpo del error puede repetir la dirección de destino.
       console.error("[correo] Resend respondió", res.status);
-      return false;
+      return { ok: false, status: res.status };
     }
-    return true;
+    return { ok: true, status: res.status };
   } catch (err) {
     console.error("[correo] no se pudo enviar:", err instanceof Error ? err.message : err);
-    return false;
+    return { ok: false, status: 0 };
   }
 }

@@ -8,19 +8,25 @@ import {
   actualizarCaptacionAction,
   actualizarContactoAction,
   archivarContactoAction,
+  completarSeguimientoAction,
   crearBusquedaAction,
   crearCaptacionAction,
+  fijarProximoContactoAction,
+  marcarComisionCobradaAction,
   proponerInmuebleAction,
   quitarPropuestaAction,
+  quitarProximoContactoAction,
   registrarActividadAction,
+  registrarCierreAction,
 } from "@/lib/actions/admin-crm";
-import { sugerirInmuebles } from "@/lib/crm/reglas";
+import { aHoraLocalBogota, clasificarSeguimiento, diaBogota, diasDeAtraso, sugerirInmuebles } from "@/lib/crm/reglas";
 import { getCrmStore } from "@/lib/crm/store";
 import {
   ESTADOS_BUSQUEDA,
   ESTADOS_CAPTACION,
   ESTADO_BUSQUEDA_LABELS,
   ESTADO_CAPTACION_LABELS,
+  ESTADO_PROPUESTA_LABELS,
   ESTATUS_PAGO,
   ESTATUS_PAGO_LABELS,
   MULTIMEDIA,
@@ -28,6 +34,7 @@ import {
   ORIGEN_LABELS,
   TIPOS_ACTIVIDAD,
   TIPOS_COMPRADOR,
+  TIPOS_SEGUIMIENTO,
   TIPO_ACTIVIDAD_LABELS,
   TIPO_COMPRADOR_LABELS,
 } from "@/lib/crm/tipos";
@@ -54,6 +61,11 @@ function fechaHora(iso: string): string {
   return new Date(iso).toLocaleString("es-CO", { timeZone: "America/Bogota", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
+/** "2026-11-20" (día, sin hora) → "20 nov 2026". Se lee a mediodía UTC para que ninguna zona lo corra de día. */
+function dia(ymd: string): string {
+  return new Date(`${ymd}T12:00:00.000Z`).toLocaleDateString("es-CO", { timeZone: "UTC", day: "2-digit", month: "short", year: "numeric" });
+}
+
 export default async function FichaContactoPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string }> }) {
   const { id } = await params;
   const { error } = await searchParams;
@@ -63,15 +75,41 @@ export default async function FichaContactoPage({ params, searchParams }: { para
   const contacto = await crm.obtenerContacto(id);
   if (!contacto) notFound();
 
-  const [captaciones, busquedas, actividades, propiedades, leads] = await Promise.all([
+  const [captaciones, busquedas, actividades, propiedades, leads, cierres] = await Promise.all([
     crm.listarCaptaciones(id),
     crm.listarBusquedas(id),
     crm.listarActividades(id),
     getRepository().properties.list(),
     getRepository().leads.list(),
+    crm.listarCierres({ contactoId: id }),
   ]);
   const propuestas = await crm.listarPropuestas(busquedas.map((b) => b.id));
   const inmueble = new Map(propiedades.map((p) => [p.id, p]));
+  const ahora = new Date();
+  const hoy = diaBogota(ahora);
+
+  // Para «Registrar venta»: quiénes tienen propuesto cada inmueble de este vendedor (el comprador se elige de ahí).
+  const vendibles = captaciones.filter((c) => c.estado !== "descartada");
+  const vendidas = new Set(cierres.map((c) => c.captacionId).filter(Boolean));
+  const conInmueble = new Set(vendibles.filter((c) => c.propertyId && !vendidas.has(c.id)).map((c) => c.propertyId!));
+  const candidatos = new Map<string, { value: string; nombre: string; estado: string }[]>();
+  let nombres = new Map<string, string>();
+  if (conInmueble.size || cierres.length) {
+    const [todasBusquedas, todos] = await Promise.all([crm.listarBusquedas(), crm.listarContactos({ incluirArchivados: true })]);
+    nombres = new Map(todos.map((c) => [c.id, c.nombre]));
+    if (conInmueble.size) {
+      const busquedaPorId = new Map(todasBusquedas.map((b) => [b.id, b]));
+      for (const pr of await crm.listarPropuestas()) {
+        if (!conInmueble.has(pr.propertyId) || pr.estado === "descartado") continue;
+        const b = busquedaPorId.get(pr.busquedaId);
+        if (!b || b.estado === "descartada" || b.contactoId === id) continue;
+        const lista = candidatos.get(pr.propertyId) ?? [];
+        lista.push({ value: `${b.id}|${b.contactoId}`, nombre: nombres.get(b.contactoId) ?? "(sin nombre)", estado: ESTADO_PROPUESTA_LABELS[pr.estado] });
+        candidatos.set(pr.propertyId, lista);
+      }
+    }
+  }
+  const seguimiento = contacto.proximoContactoAt ? clasificarSeguimiento(contacto.proximoContactoAt, ahora) : undefined;
 
   // Leads del formulario de esta persona (mismo teléfono) y sus servicios de publicación (mismo correo o teléfono).
   const mismoTelefono = (crudo?: string) => Boolean(contacto.telefonoE164 && crudo && normalizarTelefono(crudo)?.e164 === contacto.telefonoE164);
@@ -176,8 +214,10 @@ export default async function FichaContactoPage({ params, searchParams }: { para
             <div className="space-y-4">
               {captaciones.map((c) => {
                 const p = c.propertyId ? inmueble.get(c.propertyId) : undefined;
+                const compradores = c.propertyId ? (candidatos.get(c.propertyId) ?? []) : [];
                 return (
-                  <form key={c.id} action={actualizarCaptacionAction} className="space-y-3 rounded-xl border border-line p-4">
+                  <div key={c.id} className="space-y-2">
+                  <form action={actualizarCaptacionAction} className="space-y-3 rounded-xl border border-line p-4">
                     <input type="hidden" name="id" value={c.id} />
                     <input type="hidden" name="contactoId" value={contacto.id} />
                     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -241,6 +281,60 @@ export default async function FichaContactoPage({ params, searchParams }: { para
                     </div>
                     <BotonEnviar className={primario}>Guardar</BotonEnviar>
                   </form>
+                  {c.estado !== "descartada" && c.estado !== "vendida" && vendidas.has(c.id) && (
+                    // La venta se guardó pero un paso posterior falló: se termina con los datos ya guardados.
+                    <form action={registrarCierreAction} className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                      <input type="hidden" name="captacionId" value={c.id} />
+                      <input type="hidden" name="contactoId" value={contacto.id} />
+                      <input type="hidden" name="completar" value="1" />
+                      <span className="flex-1 text-xs text-amber-900">La venta quedó registrada, pero falta pasar la captación a vendida y cerrar lo demás.</span>
+                      <BotonEnviar className={`${primario} inline-flex min-h-11 items-center`}>Completar venta</BotonEnviar>
+                    </form>
+                  )}
+                  {c.estado !== "descartada" && !vendidas.has(c.id) && (
+                    <details className="rounded-xl border border-dashed border-line">
+                      <summary className="flex min-h-11 cursor-pointer list-none items-center px-4 py-2.5 text-xs font-semibold text-brand-800">Registrar venta</summary>
+                      <form action={registrarCierreAction} className="grid gap-3 border-t border-line p-4 sm:grid-cols-3">
+                        <input type="hidden" name="captacionId" value={c.id} />
+                        <input type="hidden" name="contactoId" value={contacto.id} />
+                        <label className={etiqueta}>
+                          Precio de venta
+                          <input name="precio" required defaultValue={c.precioEsperado ?? p?.precio ?? ""} inputMode="numeric" placeholder="450.000.000" className={`${campo} mt-1`} />
+                        </label>
+                        <label className={etiqueta}>
+                          Fecha de la venta
+                          <input name="fecha" type="date" required defaultValue={hoy} max={hoy} className={`${campo} mt-1`} />
+                        </label>
+                        <label className={etiqueta}>
+                          Comisión %
+                          <input name="pct" defaultValue={c.comisionPct} inputMode="decimal" className={`${campo} mt-1`} />
+                        </label>
+                        <label className={`${etiqueta} sm:col-span-3`}>
+                          Comprador
+                          <select name="comprador" defaultValue={compradores[0]?.value ?? ""} className={`${campo} mt-1`}>
+                            {compradores.map((o) => (
+                              <option key={o.value} value={o.value}>
+                                {o.nombre} ({o.estado})
+                              </option>
+                            ))}
+                            <option value="">Otro / no registrado</option>
+                          </select>
+                          {!c.propertyId && <span className="mt-1 block font-normal text-muted">Sin inmueble enlazado no hay compradores con propuesta: queda como «otro».</span>}
+                        </label>
+                        <label className={`${etiqueta} sm:col-span-3`}>
+                          Notas
+                          <textarea name="notas" rows={2} maxLength={2000} placeholder="Notaría, forma de pago, lo que se acordó" className={`${campo} mt-1 h-auto py-2`} />
+                        </label>
+                        <p className="text-xs text-muted sm:col-span-3">
+                          Al guardar: la captación queda vendida{p ? `, el inmueble ${p.codigo} pasa a «Vendido» en el catálogo` : ""} y, si eliges comprador, su búsqueda se cierra. Se registra en la línea de tiempo de ambos.
+                        </p>
+                        <div className="sm:col-span-3">
+                          <BotonEnviar className={`${primario} inline-flex min-h-11 items-center`}>Registrar venta</BotonEnviar>
+                        </div>
+                      </form>
+                    </details>
+                  )}
+                  </div>
                 );
               })}
               {captaciones.length === 0 && <p className="text-sm text-muted">Todavía no es vendedor.</p>}
@@ -431,9 +525,166 @@ export default async function FichaContactoPage({ params, searchParams }: { para
               </details>
             </div>
           </section>
+
+          {/* Ventas cerradas */}
+          {cierres.length > 0 && (
+            <section className={tarjeta} aria-labelledby="cierres">
+              <h2 id="cierres" className="mb-3 text-sm font-bold text-ink">Ventas cerradas</h2>
+              <ul className="space-y-4">
+                {cierres.map((ci) => {
+                  const p = ci.propertyId ? inmueble.get(ci.propertyId) : undefined;
+                  const rol = ci.vendedorContactoId === contacto.id ? "Vendió" : "Compró";
+                  const otro = rol === "Vendió" ? ci.compradorContactoId : ci.vendedorContactoId;
+                  const pendiente = ci.comisionPactada !== undefined && (ci.comisionCobrada ?? 0) < ci.comisionPactada;
+                  return (
+                    <li key={ci.id} className="rounded-xl border border-line p-4 text-sm">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="font-semibold text-ink">
+                          {rol}{" "}
+                          {p ? (
+                            <Link href={`/admin/inmuebles/${p.id}`} className="text-brand-700 underline underline-offset-2">
+                              {p.codigo} · {p.titulo}
+                            </Link>
+                          ) : (
+                            "un inmueble sin ficha"
+                          )}
+                        </p>
+                        <span className="text-xs text-muted">{dia(ci.fechaCierre)}</span>
+                      </div>
+                      <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
+                        <dt className="text-muted">Precio de venta</dt>
+                        <dd className="font-semibold text-ink">{formatPrice(ci.precioVenta)}</dd>
+                        <dt className="text-muted">{rol === "Vendió" ? "Comprador" : "Vendedor"}</dt>
+                        <dd className="text-ink-soft">
+                          {otro ? (
+                            <Link href={`/admin/crm/contactos/${otro}`} className="text-brand-700 underline underline-offset-2">
+                              {nombres.get(otro) ?? "(contacto)"}
+                            </Link>
+                          ) : (
+                            "Otro / no registrado"
+                          )}
+                        </dd>
+                        <dt className="text-muted">Comisión pactada</dt>
+                        <dd className="text-ink-soft">
+                          {ci.comisionPactada !== undefined ? formatPrice(ci.comisionPactada) : "—"}
+                          {ci.comisionPct !== undefined && <span className="text-muted"> ({ci.comisionPct} %)</span>}
+                        </dd>
+                        <dt className="text-muted">Comisión cobrada</dt>
+                        <dd className={pendiente ? "font-semibold text-accent-600" : "text-ink-soft"}>
+                          {ci.comisionCobrada !== undefined ? `${formatPrice(ci.comisionCobrada)}${ci.cobradaAt ? ` el ${dia(ci.cobradaAt)}` : ""}` : "Sin cobrar"}
+                        </dd>
+                        {ci.notas && (
+                          <>
+                            <dt className="text-muted">Notas</dt>
+                            <dd className="whitespace-pre-wrap text-ink-soft">{ci.notas}</dd>
+                          </>
+                        )}
+                      </dl>
+                      <form action={marcarComisionCobradaAction} className="mt-3 flex flex-wrap items-end gap-2">
+                        <input type="hidden" name="id" value={ci.id} />
+                        <input type="hidden" name="contactoId" value={contacto.id} />
+                        <label className={etiqueta}>
+                          Cobrado
+                          <input name="monto" required defaultValue={ci.comisionCobrada ?? ci.comisionPactada ?? ""} inputMode="numeric" className={`${campo} mt-1 w-40`} />
+                        </label>
+                        <label className={etiqueta}>
+                          Fecha
+                          <input name="fecha" type="date" required defaultValue={ci.cobradaAt ?? hoy} max={hoy} className={`${campo} mt-1`} />
+                        </label>
+                        <BotonEnviar className={secundario}>Marcar comisión cobrada</BotonEnviar>
+                      </form>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
         </div>
 
         <div className="space-y-6">
+          {/* Próximo contacto */}
+          <section
+            className={`${tarjeta} ${seguimiento === "vencido" ? "border-rose-200" : seguimiento === "hoy" ? "border-accent-500/40" : ""}`}
+            aria-labelledby="proximo"
+          >
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h2 id="proximo" className="text-sm font-bold text-ink">Próximo contacto</h2>
+              {seguimiento === "vencido" && contacto.proximoContactoAt && (
+                <span className="rounded-full bg-rose-50 px-2.5 py-0.5 text-xs font-semibold text-rose-700">
+                  Vencido hace {diasDeAtraso(contacto.proximoContactoAt, ahora)} día{diasDeAtraso(contacto.proximoContactoAt, ahora) === 1 ? "" : "s"}
+                </span>
+              )}
+              {seguimiento === "hoy" && <span className="rounded-full bg-accent-500/15 px-2.5 py-0.5 text-xs font-semibold text-accent-600">Hoy</span>}
+            </div>
+            {contacto.proximoContactoAt ? (
+              <div className="space-y-3">
+                <p className="text-sm text-ink">
+                  <strong>{fechaHora(contacto.proximoContactoAt)}</strong>
+                  {contacto.proximoContactoNota && <span className="block text-ink-soft">{contacto.proximoContactoNota}</span>}
+                </p>
+                <form action={completarSeguimientoAction} className="space-y-2 rounded-xl bg-surface p-3">
+                  <input type="hidden" name="contactoId" value={contacto.id} />
+                  <input type="hidden" name="proximoAt" value={contacto.proximoContactoAt} />
+                  <div className="grid grid-cols-1 items-end gap-2 sm:grid-cols-[auto_1fr]">
+                    <label className={etiqueta}>
+                      Cómo fue
+                      <select name="tipo" defaultValue="llamada" className={`${campo} mt-1`}>
+                        {TIPOS_SEGUIMIENTO.map((s) => (
+                          <option key={s} value={s}>{TIPO_ACTIVIDAD_LABELS[s]}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className={etiqueta}>
+                      Qué se habló
+                      <input name="detalle" maxLength={2000} placeholder={contacto.proximoContactoNota ?? "(opcional)"} className={`${campo} mt-1`} />
+                    </label>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <BotonEnviar className={`${primario} inline-flex min-h-11 items-center`}>Hecho</BotonEnviar>
+                    <span className="text-xs text-muted">Queda en la línea de tiempo y se borra la fecha.</span>
+                  </div>
+                </form>
+                {/* Destructivo y sin rastro: lejos de «Hecho» y con un segundo paso para confirmar. */}
+                <details className="mt-3">
+                  <summary className="inline-flex min-h-11 cursor-pointer list-none items-center px-1 text-xs font-semibold text-muted underline underline-offset-2 hover:text-rose-600">
+                    Quitar la fecha sin registrar nada
+                  </summary>
+                  <form action={quitarProximoContactoAction} className="mt-1 flex flex-wrap items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3">
+                    <input type="hidden" name="contactoId" value={contacto.id} />
+                    <span className="flex-1 text-xs text-rose-800">Se borran la fecha y la nota sin dejar nada en la línea de tiempo.</span>
+                    <BotonEnviar className="inline-flex min-h-11 items-center rounded-lg bg-rose-600 px-3 text-xs font-semibold text-white hover:bg-rose-700">Sí, quitar la fecha</BotonEnviar>
+                  </form>
+                </details>
+              </div>
+            ) : (
+              <p className="text-sm text-muted">Sin fecha.</p>
+            )}
+
+            <form action={fijarProximoContactoAction} className="mt-4 space-y-2 border-t border-line pt-4">
+              <input type="hidden" name="contactoId" value={contacto.id} />
+              <label className={etiqueta}>
+                Para qué (nota corta)
+                <input name="nota" maxLength={300} defaultValue={contacto.proximoContactoNota ?? ""} placeholder="Mandarle el apto de Cedritos" className={`${campo} mt-1`} />
+              </label>
+              {/* «Agendar/Cambiar» va antes de los atajos: es el botón por defecto, el que usa Enter (o «Ir» en el
+                  teclado del celular). Si fuera «En 1 día», Enter mandaría dias=1 y se perdería la fecha escrita. */}
+              <div className="flex items-end gap-2">
+                <label className={`${etiqueta} flex-1`}>
+                  Fecha y hora
+                  <input name="fecha" type="datetime-local" defaultValue={contacto.proximoContactoAt ? aHoraLocalBogota(contacto.proximoContactoAt) : ""} className={`${campo} mt-1`} />
+                </label>
+                <BotonEnviar className={`${primario} inline-flex min-h-11 items-center`}>{contacto.proximoContactoAt ? "Cambiar" : "Agendar"}</BotonEnviar>
+              </div>
+              <p className="text-xs font-semibold text-ink-soft">O con un atajo</p>
+              <div className="flex flex-wrap gap-2">
+                <BotonEnviar name="dias" value="1" className={`${secundario} inline-flex min-h-11 items-center`}>En 1 día</BotonEnviar>
+                <BotonEnviar name="dias" value="3" className={`${secundario} inline-flex min-h-11 items-center`}>En 3 días</BotonEnviar>
+                <BotonEnviar name="dias" value="7" className={`${secundario} inline-flex min-h-11 items-center`}>En 7 días</BotonEnviar>
+              </div>
+              <p className="text-xs text-muted">Los atajos agendan a las 9:00 a. m. Hora de Bogotá.</p>
+            </form>
+          </section>
+
           {/* Línea de tiempo */}
           <section className={tarjeta} aria-labelledby="actividad">
             <h2 id="actividad" className="mb-3 text-sm font-bold text-ink">Seguimiento</h2>
@@ -457,7 +708,22 @@ export default async function FichaContactoPage({ params, searchParams }: { para
                 Qué pasó
                 <textarea name="detalle" required rows={2} maxLength={2000} className={`${campo} mt-1 h-auto py-2`} />
               </label>
-              <BotonEnviar className={primario}>Registrar</BotonEnviar>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-[auto_1fr]">
+                <label className={etiqueta}>
+                  Volver a contactar
+                  <select name="proximo" defaultValue="" className={`${campo} mt-1`}>
+                    <option value="">{contacto.proximoContactoAt ? "Dejar la fecha como está" : "Sin fecha"}</option>
+                    <option value="1">En 1 día</option>
+                    <option value="3">En 3 días</option>
+                    <option value="7">En 7 días</option>
+                  </select>
+                </label>
+                <label className={etiqueta}>
+                  Para qué
+                  <input name="proximoNota" maxLength={300} placeholder="(opcional)" className={`${campo} mt-1`} />
+                </label>
+              </div>
+              <BotonEnviar className={`${primario} inline-flex min-h-11 items-center`}>Registrar</BotonEnviar>
             </form>
             <ol className="mt-5 space-y-4 border-l border-line pl-4">
               {actividades.map((a) => {

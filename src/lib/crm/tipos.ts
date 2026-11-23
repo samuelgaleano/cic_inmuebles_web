@@ -89,9 +89,40 @@ export interface Contacto {
   origen: Origen;
   archivado: boolean;
   creadoEn: string;
+  /** Cuándo volver a llamarlo (ISO UTC). Se fija y se borra aparte de los datos (`fijarProximoContacto`). */
+  proximoContactoAt?: string;
+  /** Para qué es ese próximo contacto ("mandarle el apto de Cedritos"). */
+  proximoContactoNota?: string;
 }
 
-export type ContactoInput = Omit<Contacto, "id" | "archivado" | "creadoEn">;
+export type ContactoInput = Omit<Contacto, "id" | "archivado" | "creadoEn" | "proximoContactoAt" | "proximoContactoNota">;
+
+/** Tipos de actividad con los que se cierra un seguimiento («Hecho»). */
+export const TIPOS_SEGUIMIENTO = ["llamada", "whatsapp", "nota"] as const satisfies readonly TipoActividad[];
+
+export type ClaseSeguimiento = "vencido" | "hoy" | "futuro";
+
+/** Una venta cerrada: quién vendió, quién compró, por cuánto y la comisión pactada y cobrada. */
+export interface Cierre {
+  id: string;
+  captacionId?: string;
+  busquedaId?: string;
+  propertyId?: string;
+  vendedorContactoId?: string;
+  compradorContactoId?: string;
+  precioVenta: number;
+  /** Día de la venta (YYYY-MM-DD, calendario de Bogotá). */
+  fechaCierre: string;
+  comisionPct?: number;
+  comisionPactada?: number;
+  comisionCobrada?: number;
+  /** Día en que se cobró la comisión (YYYY-MM-DD). */
+  cobradaAt?: string;
+  notas?: string;
+  creadoEn: string;
+}
+
+export type CierreInput = Omit<Cierre, "id" | "creadoEn" | "comisionCobrada" | "cobradaAt">;
 
 export interface Captacion {
   id: string;

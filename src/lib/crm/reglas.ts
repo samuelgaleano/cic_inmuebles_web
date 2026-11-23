@@ -1,6 +1,6 @@
 import type { Property } from "@/lib/domain";
 import { normalizarTelefono } from "@/lib/utils/telefono";
-import type { ContactoInput, Origen } from "./tipos";
+import type { Cierre, ClaseSeguimiento, ContactoInput, Origen } from "./tipos";
 
 /** Reglas puras del CRM (sin base de datos), para poder probarlas. */
 
@@ -139,4 +139,128 @@ export function sugerirInmuebles(
     resultado.push({ property: p, motivo: motivos.join(" · "), puntos });
   }
   return resultado.sort((a, b) => b.puntos - a.puntos || b.property.precio - a.property.precio).slice(0, limite);
+}
+
+// ---------------------------------------------------------------- Próximo contacto
+
+/** Bogotá es UTC-5 todo el año (sin horario de verano), igual que en src/lib/utils/hora-bogota.ts. */
+const DESFASE_BOGOTA_MS = 5 * 60 * 60 * 1000;
+const DIA_MS = 24 * 60 * 60 * 1000;
+
+/** Día calendario de Bogotá ("2026-11-23") de un instante. */
+export function diaBogota(instante: Date | string): string {
+  const t = typeof instante === "string" ? new Date(instante).getTime() : instante.getTime();
+  return new Date(t - DESFASE_BOGOTA_MS).toISOString().slice(0, 10);
+}
+
+/** Último milisegundo del día de hoy en Bogotá, en ISO UTC: el tope para listar "lo de hoy y lo vencido". */
+export function finDelDiaBogota(ahora: Date): string {
+  const [a, m, d] = diaBogota(ahora).split("-").map(Number);
+  return new Date(Date.UTC(a, m - 1, d + 1) + DESFASE_BOGOTA_MS - 1).toISOString();
+}
+
+/** El día `dias` después de hoy (calendario de Bogotá) a las 9:00 de Bogotá, en ISO UTC. */
+export function fechaDeSeguimiento(dias: number, ahora: Date): string {
+  const [a, m, d] = diaBogota(ahora).split("-").map(Number);
+  return new Date(Date.UTC(a, m - 1, d + Math.trunc(dias), 9) + DESFASE_BOGOTA_MS).toISOString();
+}
+
+/** Diferencia en días calendario de Bogotá: positiva si `at` cae antes de hoy. */
+export function diasDeAtraso(at: string, ahora: Date): number {
+  return Math.round((Date.parse(diaBogota(ahora)) - Date.parse(diaBogota(at))) / DIA_MS);
+}
+
+/** Si el próximo contacto ya pasó (día anterior), es hoy o es más adelante, por día calendario de Bogotá. */
+export function clasificarSeguimiento(at: string, ahora: Date): ClaseSeguimiento {
+  const atraso = diasDeAtraso(at, ahora);
+  return atraso > 0 ? "vencido" : atraso === 0 ? "hoy" : "futuro";
+}
+
+/** ISO UTC → valor de un `<input type="datetime-local">` en hora de Bogotá ("2026-11-24T09:00"). */
+export function aHoraLocalBogota(iso: string): string {
+  return new Date(new Date(iso).getTime() - DESFASE_BOGOTA_MS).toISOString().slice(0, 16);
+}
+
+// ---------------------------------------------------------------- Cierres
+
+/** "2026-11-23" con fecha real (sin 2026-02-30). */
+export function leerDia(crudo: string | null | undefined): string | null {
+  const t = (crudo ?? "").trim();
+  const m = t.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return null;
+  const f = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  return f.toISOString().slice(0, 10) === t ? t : null;
+}
+
+export type ResultadoCierre =
+  | { ok: true; valor: { precioVenta: number; fechaCierre: string; comisionPct?: number; comisionPactada?: number } }
+  | { ok: false; error: string };
+
+/**
+ * Valida el registro de una venta: precio mayor que cero, fecha real y no más de un día en el futuro
+ * (margen por si se registra de noche con la hora de otro lado). La comisión pactada, si no se escribe,
+ * es precio × porcentaje / 100 redondeada al peso. Porcentaje vacío = sin porcentaje.
+ */
+export function validarCierre(
+  datos: { precio?: string; fecha?: string; pct?: string; pactada?: string },
+  ahora: Date,
+): ResultadoCierre {
+  const precio = leerPrecio(datos.precio);
+  if (precio === null || precio === undefined || precio <= 0) return { ok: false, error: "Escribe el precio de venta (solo números, mayor que cero)." };
+
+  const fecha = leerDia(datos.fecha);
+  if (!fecha) return { ok: false, error: "Revisa la fecha de la venta." };
+  const manana = diaBogota(new Date(ahora.getTime() + DIA_MS));
+  if (fecha > manana) return { ok: false, error: "La fecha de la venta no puede estar en el futuro." };
+  if (fecha < "2000-01-01") return { ok: false, error: "Revisa la fecha de la venta." };
+
+  let pct: number | undefined;
+  if ((datos.pct ?? "").trim()) {
+    const p = leerPorcentaje(datos.pct);
+    if (p === null) return { ok: false, error: "Revisa el porcentaje de comisión: debe estar entre 0 y 100." };
+    pct = p;
+  }
+
+  const pactadaEscrita = leerPrecio(datos.pactada);
+  if (pactadaEscrita === null) return { ok: false, error: "Revisa la comisión pactada: usa solo números." };
+  const pactada = pactadaEscrita ?? (pct !== undefined ? comisionValor(precio, pct) : undefined);
+
+  return {
+    ok: true,
+    valor: {
+      precioVenta: precio,
+      fechaCierre: fecha,
+      ...(pct !== undefined ? { comisionPct: pct } : {}),
+      ...(pactada !== undefined ? { comisionPactada: pactada } : {}),
+    },
+  };
+}
+
+export interface MesDeCierres {
+  /** "2026-11" */
+  mes: string;
+  cantidad: number;
+  valorVendido: number;
+  comisionPactada: number;
+  comisionCobrada: number;
+}
+
+/** Ventas cerradas por mes (según la fecha de cierre), de los últimos `meses` incluido el actual, del más reciente al más viejo. */
+export function cierresPorMes(cierres: Pick<Cierre, "fechaCierre" | "precioVenta" | "comisionPactada" | "comisionCobrada">[], ahora: Date, meses = 6): MesDeCierres[] {
+  const [a, m] = diaBogota(ahora).split("-").map(Number);
+  const filas: MesDeCierres[] = [];
+  for (let i = 0; i < meses; i++) {
+    const f = new Date(Date.UTC(a, m - 1 - i, 1));
+    filas.push({ mes: f.toISOString().slice(0, 7), cantidad: 0, valorVendido: 0, comisionPactada: 0, comisionCobrada: 0 });
+  }
+  const porMes = new Map(filas.map((f) => [f.mes, f]));
+  for (const c of cierres) {
+    const f = porMes.get(c.fechaCierre.slice(0, 7));
+    if (!f) continue;
+    f.cantidad += 1;
+    f.valorVendido += c.precioVenta;
+    f.comisionPactada += c.comisionPactada ?? 0;
+    f.comisionCobrada += c.comisionCobrada ?? 0;
+  }
+  return filas;
 }

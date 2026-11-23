@@ -2,6 +2,7 @@ import { MessageCircle, Search } from "lucide-react";
 import Link from "next/link";
 import { BotonEnviar } from "@/components/admin/boton-enviar";
 import { crearContactoAction, sincronizarCrmAction } from "@/lib/actions/admin-crm";
+import { clasificarSeguimiento, diasDeAtraso, finDelDiaBogota } from "@/lib/crm/reglas";
 import { getCrmStore } from "@/lib/crm/store";
 import {
   ESTADO_BUSQUEDA_LABELS,
@@ -65,11 +66,13 @@ export default async function AdminCrmPage({ searchParams }: { searchParams: Pro
     );
   }
 
-  const [contactos, todasCaptaciones, todasBusquedas, propiedades] = await Promise.all([
+  const ahora = new Date();
+  const [contactos, todasCaptaciones, todasBusquedas, propiedades, seguimientos] = await Promise.all([
     crm.listarContactos({ q: vista === "contactos" ? q : undefined }),
     crm.listarCaptaciones(),
     crm.listarBusquedas(),
     getRepository().properties.list(),
+    crm.listarSeguimientos(finDelDiaBogota(ahora)),
   ]);
   // Los contactos de la pestaña pueden venir filtrados por la búsqueda: para nombrar a vendedores y compradores se leen todos.
   const todos = await crm.listarContactos({ incluirArchivados: true });
@@ -98,7 +101,9 @@ export default async function AdminCrmPage({ searchParams }: { searchParams: Pro
     },
     { titulo: "Contactos sin seguimiento", items: todos.filter((c) => !c.archivado && !c.ultimaActividad).map((c) => ({ id: c.id, nombre: c.nombre })) },
   ];
-  const hayPendientes = pendientes.some((g) => g.items.length > 0);
+  const hayPendientes = seguimientos.length > 0 || pendientes.some((g) => g.items.length > 0);
+  const nVencidos = seguimientos.filter((c) => clasificarSeguimiento(c.proximoContactoAt!, ahora) === "vencido").length;
+  const horaBogota = (iso: string) => new Date(iso).toLocaleTimeString("es-CO", { timeZone: "America/Bogota", hour: "numeric", minute: "2-digit" });
 
   return (
     <div className="space-y-6">
@@ -140,6 +145,35 @@ export default async function AdminCrmPage({ searchParams }: { searchParams: Pro
 
       <section aria-labelledby="pendientes" className="rounded-2xl border border-line bg-white p-5">
         <h2 id="pendientes" className="mb-3 text-sm font-bold text-ink">Por hacer</h2>
+        {hayPendientes && (
+          <div className="mb-5 rounded-xl border border-line bg-surface p-4">
+            <p className="text-xs font-semibold text-ink-soft">
+              Para hoy y vencidos{" "}
+              <span className={`ml-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${seguimientos.length ? "bg-accent-500/15 text-accent-600" : "bg-ink/[0.07] text-muted"}`}>{seguimientos.length}</span>
+              {nVencidos > 0 && <span className="ml-1 rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-bold text-rose-700">{nVencidos} vencido{nVencidos === 1 ? "" : "s"}</span>}
+            </p>
+            <ul className="mt-2 grid gap-x-6 gap-y-1.5 text-xs sm:grid-cols-2">
+              {seguimientos.slice(0, 10).map((c) => {
+                const atraso = diasDeAtraso(c.proximoContactoAt!, ahora);
+                return (
+                  <li key={c.id} className="min-w-0">
+                    {atraso > 0 ? (
+                      <span className="mr-1.5 rounded bg-rose-50 px-1.5 py-0.5 text-[11px] font-bold text-rose-700">Vencido {atraso === 1 ? "ayer" : `hace ${atraso} días`}</span>
+                    ) : (
+                      <span className="mr-1.5 text-muted">Hoy {horaBogota(c.proximoContactoAt!)}</span>
+                    )}
+                    <Link href={`/admin/crm/contactos/${c.id}`} className="font-medium text-brand-700 underline underline-offset-2">
+                      {c.nombre}
+                    </Link>
+                    {c.proximoContactoNota && <span className="text-ink-soft"> · {c.proximoContactoNota}</span>}
+                  </li>
+                );
+              })}
+              {seguimientos.length > 10 && <li className="text-muted">y {seguimientos.length - 10} más</li>}
+              {seguimientos.length === 0 && <li className="text-muted">Nada agendado para hoy. Agenda el próximo contacto desde la ficha de cada persona.</li>}
+            </ul>
+          </div>
+        )}
         {hayPendientes ? (
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
             {pendientes.map((g) => (

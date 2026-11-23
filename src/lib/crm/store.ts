@@ -7,6 +7,8 @@ import type {
   BusquedaInput,
   Captacion,
   CaptacionInput,
+  Cierre,
+  CierreInput,
   Contacto,
   ContactoInput,
   ContactoResumen,
@@ -14,8 +16,15 @@ import type {
   Propuesta,
 } from "./tipos";
 
-/** Las tablas no existen todavía (falta aplicar supabase/migrations/0007_crm.sql). */
-export class CrmNoDisponibleError extends Error {}
+/** Las tablas o columnas no existen todavía (falta aplicar la migración `migracion`, por defecto 0007_crm.sql). */
+export class CrmNoDisponibleError extends Error {
+  constructor(
+    message?: string,
+    readonly migracion: string = "0007",
+  ) {
+    super(message);
+  }
+}
 export class CrmStoreError extends Error {}
 
 export interface CrmStore {
@@ -57,6 +66,18 @@ export interface CrmStore {
   // Leads del formulario enlazados con su persona (llave foránea leads.contacto_id)
   enlazarLead(leadId: string, contactoId: string): Promise<void>;
   leadsDeContacto(contactoId: string): Promise<string[]>;
+
+  // Próximo contacto (migración 0010)
+  /** `at` en ISO UTC; null borra la fecha y la nota. */
+  fijarProximoContacto(contactoId: string, at: string | null, nota?: string): Promise<void>;
+  /** Contactos no archivados con próximo contacto hasta `hasta` (ISO), del más viejo al más nuevo. Vacío si falta la 0010. */
+  listarSeguimientos(hasta: string): Promise<Contacto[]>;
+
+  // Ventas cerradas (migración 0010)
+  registrarCierre(input: CierreInput): Promise<Cierre>;
+  /** Con `contactoId`, las ventas donde esa persona fue vendedora o compradora. Más reciente primero. Vacío si falta la 0010. */
+  listarCierres(filtro?: { contactoId?: string; propertyId?: string }): Promise<Cierre[]>;
+  marcarComisionCobrada(id: string, monto: number, fecha: string): Promise<Cierre | null>;
 }
 
 // ---------------------------------------------------------------- Supabase
@@ -71,6 +92,24 @@ type ContactoRow = {
   notas: string | null;
   origen: Contacto["origen"];
   archivado: boolean;
+  created_at: string;
+  proximo_contacto_at?: string | null;
+  proximo_contacto_nota?: string | null;
+};
+type CierreRow = {
+  id: string;
+  captacion_id: string | null;
+  busqueda_id: string | null;
+  property_id: string | null;
+  vendedor_contacto_id: string | null;
+  comprador_contacto_id: string | null;
+  precio_venta: number | string;
+  fecha_cierre: string;
+  comision_pct: number | string | null;
+  comision_pactada: number | string | null;
+  comision_cobrada: number | string | null;
+  cobrada_at: string | null;
+  notas: string | null;
   created_at: string;
 };
 type CaptacionRow = {
@@ -114,7 +153,32 @@ const aContacto = (r: ContactoRow): Contacto => ({
   origen: r.origen,
   archivado: r.archivado,
   creadoEn: r.created_at,
+  ...(r.proximo_contacto_at ? { proximoContactoAt: new Date(r.proximo_contacto_at).toISOString() } : {}),
+  ...(r.proximo_contacto_nota ? { proximoContactoNota: r.proximo_contacto_nota } : {}),
 });
+
+const numero = (v: number | string | null) => (v === null ? undefined : Number(v));
+const aCierre = (r: CierreRow): Cierre => {
+  const pct = numero(r.comision_pct);
+  const pactada = numero(r.comision_pactada);
+  const cobrada = numero(r.comision_cobrada);
+  return {
+    id: r.id,
+    ...(r.captacion_id ? { captacionId: r.captacion_id } : {}),
+    ...(r.busqueda_id ? { busquedaId: r.busqueda_id } : {}),
+    ...(r.property_id ? { propertyId: r.property_id } : {}),
+    ...(r.vendedor_contacto_id ? { vendedorContactoId: r.vendedor_contacto_id } : {}),
+    ...(r.comprador_contacto_id ? { compradorContactoId: r.comprador_contacto_id } : {}),
+    precioVenta: Number(r.precio_venta),
+    fechaCierre: r.fecha_cierre.slice(0, 10),
+    ...(pct !== undefined ? { comisionPct: pct } : {}),
+    ...(pactada !== undefined ? { comisionPactada: pactada } : {}),
+    ...(cobrada !== undefined ? { comisionCobrada: cobrada } : {}),
+    ...(r.cobrada_at ? { cobradaAt: r.cobrada_at.slice(0, 10) } : {}),
+    ...(r.notas ? { notas: r.notas } : {}),
+    creadoEn: r.created_at,
+  };
+};
 
 const aCaptacion = (r: CaptacionRow): Captacion => ({
   id: r.id,
@@ -155,15 +219,48 @@ const aActividad = (r: ActividadRow): Actividad => ({
   ocurrioEn: r.ocurrio_en,
 });
 
-function falla(op: string, error: { message: string; code?: string } | null): never {
+type ErrorDb = { message: string; code?: string };
+
+/** Tabla o columna que no existe todavía. 42P01 tabla, 42703 columna, PGRST204/205 caché de esquema de PostgREST. */
+function faltaEsquema(error: ErrorDb | null): boolean {
+  return Boolean(error && (["42P01", "42703", "PGRST204", "PGRST205"].includes(error.code ?? "") || /schema cache|does not exist/i.test(error.message)));
+}
+
+/** Lo que agrega 0010 (columnas de próximo contacto y tabla cierres). */
+function esDe0010(error: ErrorDb | null): boolean {
+  return Boolean(error && faltaEsquema(error) && /proximo_contacto|cierres/i.test(error.message));
+}
+
+function falla(op: string, error: ErrorDb | null): never {
   const msg = error?.message ?? "error desconocido";
-  if (error?.code === "42P01" || error?.code === "PGRST205" || /schema cache|does not exist/i.test(msg)) {
-    throw new CrmNoDisponibleError(`[crm] ${op}: falta aplicar la migración 0007 (${msg})`);
+  if (faltaEsquema(error)) {
+    const migracion = esDe0010(error) ? "0010" : "0007";
+    throw new CrmNoDisponibleError(`[crm] ${op}: falta aplicar la migración ${migracion} (${msg})`, migracion);
   }
   throw new CrmStoreError(`[crm] ${op}: ${msg}`);
 }
 
 const COLS_CONTACTO = "id, nombre, telefono, telefono_e164, email, ciudad, notas, origen, archivado, created_at";
+/** Con las columnas de 0010. Mientras la migración no esté aplicada se lee sin ellas (ver `leerContactos`). */
+const COLS_CONTACTO_0010 = `${COLS_CONTACTO}, proximo_contacto_at, proximo_contacto_nota`;
+const COLS_CIERRE =
+  "id, captacion_id, busqueda_id, property_id, vendedor_contacto_id, comprador_contacto_id, precio_venta, fecha_cierre, comision_pct, comision_pactada, comision_cobrada, cobrada_at, notas, created_at";
+const UUID_DB = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function filaDeCierre(i: CierreInput): Record<string, unknown> {
+  return {
+    captacion_id: i.captacionId ?? null,
+    busqueda_id: i.busquedaId ?? null,
+    property_id: i.propertyId ?? null,
+    vendedor_contacto_id: i.vendedorContactoId ?? null,
+    comprador_contacto_id: i.compradorContactoId ?? null,
+    precio_venta: i.precioVenta,
+    fecha_cierre: i.fechaCierre,
+    comision_pct: i.comisionPct ?? null,
+    comision_pactada: i.comisionPactada ?? null,
+    notas: i.notas ?? null,
+  };
+}
 const COLS_CAPTACION =
   "id, contacto_id, property_id, ubicacion, precio_esperado, comision_pct, comision_valor, estatus_pago, aprobada, multimedia, estado, notas, created_at";
 const COLS_BUSQUEDA = "id, contacto_id, tipo, ubicacion, precio_max, especificacion, potencial, estado, notas, created_at";
@@ -216,6 +313,27 @@ class SupabaseCrmStore implements CrmStore {
     return getSupabaseAdmin();
   }
 
+  /** false cuando la base aún no tiene las columnas de 0010: se deja de pedirlas hasta el próximo arranque. */
+  private con0010 = true;
+
+  /**
+   * Lee contactos pidiendo las columnas de 0010 y, si la migración no está aplicada, repite sin ellas:
+   * así el CRM sigue funcionando entre el despliegue y el momento en que se corre la migración.
+   * PostgREST valida las columnas antes de ejecutar, así que el primer intento no deja nada a medias.
+   */
+  private async leerContactos(op: string, consulta: (cols: string) => PromiseLike<{ data: unknown; error: ErrorDb | null }>): Promise<unknown> {
+    if (this.con0010) {
+      const r = await consulta(COLS_CONTACTO_0010);
+      if (!r.error) return r.data;
+      if (!esDe0010(r.error)) falla(op, r.error);
+      console.warn("[crm] falta la migración 0010: se lee sin el próximo contacto");
+      this.con0010 = false;
+    }
+    const r = await consulta(COLS_CONTACTO);
+    if (r.error) falla(op, r.error);
+    return r.data;
+  }
+
   async disponible(): Promise<boolean> {
     try {
       const { error } = await this.db().from("contactos").select("id").limit(1);
@@ -226,15 +344,16 @@ class SupabaseCrmStore implements CrmStore {
   }
 
   async listarContactos(opts: { q?: string; incluirArchivados?: boolean } = {}): Promise<ContactoResumen[]> {
-    let consulta = this.db().from("contactos").select(COLS_CONTACTO).order("created_at", { ascending: false }).limit(1000);
-    if (!opts.incluirArchivados) consulta = consulta.eq("archivado", false);
     const q = opts.q?.trim();
-    if (q) {
-      const p = patron(q);
-      consulta = consulta.or(`nombre.ilike.${p},telefono.ilike.${p},email.ilike.${p},ciudad.ilike.${p}`);
-    }
-    const { data, error } = await consulta;
-    if (error) falla("listarContactos", error);
+    const data = await this.leerContactos("listarContactos", (cols) => {
+      let consulta = this.db().from("contactos").select(cols).order("created_at", { ascending: false }).limit(1000);
+      if (!opts.incluirArchivados) consulta = consulta.eq("archivado", false);
+      if (q) {
+        const p = patron(q);
+        consulta = consulta.or(`nombre.ilike.${p},telefono.ilike.${p},email.ilike.${p},ciudad.ilike.${p}`);
+      }
+      return consulta;
+    });
     const contactos = ((data ?? []) as ContactoRow[]).map(aContacto);
     if (!contactos.length) return [];
 
@@ -260,8 +379,7 @@ class SupabaseCrmStore implements CrmStore {
   }
 
   async obtenerContacto(id: string): Promise<Contacto | null> {
-    const { data, error } = await this.db().from("contactos").select(COLS_CONTACTO).eq("id", id).maybeSingle();
-    if (error) falla("obtenerContacto", error);
+    const data = await this.leerContactos("obtenerContacto", (cols) => this.db().from("contactos").select(cols).eq("id", id).maybeSingle());
     return data ? aContacto(data as ContactoRow) : null;
   }
 
@@ -284,8 +402,7 @@ class SupabaseCrmStore implements CrmStore {
   }
 
   async actualizarContacto(id: string, patch: Partial<ContactoInput>): Promise<Contacto | null> {
-    const { data, error } = await this.db().from("contactos").update(filaDeContacto(patch)).eq("id", id).select(COLS_CONTACTO).maybeSingle();
-    if (error) falla("actualizarContacto", error);
+    const data = await this.leerContactos("actualizarContacto", (cols) => this.db().from("contactos").update(filaDeContacto(patch)).eq("id", id).select(cols).maybeSingle());
     return data ? aContacto(data as ContactoRow) : null;
   }
 
@@ -298,9 +415,8 @@ class SupabaseCrmStore implements CrmStore {
     // Comodines de ILIKE escapados: el correo se compara completo (un "_" de juan_villa@… es literal).
     const limpio = email.trim().replace(/[%_\\]/g, "\\$&");
     if (!limpio) return null;
-    const { data, error } = await this.db().from("contactos").select(COLS_CONTACTO).ilike("email", limpio).order("created_at").limit(1);
-    if (error) falla("buscarPorEmail", error);
-    const fila = (data ?? [])[0] as ContactoRow | undefined;
+    const data = await this.leerContactos("buscarPorEmail", (cols) => this.db().from("contactos").select(cols).ilike("email", limpio).order("created_at").limit(1));
+    const fila = ((data ?? []) as ContactoRow[])[0];
     return fila ? aContacto(fila) : null;
   }
 
@@ -414,6 +530,60 @@ class SupabaseCrmStore implements CrmStore {
     const { data, error } = await this.db().from("leads").select("id").eq("contacto_id", contactoId).limit(500);
     if (error) return [];
     return ((data ?? []) as { id: string }[]).map((l) => l.id);
+  }
+
+  async fijarProximoContacto(contactoId: string, at: string | null, nota?: string): Promise<void> {
+    const { data, error } = await this.db()
+      .from("contactos")
+      .update({ proximo_contacto_at: at, proximo_contacto_nota: at ? (nota?.trim() || null) : null })
+      .eq("id", contactoId)
+      .select("id");
+    if (error) falla("fijarProximoContacto", error);
+    if (!(data ?? []).length) throw new CrmStoreError("llave foránea: el contacto no existe");
+  }
+
+  async listarSeguimientos(hasta: string): Promise<Contacto[]> {
+    const { data, error } = await this.db()
+      .from("contactos")
+      .select(COLS_CONTACTO_0010)
+      .eq("archivado", false)
+      .not("proximo_contacto_at", "is", null)
+      .lte("proximo_contacto_at", hasta)
+      .order("proximo_contacto_at", { ascending: true })
+      .limit(500);
+    if (error) {
+      if (esDe0010(error)) return []; // sin la migración no hay fechas que mostrar
+      falla("listarSeguimientos", error);
+    }
+    return ((data ?? []) as ContactoRow[]).map(aContacto);
+  }
+
+  async registrarCierre(input: CierreInput): Promise<Cierre> {
+    const { data, error } = await this.db().from("cierres").insert(filaDeCierre(input)).select(COLS_CIERRE).single();
+    if (error) falla("registrarCierre", error);
+    return aCierre(data as CierreRow);
+  }
+
+  async listarCierres(filtro: { contactoId?: string; propertyId?: string } = {}): Promise<Cierre[]> {
+    let c = this.db().from("cierres").select(COLS_CIERRE).order("fecha_cierre", { ascending: false }).order("created_at", { ascending: false }).limit(1000);
+    if (filtro.contactoId) {
+      // Va dentro del filtro `or` de PostgREST: solo se acepta un uuid.
+      if (!UUID_DB.test(filtro.contactoId)) return [];
+      c = c.or(`vendedor_contacto_id.eq.${filtro.contactoId},comprador_contacto_id.eq.${filtro.contactoId}`);
+    }
+    if (filtro.propertyId) c = c.eq("property_id", filtro.propertyId);
+    const { data, error } = await c;
+    if (error) {
+      if (esDe0010(error)) return [];
+      falla("listarCierres", error);
+    }
+    return ((data ?? []) as CierreRow[]).map(aCierre);
+  }
+
+  async marcarComisionCobrada(id: string, monto: number, fecha: string): Promise<Cierre | null> {
+    const { data, error } = await this.db().from("cierres").update({ comision_cobrada: monto, cobrada_at: fecha }).eq("id", id).select(COLS_CIERRE).maybeSingle();
+    if (error) falla("marcarComisionCobrada", error);
+    return data ? aCierre(data as CierreRow) : null;
   }
 }
 
@@ -606,6 +776,62 @@ export class MemoryCrmStore implements CrmStore {
 
   async leadsDeContacto(contactoId: string): Promise<string[]> {
     return [...this.leadsEnlazados].filter(([, c]) => c === contactoId).map(([l]) => l);
+  }
+
+  async fijarProximoContacto(contactoId: string, at: string | null, nota?: string): Promise<void> {
+    const c = this.contactos.find((x) => x.id === contactoId);
+    if (!c) throw new CrmStoreError("llave foránea: el contacto no existe");
+    delete c.proximoContactoAt;
+    delete c.proximoContactoNota;
+    if (at) {
+      c.proximoContactoAt = new Date(at).toISOString();
+      if (nota?.trim()) c.proximoContactoNota = nota.trim();
+    }
+  }
+
+  async listarSeguimientos(hasta: string): Promise<Contacto[]> {
+    const tope = new Date(hasta).getTime();
+    return this.contactos
+      .filter((c) => !c.archivado && c.proximoContactoAt && new Date(c.proximoContactoAt).getTime() <= tope)
+      .sort((a, b) => a.proximoContactoAt!.localeCompare(b.proximoContactoAt!));
+  }
+
+  cierres: Cierre[] = [];
+
+  async registrarCierre(input: CierreInput): Promise<Cierre> {
+    // Los mismos chequeos que la tabla: precio > 0, porcentaje 0 a 100, montos no negativos y llaves que existan.
+    if (!(input.precioVenta > 0)) throw new CrmStoreError("cierres_precio_venta_check: el precio debe ser mayor que cero");
+    if (input.comisionPct !== undefined && (input.comisionPct < 0 || input.comisionPct > 100)) throw new CrmStoreError("cierres_comision_pct_check");
+    if (input.comisionPactada !== undefined && input.comisionPactada < 0) throw new CrmStoreError("cierres_comision_pactada_check");
+    for (const id of [input.vendedorContactoId, input.compradorContactoId]) if (id) this.exigirContacto(id);
+    this.exigirInmueble(input.propertyId);
+    if (input.captacionId && !this.captaciones.some((c) => c.id === input.captacionId)) throw new CrmStoreError("llave foránea: la captación no existe");
+    if (input.busquedaId && !this.busquedas.some((b) => b.id === input.busquedaId)) throw new CrmStoreError("llave foránea: la búsqueda no existe");
+    // Índice único parcial cierres_captacion_unica: una captación se vende una sola vez.
+    if (input.captacionId && this.cierres.some((x) => x.captacionId === input.captacionId)) {
+      throw new CrmStoreError('duplicate key value violates unique constraint "cierres_captacion_unica"');
+    }
+    const c: Cierre = { ...input, id: this.id(), creadoEn: this.ahora() };
+    for (const k of Object.keys(c) as (keyof Cierre)[]) if (c[k] === undefined) delete (c as unknown as Record<string, unknown>)[k];
+    this.cierres.push(c);
+    return { ...c };
+  }
+
+  async listarCierres(filtro: { contactoId?: string; propertyId?: string } = {}): Promise<Cierre[]> {
+    return this.cierres
+      .filter((c) => !filtro.contactoId || c.vendedorContactoId === filtro.contactoId || c.compradorContactoId === filtro.contactoId)
+      .filter((c) => !filtro.propertyId || c.propertyId === filtro.propertyId)
+      .sort((a, b) => b.fechaCierre.localeCompare(a.fechaCierre) || b.creadoEn.localeCompare(a.creadoEn))
+      .map((c) => ({ ...c }));
+  }
+
+  async marcarComisionCobrada(id: string, monto: number, fecha: string): Promise<Cierre | null> {
+    if (monto < 0) throw new CrmStoreError("cierres_comision_cobrada_check");
+    const c = this.cierres.find((x) => x.id === id);
+    if (!c) return null;
+    c.comisionCobrada = monto;
+    c.cobradaAt = fecha.slice(0, 10);
+    return { ...c };
   }
 }
 
