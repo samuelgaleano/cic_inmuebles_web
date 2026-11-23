@@ -5,6 +5,7 @@ import { defaultDeps } from "@/lib/pagos/process";
 import { reconcile } from "@/lib/pagos/reconcile";
 import { getPagosStore, isPagosStoreConfigured } from "@/lib/pagos/store";
 import { revisarVencimientos } from "@/lib/servicios/procesar";
+import { registrarLatido } from "@/lib/salud/latidos";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -89,6 +90,8 @@ export async function GET(req: Request) {
       console.error("[pagos] no se pudo enviar la alerta del cron:", mensajeError(err));
     }
   }
+
+  await registrarLatido("cron-diario", fallos.length === 0, fallos.length ? `${fallos.length} fallo(s)` : undefined);
 
   const at = new Date().toISOString();
   if (!result) return NextResponse.json({ ok: false, at, error: errorPagos, rawPurgados, vigencias }, { status: 500 });

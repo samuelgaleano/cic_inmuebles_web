@@ -4,6 +4,7 @@ import { getRepository } from "@/lib/data";
 import { isSheetsConfigured, syncAllPropertiesToSheet } from "@/lib/integrations/sheets";
 import { autorizadoCron } from "@/lib/auth/cron";
 import { sendPagosAlert } from "@/lib/notifications/payment";
+import { registrarLatido } from "@/lib/salud/latidos";
 
 /**
  * Sincronización automática (Drive → catálogo → Sheets).
@@ -62,6 +63,7 @@ export async function GET(req: Request) {
   }
 
   if (fallos.length) await avisarFallo(fallos);
+  await registrarLatido("cron-sync", fallos.length === 0, fallos.length ? `${fallos.length} fallo(s)` : undefined);
 
   // 500 si la importación no corrió: así el fallo también se ve en el panel de Crons de Vercel.
   return NextResponse.json({ at: new Date().toISOString(), ...result }, { status: result.ok === false ? 500 : 200 });
