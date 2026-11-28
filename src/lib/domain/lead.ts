@@ -64,7 +64,22 @@ export interface Lead {
   fuente: LeadSource;
   estado: LeadStatus;
   creadoEn: string;
+
+  // Seguimiento y origen (columnas de 0012; ausentes mientras la migración no esté aplicada)
+  /** Primera vez que alguien del equipo le escribió, lo llamó o le cambió el estado desde «nuevo». */
+  primerContactoAt?: string;
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
+  /** Sitio desde el que llegó (document.referrer). */
+  referente?: string;
+  paginaEntrada?: string;
+  /** Datos suprimidos a pedido de la persona (Ley 1581, columna de 0013). */
+  suprimidoAt?: string;
 }
 
+/** Nombre que queda en una persona, un lead o una cita cuyos datos se suprimieron (Ley 1581). */
+export const NOMBRE_SUPRIMIDO = "Suprimido";
+
 /** Datos que llegan desde un formulario (sin campos generados por el sistema). */
-export type LeadInput = Omit<Lead, "id" | "estado" | "creadoEn">;
+export type LeadInput = Omit<Lead, "id" | "estado" | "creadoEn" | "primerContactoAt" | "suprimidoAt">;

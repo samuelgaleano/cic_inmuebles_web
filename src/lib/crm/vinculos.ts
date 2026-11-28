@@ -3,7 +3,7 @@ import type { Lead, Property } from "@/lib/domain";
 import type { Servicio } from "@/lib/servicios/vigencia";
 import { sinTildes, validarContacto } from "./reglas";
 import type { CrmStore } from "./store";
-import type { Contacto, EstadoCaptacion } from "./tipos";
+import { marcaDe, type Contacto, type EstadoCaptacion } from "./tipos";
 
 /**
  * Lo que enlaza el CRM con el resto de la plataforma: los leads del formulario, los inmuebles con su
@@ -15,7 +15,7 @@ import type { Contacto, EstadoCaptacion } from "./tipos";
  * Persona del CRM para estos datos: por teléfono si lo hay; si no, por correo (los compradores de planes suelen
  * traer correo y no teléfono, y con otro nombre legal) y, por último, por nombre exacto entre los que no tienen teléfono.
  */
-async function contactoDe(
+export async function contactoDe(
   crm: CrmStore,
   datos: { nombre: string; telefono?: string; email?: string; ciudad?: string; origen: Contacto["origen"] },
 ): Promise<{ contacto: Contacto; creado: boolean } | null> {
@@ -31,7 +31,9 @@ async function contactoDe(
   }
   if (!v.valor.telefonoE164) {
     const clave = sinTildes(v.valor.nombre);
-    const mismo = (await crm.listarContactos({ q: v.valor.nombre, incluirArchivados: true })).find((c) => !c.telefonoE164 && sinTildes(c.nombre) === clave);
+    // Una página filtrada por el nombre basta: el que coincide exacto está entre los que lo contienen.
+    const { filas } = await crm.paginaContactos({ q: v.valor.nombre, incluirArchivados: true, porPagina: 200 });
+    const mismo = filas.find((c) => !c.telefonoE164 && sinTildes(c.nombre) === clave);
     if (mismo) return { contacto: mismo, creado: false };
   }
   return crm.crearContacto(v.valor);
@@ -43,8 +45,14 @@ export interface VinculoLead {
   nuevo: boolean;
 }
 
-/** Pasa un lead del formulario al CRM: persona, captación o búsqueda, e inmueble propuesto si preguntó por uno. */
+/**
+ * Pasa un lead del formulario al CRM: persona, captación o búsqueda, e inmueble propuesto si preguntó por uno.
+ * Idempotente por llave (0013): la captación o búsqueda y la nota llevan el id del lead con índice único, así que
+ * repetirlo (o dos envíos a la vez) no duplica nada. Sin la 0013 se reconoce por la marca `[lead:<id>]` de la nota.
+ * Un lead suprimido (Ley 1581) no vuelve a entrar.
+ */
 export async function vincularLead(crm: CrmStore, lead: Lead): Promise<VinculoLead | null> {
+  if (lead.suprimidoAt) return null;
   const r = await contactoDe(crm, { nombre: lead.nombre, telefono: lead.telefono, email: lead.email, ciudad: lead.ciudad, origen: lead.fuente });
   if (!r) return null;
   const { contacto } = r;
@@ -55,28 +63,33 @@ export async function vincularLead(crm: CrmStore, lead: Lead): Promise<VinculoLe
   // La llave foránea se asegura siempre, también para leads que ya se habían pasado antes de existir.
   await crm.enlazarLead(lead.id, contacto.id).catch((err) => console.error("[crm] no se pudo enlazar el lead:", err instanceof Error ? err.message : err));
 
-  const marca = `[lead:${lead.id}]`;
-  const previas = await crm.listarActividades(contacto.id);
-  if (previas.some((a) => a.detalle.includes(marca))) return { contactoId: contacto.id, nuevo: false };
+  const llave = { tipo: "lead" as const, id: lead.id };
+  if (await crm.existeActividad(llave, contacto.id)) return { contactoId: contacto.id, nuevo: false };
 
   if (lead.tipo === "vendedor") {
-    await crm.crearCaptacion({
-      contactoId: contacto.id,
-      ...(lead.tipoInmueble || lead.ciudad ? { ubicacion: [lead.tipoInmueble, lead.ciudad].filter(Boolean).join(" · ") } : {}),
-      comisionPct: 3,
-      estatusPago: "pendiente",
-      aprobada: false,
-      multimedia: "por_coordinar",
-      estado: "nueva",
-    });
+    await crm.crearCaptacion(
+      {
+        contactoId: contacto.id,
+        ...(lead.tipoInmueble || lead.ciudad ? { ubicacion: [lead.tipoInmueble, lead.ciudad].filter(Boolean).join(" · ") } : {}),
+        comisionPct: 3,
+        estatusPago: "pendiente",
+        aprobada: false,
+        multimedia: "por_coordinar",
+        estado: "nueva",
+      },
+      { leadId: lead.id },
+    );
   } else {
-    const b = await crm.crearBusqueda({
-      contactoId: contacto.id,
-      tipo: "comprador",
-      ...(lead.mensaje ? { especificacion: lead.mensaje.slice(0, 600) } : {}),
-      potencial: false,
-      estado: "activa",
-    });
+    const b = await crm.crearBusqueda(
+      {
+        contactoId: contacto.id,
+        tipo: "comprador",
+        ...(lead.mensaje ? { especificacion: lead.mensaje.slice(0, 600) } : {}),
+        potencial: false,
+        estado: "activa",
+      },
+      { leadId: lead.id },
+    );
     if (lead.propertyId) {
       await crm.proponer(b.id, lead.propertyId).catch((err) => console.warn("[crm] no se pudo proponer el inmueble del lead:", err instanceof Error ? err.message : err));
     }
@@ -85,11 +98,13 @@ export async function vincularLead(crm: CrmStore, lead: Lead): Promise<VinculoLe
   const nota = {
     contactoId: contacto.id,
     tipo: "nota" as const,
-    detalle: `Lead del formulario web ${marca}: ${intencion}${lead.propertySlug ? ` (${lead.propertySlug})` : ""}.${lead.mensaje ? ` Mensaje: ${lead.mensaje}` : ""}`.slice(0, 2000),
+    detalle: `Lead del formulario web ${marcaDe(llave)}: ${intencion}${lead.propertySlug ? ` (${lead.propertySlug})` : ""}.${lead.mensaje ? ` Mensaje: ${lead.mensaje}` : ""}`.slice(0, 2000),
   };
   // Si el inmueble por el que preguntó ya no existe, la nota se guarda igual, sin enlazarlo.
-  await crm.registrarActividad({ ...nota, ...(lead.propertyId ? { propertyId: lead.propertyId } : {}) }).catch(() => crm.registrarActividad(nota));
-  return { contactoId: contacto.id, nuevo: true };
+  const r2 = await crm
+    .registrarActividadUnica({ ...nota, ...(lead.propertyId ? { propertyId: lead.propertyId } : {}) }, llave)
+    .catch(() => crm.registrarActividadUnica(nota, llave));
+  return { contactoId: contacto.id, nuevo: r2.nueva };
 }
 
 /** Estado de la captación que corresponde al estado del inmueble en el catálogo. */
@@ -165,16 +180,19 @@ export async function vincularServicio(
   // Un plan descartado (prueba, reembolso) queda enlazado a su persona como historia, sin sumar a su seguimiento.
   if (s.estado === "descartado") return "sin_datos";
 
-  const marca = `[servicio:${s.id}]`;
-  if ((await crm.listarActividades(r.contacto.id)).some((a) => a.detalle.includes(marca))) return "existia";
+  // Idempotente por llave (actividades.servicio_id, 0013) o, sin ella, por la marca `[servicio:<id>]`.
+  const llave = { tipo: "servicio" as const, id: s.id };
   const plan = getPlan(s.planId)?.nombre ?? s.planId;
-  await crm.registrarActividad({
-    contactoId: r.contacto.id,
-    tipo: "nota",
-    detalle: `Compró el plan «${plan}» (${s.dias} días) desde la web. ${marca}`,
-    ocurrioEn: s.createdAt,
-  });
-  return "creado";
+  const { nueva } = await crm.registrarActividadUnica(
+    {
+      contactoId: r.contacto.id,
+      tipo: "nota",
+      detalle: `Compró el plan «${plan}» (${s.dias} días) desde la web. ${marcaDe(llave)}`,
+      ocurrioEn: s.createdAt,
+    },
+    llave,
+  );
+  return nueva ? "creado" : "existia";
 }
 
 export interface ResumenSincronizacion {
@@ -203,7 +221,7 @@ export async function sincronizarTodo(
     }
   }
   for (const l of datos.leads) {
-    if (l.estado === "descartado") {
+    if (l.estado === "descartado" || l.suprimidoAt) {
       r.leads.omitidos += 1; // spam o descartado a mano: no es una persona para el CRM
       continue;
     }

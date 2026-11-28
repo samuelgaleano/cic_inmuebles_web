@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getCrmStore } from "@/lib/crm/store";
-import { ESTADO_CAPTACION_LABELS, ESTADO_PROPUESTA_LABELS, ESTATUS_PAGO_LABELS } from "@/lib/crm/tipos";
+import { ESTADO_CAPTACION_LABELS, ESTADO_PROPUESTA_LABELS, ESTATUS_PAGO_LABELS, type PropuestaDeInmueble } from "@/lib/crm/tipos";
 import { getPlan } from "@/lib/config/plans";
 import type { Property } from "@/lib/domain";
 import { getRepository } from "@/lib/data";
@@ -17,18 +17,16 @@ const lista = "divide-y divide-line text-sm";
  */
 export async function RelacionesInmueble({ property }: { property: Property }) {
   const crm = getCrmStore();
-  const [captaciones, busquedas, leads] = await Promise.all([
-    crm.listarCaptaciones().catch(() => []),
-    crm.listarBusquedas().catch(() => []),
-    getRepository().leads.list().catch(() => []),
+  // Consultas por el inmueble (property_id / slug): ni las búsquedas de todos ni la tabla de leads completa.
+  const [vigente, propuestas, susLeads] = await Promise.all([
+    crm.captacionVigenteDe(property.id).catch(() => null),
+    crm.propuestasDeInmuebles([property.id]).catch((): PropuestaDeInmueble[] => []),
+    getRepository().leads.listarDeInmueble(property.id, property.slug).catch(() => []),
   ]);
-  const propuestas = (await crm.listarPropuestas(busquedas.map((b) => b.id)).catch(() => [])).filter((p) => p.propertyId === property.id);
-  const suyas = captaciones.filter((c) => c.propertyId === property.id && c.estado !== "descartada");
-  const interesados = new Set([...suyas.map((c) => c.contactoId), ...busquedas.filter((b) => propuestas.some((p) => p.busquedaId === b.id)).map((b) => b.contactoId)]);
-  const contactos = interesados.size ? await crm.listarContactos({ incluirArchivados: true }).catch(() => []) : [];
-  const persona = new Map(contactos.map((c) => [c.id, c]));
+  const suyas = vigente ? [vigente] : [];
+  const vendedores = new Map((await crm.contactosPorId(suyas.map((c) => c.contactoId)).catch(() => [])).map((c) => [c.id, c]));
+  const persona = new Map([...vendedores, ...propuestas.map((p) => [p.contacto.id, p.contacto] as const)]);
   const servicios = (await getServiciosStore().listar().catch(() => [])).filter((s) => s.propertySlug === property.slug && s.estado !== "descartado");
-  const susLeads = leads.filter((l) => l.propertyId === property.id || l.propertySlug === property.slug);
 
   const nada = !suyas.length && !propuestas.length && !servicios.length && !susLeads.length;
   const nombre = (id: string) => {
@@ -72,10 +70,9 @@ export async function RelacionesInmueble({ property }: { property: Property }) {
           <h3 className="mb-1 text-xs font-bold uppercase tracking-wider text-muted">Compradores a los que se propuso</h3>
           <ul className={lista}>
             {propuestas.map((p) => {
-              const b = busquedas.find((x) => x.id === p.busquedaId);
               return (
                 <li key={p.busquedaId} className="flex flex-wrap items-center justify-between gap-2 py-2">
-                  <span>{b ? nombre(b.contactoId) : "—"}</span>
+                  <span>{nombre(p.contacto.id)}</span>
                   <span className="text-xs text-ink-soft">{ESTADO_PROPUESTA_LABELS[p.estado]}</span>
                 </li>
               );

@@ -4,6 +4,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { getRepository } from "@/lib/data";
 import { deletePropertyAction } from "@/lib/actions/admin-properties";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { CopiarEnlaceRedes } from "@/components/admin/copiar-enlace-redes";
 import {
   PROPERTY_STATUSES,
   PROPERTY_STATUS_LABELS,
@@ -93,6 +94,13 @@ export default async function AdminInmueblesPage({
                 <td className="px-4 py-3">
                   <p className="font-medium text-ink">{p.titulo}</p>
                   <p className="text-xs text-muted">{PROPERTY_TYPE_LABELS[p.tipo]}{p.publicado ? "" : " · borrador"}</p>
+                  {/* Solo lo publicado tiene ficha pública que compartir. */}
+                  {p.publicado && (
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      <span className="text-[11px] font-semibold text-muted">Copiar enlace para</span>
+                      <CopiarEnlaceRedes slug={p.slug} />
+                    </div>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-ink-soft">{p.ubicacion.ciudad}</td>
                 <td className="px-4 py-3 font-semibold text-ink">{formatPrice(p.precio)}</td>

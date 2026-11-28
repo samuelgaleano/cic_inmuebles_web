@@ -1,7 +1,9 @@
-import { ArrowLeft, MessageCircle } from "lucide-react";
+import { ArrowLeft, CalendarPlus, Phone } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BotonEnviar } from "@/components/admin/boton-enviar";
+import { EnlaceContacto } from "@/components/admin/enlace-contacto";
+import { MenuWhatsApp } from "@/components/admin/menu-whatsapp";
 import { PropuestaEstadoForm } from "@/components/admin/propuesta-estado-form";
 import {
   actualizarBusquedaAction,
@@ -18,7 +20,9 @@ import {
   quitarProximoContactoAction,
   registrarActividadAction,
   registrarCierreAction,
+  suprimirDatosAction,
 } from "@/lib/actions/admin-crm";
+import { opcionesWhatsApp } from "@/lib/crm/plantillas-whatsapp";
 import { aHoraLocalBogota, clasificarSeguimiento, diaBogota, diasDeAtraso, sugerirInmuebles } from "@/lib/crm/reglas";
 import { getCrmStore } from "@/lib/crm/store";
 import {
@@ -44,7 +48,8 @@ import { getPagosStore } from "@/lib/pagos/store";
 import { getServiciosStore } from "@/lib/servicios/store";
 import { DIAS_DE_GRACIA, diasDePeriodo, ETIQUETA_ESTADO, ETIQUETA_PERIODO, fechaHora as fechaHoraBogota, finDeGracia, type Periodo, type Servicio } from "@/lib/servicios/vigencia";
 import { formatPrice } from "@/lib/utils/format";
-import { enlaceWhatsApp, normalizarTelefono } from "@/lib/utils/telefono";
+import { enlaceWhatsApp, normalizarTelefono, variantesTelefono } from "@/lib/utils/telefono";
+import { APPOINTMENT_STATUS_LABELS } from "@/lib/domain";
 
 export const dynamic = "force-dynamic";
 
@@ -75,12 +80,17 @@ export default async function FichaContactoPage({ params, searchParams }: { para
   const contacto = await crm.obtenerContacto(id);
   if (!contacto) notFound();
 
-  const [captaciones, busquedas, actividades, propiedades, leads, cierres] = await Promise.all([
+  const repo = getRepository();
+  // Todo filtrado por esta persona (contacto_id) o por sus inmuebles (property_id): nada de leer tablas completas.
+  const [captaciones, busquedas, actividades, propiedades, susLeads, cierres] = await Promise.all([
     crm.listarCaptaciones(id),
     crm.listarBusquedas(id),
     crm.listarActividades(id),
-    getRepository().properties.list(),
-    getRepository().leads.list(),
+    repo.properties.list(),
+    // Los leads enlazados por llave foránea y, para los anteriores al enlace, los de su mismo teléfono o correo.
+    crm.leadsDeContacto(id).then((ids) =>
+      repo.leads.listarDeContacto({ contactoId: id, ids, telefonos: variantesTelefono(contacto.telefono, contacto.telefonoE164), email: contacto.email }).catch(() => []),
+    ),
     crm.listarCierres({ contactoId: id }),
   ]);
   const propuestas = await crm.listarPropuestas(busquedas.map((b) => b.id));
@@ -93,29 +103,21 @@ export default async function FichaContactoPage({ params, searchParams }: { para
   const vendidas = new Set(cierres.map((c) => c.captacionId).filter(Boolean));
   const conInmueble = new Set(vendibles.filter((c) => c.propertyId && !vendidas.has(c.id)).map((c) => c.propertyId!));
   const candidatos = new Map<string, { value: string; nombre: string; estado: string }[]>();
-  let nombres = new Map<string, string>();
-  if (conInmueble.size || cierres.length) {
-    const [todasBusquedas, todos] = await Promise.all([crm.listarBusquedas(), crm.listarContactos({ incluirArchivados: true })]);
-    nombres = new Map(todos.map((c) => [c.id, c.nombre]));
-    if (conInmueble.size) {
-      const busquedaPorId = new Map(todasBusquedas.map((b) => [b.id, b]));
-      for (const pr of await crm.listarPropuestas()) {
-        if (!conInmueble.has(pr.propertyId) || pr.estado === "descartado") continue;
-        const b = busquedaPorId.get(pr.busquedaId);
-        if (!b || b.estado === "descartada" || b.contactoId === id) continue;
-        const lista = candidatos.get(pr.propertyId) ?? [];
-        lista.push({ value: `${b.id}|${b.contactoId}`, nombre: nombres.get(b.contactoId) ?? "(sin nombre)", estado: ESTADO_PROPUESTA_LABELS[pr.estado] });
-        candidatos.set(pr.propertyId, lista);
-      }
-    }
+  // Solo las propuestas de los inmuebles de este vendedor (consulta por property_id).
+  for (const pr of conInmueble.size ? await crm.propuestasDeInmuebles([...conInmueble]) : []) {
+    if (pr.estado === "descartado" || pr.estadoBusqueda === "descartada" || pr.contacto.id === id) continue;
+    const lista = candidatos.get(pr.propertyId) ?? [];
+    lista.push({ value: `${pr.busquedaId}|${pr.contacto.id}`, nombre: pr.contacto.nombre, estado: ESTADO_PROPUESTA_LABELS[pr.estado] });
+    candidatos.set(pr.propertyId, lista);
   }
+  // Nombres de la otra parte de cada venta.
+  const otros = cierres.flatMap((c) => [c.vendedorContactoId, c.compradorContactoId]).filter((x): x is string => Boolean(x) && x !== id);
+  const nombres = new Map((otros.length ? await crm.contactosPorId(otros) : []).map((c) => [c.id, c.nombre]));
   const seguimiento = contacto.proximoContactoAt ? clasificarSeguimiento(contacto.proximoContactoAt, ahora) : undefined;
 
-  // Leads del formulario de esta persona (mismo teléfono) y sus servicios de publicación (mismo correo o teléfono).
+  // Sus servicios de publicación: enlazados por llave foránea o, los anteriores al enlace, por correo o teléfono.
   const mismoTelefono = (crudo?: string) => Boolean(contacto.telefonoE164 && crudo && normalizarTelefono(crudo)?.e164 === contacto.telefonoE164);
-  // Los leads y planes enlazados por llave foránea y, para los anteriores al enlace, los que coinciden por teléfono o correo.
-  const idsLeads = new Set(await crm.leadsDeContacto(id));
-  const susLeads = leads.filter((l) => idsLeads.has(l.id) || mismoTelefono(l.telefono) || Boolean(contacto.email && l.email?.toLowerCase() === contacto.email));
+  const citas = await repo.appointments.listarDe({ contactoId: id, leadIds: susLeads.map((l) => l.id) }).catch(() => []);
   const serviciosStore = getServiciosStore();
   let susServicios: Servicio[] = [];
   try {
@@ -137,7 +139,35 @@ export default async function FichaContactoPage({ params, searchParams }: { para
     });
   }
 
-  const wa = contacto.telefono ? enlaceWhatsApp(contacto.telefono, `Hola ${contacto.nombre.split(" ")[0]}, te escribimos de CIC Inmuebles.`) : undefined;
+  const wa = contacto.telefono ? enlaceWhatsApp(contacto.telefono) : undefined;
+  const tel = contacto.telefono ? normalizarTelefono(contacto.telefono)?.e164 : undefined;
+
+  // Mensajes de WhatsApp según la etapa de esta persona.
+  const aMensaje = (pid?: string) => {
+    const p = pid ? inmueble.get(pid) : undefined;
+    return p ? { titulo: p.titulo, slug: p.slug, precio: p.precio, sector: p.ubicacion.sector } : undefined;
+  };
+  const vivas = busquedas.filter((b) => b.estado !== "descartada" && b.estado !== "cerrada");
+  const suyasPropuestas = propuestas.filter((p) => vivas.some((b) => b.id === p.busquedaId) && p.estado !== "descartado");
+  const proxima = citas.find((c) => (c.estado === "confirmada" || c.estado === "solicitada") && new Date(c.inicioEn) > ahora);
+  const ultimaVisita = [...citas].reverse().find((c) => c.estado === "realizada");
+  const visitada = ultimaVisita?.propertyId ?? suyasPropuestas.find((p) => p.estado === "visito")?.propertyId;
+  const similar = vivas.length ? sugerirInmuebles(vivas[0], propiedades, propuestas.filter((p) => p.busquedaId === vivas[0].id).map((p) => p.propertyId))[0]?.property : undefined;
+  const capVigente = captaciones.find((c) => c.estado !== "descartada" && c.estado !== "vendida");
+  const inmuebleProxima = proxima ? aMensaje(proxima.propertyId) : undefined;
+  const opciones = opcionesWhatsApp({
+    nombre: contacto.nombre,
+    telefono: contacto.telefono,
+    esComprador: vivas.length > 0,
+    esVendedor: Boolean(capVigente),
+    interes: aMensaje(suyasPropuestas[0]?.propertyId ?? susLeads.find((l) => l.propertyId)?.propertyId),
+    queVende: capVigente?.ubicacion ? `tu inmueble en ${capVigente.ubicacion}` : undefined,
+    inmuebleVendedor: aMensaje(capVigente?.propertyId),
+    ...(proxima && inmuebleProxima ? { proximaVisita: { inicioEn: proxima.inicioEn, inmueble: inmuebleProxima } } : {}),
+    visitado: aMensaje(visitada),
+    ...(similar ? { similar: { titulo: similar.titulo, slug: similar.slug, precio: similar.precio, sector: similar.ubicacion.sector } } : {}),
+  });
+  const agendar = (propertyId?: string) => `/admin/agenda?${new URLSearchParams({ contactoId: contacto.id, ...(propertyId ? { propertyId } : {}) }).toString()}#nueva-cita`;
 
   return (
     <div className="space-y-6">
@@ -154,12 +184,16 @@ export default async function FichaContactoPage({ params, searchParams }: { para
               {[contacto.telefono, contacto.email, contacto.ciudad].filter(Boolean).join(" · ") || "Sin datos de contacto"} · Origen: {ORIGEN_LABELS[contacto.origen]}
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            {wa && (
-              <a href={wa} target="_blank" rel="noopener noreferrer" className={`${secundario} inline-flex items-center gap-1.5`}>
-                <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
-              </a>
+          <div className="flex flex-wrap items-center gap-2">
+            <MenuWhatsApp opciones={opciones} contactoId={contacto.id} enlaceSimple={wa} />
+            {tel && (
+              <EnlaceContacto href={`tel:${tel}`} contactoId={contacto.id} nuevaPestana={false} className={`${secundario} inline-flex min-h-11 items-center gap-1.5`}>
+                <Phone className="h-3.5 w-3.5" aria-hidden /> Llamar
+              </EnlaceContacto>
             )}
+            <Link href={agendar()} className={`${secundario} inline-flex min-h-11 items-center gap-1.5`}>
+              <CalendarPlus className="h-3.5 w-3.5" aria-hidden /> Agendar visita
+            </Link>
             <form action={archivarContactoAction}>
               <input type="hidden" name="id" value={contacto.id} />
               <input type="hidden" name="archivado" value={contacto.archivado ? "0" : "1"} />
@@ -442,6 +476,11 @@ export default async function FichaContactoPage({ params, searchParams }: { para
                               </span>
                               <span className="flex items-center gap-2">
                                 <PropuestaEstadoForm busquedaId={b.id} propertyId={s.propertyId} contactoId={contacto.id} estado={s.estado} />
+                                {p && (
+                                  <Link href={agendar(p.id)} className="inline-flex min-h-11 items-center text-xs font-semibold text-brand-700 underline underline-offset-2 sm:min-h-0">
+                                    Agendar visita
+                                  </Link>
+                                )}
                                 <form action={quitarPropuestaAction}>
                                   <input type="hidden" name="busquedaId" value={b.id} />
                                   <input type="hidden" name="propertyId" value={s.propertyId} />
@@ -743,6 +782,34 @@ export default async function FichaContactoPage({ params, searchParams }: { para
             </ol>
           </section>
 
+          {/* Visitas de la agenda */}
+          <section className={tarjeta} aria-labelledby="visitas">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h2 id="visitas" className="text-sm font-bold text-ink">Visitas</h2>
+              <Link href={agendar()} className="inline-flex min-h-11 items-center text-xs font-semibold text-brand-700 underline underline-offset-2 sm:min-h-0">
+                + Agendar visita
+              </Link>
+            </div>
+            {citas.length ? (
+              <ul className="space-y-2 text-sm">
+                {citas.map((c) => {
+                  const p = inmueble.get(c.propertyId);
+                  return (
+                    <li key={c.id} className="flex flex-wrap items-center justify-between gap-2">
+                      <span>
+                        <span className="text-xs text-muted">{fechaHora(c.inicioEn)}</span>{" "}
+                        <span className="text-ink-soft">{p ? `${p.codigo} · ${p.titulo}` : "(inmueble eliminado)"}</span>
+                      </span>
+                      <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${c.estado === "realizada" ? "bg-brand-50 text-brand-700" : "bg-ink/[0.07] text-ink-soft"}`}>{APPOINTMENT_STATUS_LABELS[c.estado]}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="text-xs text-muted">Sin visitas agendadas. Al marcar una cita como «Realizada» en la Agenda, queda aquí y en su línea de tiempo.</p>
+            )}
+          </section>
+
           {susLeads.length > 0 && (
             <section className={tarjeta} aria-labelledby="leads">
               <h2 id="leads" className="mb-3 text-sm font-bold text-ink">Leads del formulario</h2>
@@ -821,6 +888,26 @@ export default async function FichaContactoPage({ params, searchParams }: { para
               </Link>
             </section>
           )}
+
+          {/* Ley 1581: supresión a pedido de la persona. Dos pasos: abrir y escribir la palabra de confirmación. */}
+          <section className={`${tarjeta} border-rose-200`} aria-labelledby="suprimir">
+            <h2 id="suprimir" className="text-sm font-bold text-ink">Datos personales</h2>
+            <p className="mt-1 text-xs text-muted">Si la persona pide que borren sus datos (Ley 1581 de 2012).</p>
+            <details className="mt-3">
+              <summary className="inline-flex min-h-11 cursor-pointer list-none items-center rounded-lg border border-rose-200 px-3 text-xs font-semibold text-rose-700 hover:bg-rose-50">Suprimir datos de esta persona</summary>
+              <form action={suprimirDatosAction} className="mt-3 space-y-3 rounded-xl border border-rose-200 bg-rose-50 p-3">
+                <input type="hidden" name="contactoId" value={contacto.id} />
+                <p className="text-xs text-rose-900">
+                  Se reemplaza el nombre por «Suprimido» y se borran teléfono, correo, ciudad y notas del contacto, de sus leads y de sus citas, el texto de su línea de tiempo (quedan el tipo y la fecha) y sus datos de propietario en los inmuebles. Se conservan los montos de ventas y pagos. No se puede deshacer.
+                </p>
+                <label className={etiqueta}>
+                  Escribe SUPRIMIR para confirmar
+                  <input name="confirmar" required autoComplete="off" pattern="[Ss][Uu][Pp][Rr][Ii][Mm][Ii][Rr]" className={`${campo} mt-1 h-11 bg-white`} />
+                </label>
+                <BotonEnviar className="inline-flex min-h-11 items-center rounded-lg bg-rose-600 px-3 text-xs font-semibold text-white hover:bg-rose-700">Sí, suprimir sus datos</BotonEnviar>
+              </form>
+            </details>
+          </section>
         </div>
       </div>
 

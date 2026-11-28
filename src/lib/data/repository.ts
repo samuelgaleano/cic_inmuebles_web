@@ -47,10 +47,30 @@ export interface PropertyRepository {
 
 export interface LeadRepository {
   create(input: LeadInput): Promise<Lead>;
-  list(): Promise<Lead[]>;
+  /** Más nuevos primero, hasta `limite` (por defecto 1000). Para exportar y sincronizar; el panel pagina con `listPage`. */
+  list(opts?: { limite?: number }): Promise<Lead[]>;
+  getById(id: string): Promise<Lead | null>;
+  /** Una página del panel de leads (más nuevos primero) con el total. `estado` filtra; `pagina` empieza en 1. */
+  listPage(opts: { pagina: number; porPagina: number; estado?: LeadStatus }): Promise<{ leads: Lead[]; total: number }>;
+  /** Leads de una persona: enlazados por `contacto_id` (o con esos `ids`) o con su mismo teléfono o correo. */
+  listarDeContacto(c: { contactoId: string; ids?: string[]; telefonos: string[]; email?: string }): Promise<Lead[]>;
+  /** Leads que preguntaron por un inmueble (por id o, los anteriores al enlace, por slug). */
+  listarDeInmueble(propertyId: string, slug: string): Promise<Lead[]>;
+  /** Leads creados en [desde, hasta) (ISO), para los reportes del mes. */
+  listarEntre(desde: string, hasta: string): Promise<Lead[]>;
   /** Cuántos leads llegaron desde ese instante (tope de avisos por correo). */
   countSince(iso: string): Promise<number>;
   updateStatus(id: string, estado: LeadStatus): Promise<Lead | null>;
+  /**
+   * Fija `primer_contacto_at` (0012) en los que todavía no lo tienen; nunca lo pisa.
+   * Devuelve cuántos marcó (0 si la columna no existe todavía).
+   */
+  marcarPrimerContacto(ids: string[], at: string): Promise<number>;
+  /**
+   * Ley 1581: anonimiza nombre, teléfono, correo y mensaje (y preferencia y ciudad) y marca `suprimido_at` (0013).
+   * Sin esa columna los deja «descartado», para que la sincronización del CRM no los vuelva a pasar.
+   */
+  suprimir(ids: string[], at: string): Promise<number>;
   remove(id: string): Promise<boolean>;
 }
 
@@ -66,8 +86,14 @@ export interface AgentRepository {
 
 export interface AppointmentRepository {
   list(): Promise<Appointment[]>;
+  getById(id: string): Promise<Appointment | null>;
+  /** Citas de una persona (por `contacto_id`, 0013) o de sus leads, por fecha. */
+  listarDe(c: { contactoId: string; leadIds: string[] }): Promise<Appointment[]>;
+  /** Con `contactoId` y sin la columna (0013 sin aplicar), se guarda sin él. */
   create(input: AppointmentInput): Promise<Appointment>;
   updateStatus(id: string, estado: AppointmentStatus): Promise<Appointment | null>;
+  /** Ley 1581: anonimiza el cliente (nombre, teléfono, correo, notas) de las citas de esa persona o de esos leads. */
+  suprimirDe(c: { contactoId: string; leadIds: string[] }): Promise<number>;
   remove(id: string): Promise<boolean>;
 }
 

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect, unstable_rethrow } from "next/navigation";
 import { exigirAdmin } from "@/lib/auth";
 import { CrmNoDisponibleError, CrmStoreError, getCrmStore } from "@/lib/crm/store";
-import { diaBogota, fechaDeSeguimiento, leerDia, leerPorcentaje, leerPrecio, validarCierre, validarContacto } from "@/lib/crm/reglas";
+import { diaBogota, fechaDeSeguimiento, leerDia, leerPorcentaje, leerPrecio, sinTildes, validarCierre, validarContacto } from "@/lib/crm/reglas";
 import {
   ESTADOS_BUSQUEDA,
   ESTADOS_CAPTACION,
@@ -29,6 +29,7 @@ import { isSheetsConfigured, syncPropertyToSheet } from "@/lib/integrations/shee
 import { fetchTransaction } from "@/lib/integrations/wompi";
 import { formatPrice } from "@/lib/utils/format";
 import { desdeHoraBogota } from "@/lib/utils/hora-bogota";
+import { normalizarTelefono, variantesTelefono } from "@/lib/utils/telefono";
 import { getServiciosStore } from "@/lib/servicios/store";
 import { sincronizarTodo, vincularLead } from "@/lib/crm/vinculos";
 
@@ -67,6 +68,7 @@ function mensajeDe(err: unknown): string {
   // «No se pudo guardar» sobre el mensaje correcto.
   unstable_rethrow(err);
   if (err instanceof CrmNoDisponibleError) {
+    if (err.migracion === "0013") return "Falta aplicar la migración 0013 en Supabase (resumen de contactos, llaves y visitas).";
     return err.migracion === "0010"
       ? "Falta aplicar la migración 0010 en Supabase (próximo contacto y ventas cerradas)."
       : "Falta crear las tablas del CRM (migración 0007 en Supabase).";
@@ -539,6 +541,89 @@ export async function marcarComisionCobradaAction(fd: FormData): Promise<void> {
   refrescar(contactoId);
 }
 
+// ---------------------------------------------------------------- Ley 1581: supresión a pedido
+
+/** La palabra que hay que escribir para confirmar la supresión (segundo paso). */
+const CONFIRMAR_SUPRESION = "SUPRIMIR";
+
+/**
+ * «Suprimir datos de esta persona» (Ley 1581, derecho de supresión). Anonimiza al contacto, a sus leads y a sus
+ * citas, borra el texto de sus actividades (quedan tipo y fecha) y las notas de captaciones, búsquedas y ventas,
+ * y quita sus datos de propietario de los inmuebles que vendía. Conserva los montos de ventas y pagos.
+ * Deja una actividad «Datos suprimidos el <fecha>». No hay borrado automático por plazo: eso lo decide CIC.
+ */
+export async function suprimirDatosAction(fd: FormData): Promise<void> {
+  await exigirAdmin();
+  const contactoId = texto(fd, "contactoId");
+  if (!UUID.test(contactoId)) return;
+  const ruta = FICHA(contactoId);
+  if (texto(fd, "confirmar").toUpperCase() !== CONFIRMAR_SUPRESION) volver(ruta, `Para suprimir, escribe ${CONFIRMAR_SUPRESION} en la casilla de confirmación.`);
+
+  const crm = getCrmStore();
+  const repo = getRepository();
+  const ahora = new Date();
+  const at = ahora.toISOString();
+  let aviso: string | undefined;
+  try {
+    const contacto = await crm.obtenerContacto(contactoId);
+    if (!contacto) volver("/admin/crm", "Ese contacto ya no existe.");
+    // Primero se ubica todo lo suyo, mientras todavía tiene teléfono y correo.
+    const [leads, captaciones] = await Promise.all([
+      repo.leads.listarDeContacto({
+        contactoId,
+        ids: await crm.leadsDeContacto(contactoId),
+        telefonos: variantesTelefono(contacto.telefono, contacto.telefonoE164),
+        email: contacto.email,
+      }),
+      crm.listarCaptaciones(contactoId),
+    ]);
+    const leadIds = leads.map((l) => l.id);
+    const propietario = { telefono: contacto.telefonoE164, email: contacto.email?.toLowerCase(), nombre: sinTildes(contacto.nombre) };
+
+    await crm.suprimirContacto(contactoId, at);
+    const fallos: string[] = [];
+    await repo.leads.suprimir(leadIds, at).catch((err) => {
+      console.error("[crm] suprimir leads:", err instanceof Error ? err.message : err);
+      fallos.push("sus leads");
+    });
+    await repo.appointments.suprimirDe({ contactoId, leadIds }).catch((err) => {
+      console.error("[crm] suprimir citas:", err instanceof Error ? err.message : err);
+      fallos.push("sus citas");
+    });
+    // El propietario guardado en la ficha del inmueble (y en la hoja de Google) es la misma persona.
+    for (const c of captaciones) {
+      if (!c.propertyId) continue;
+      try {
+        const p = await repo.properties.getById(c.propertyId);
+        const d = p?.propietario;
+        if (!p || !d) continue;
+        const esElla =
+          Boolean(propietario.telefono && d.telefono && normalizarTelefono(d.telefono)?.e164 === propietario.telefono) ||
+          Boolean(propietario.email && d.email?.toLowerCase() === propietario.email) ||
+          sinTildes(d.nombre) === propietario.nombre;
+        if (!esElla) continue;
+        const actualizado = await repo.properties.update(p.id, { propietario: undefined });
+        if (actualizado && isSheetsConfigured()) await syncPropertyToSheet(actualizado).catch(() => fallos.push("la hoja de Google"));
+      } catch (err) {
+        console.error("[crm] suprimir propietario:", err instanceof Error ? err.message : err);
+        fallos.push("el propietario de un inmueble");
+      }
+    }
+    await crm.registrarActividad({
+      contactoId,
+      tipo: "nota",
+      detalle: `Datos suprimidos el ${diaBogota(ahora)} a pedido de la persona (Ley 1581). Se conservan los montos de ventas y pagos.`,
+    });
+    if (fallos.length) aviso = `Se suprimieron los datos del CRM, pero falló: ${[...new Set(fallos)].join(", ")}. Vuelve a intentarlo o revisa los registros del servidor.`;
+  } catch (err) {
+    volver(ruta, mensajeDe(err));
+  }
+  revalidatePath("/admin/leads");
+  revalidatePath("/admin/agenda");
+  refrescar(contactoId);
+  volver(ruta, aviso);
+}
+
 // ---------------------------------------------------------------- Desde un lead y sincronización
 
 /**
@@ -549,7 +634,7 @@ export async function pasarLeadAlCrmAction(fd: FormData): Promise<void> {
   await exigirAdmin();
   const leadId = texto(fd, "leadId");
   if (!UUID.test(leadId)) return;
-  const lead = (await getRepository().leads.list()).find((l) => l.id === leadId);
+  const lead = await getRepository().leads.getById(leadId);
   if (!lead) volver("/admin/leads", "No encontré ese lead.");
 
   let contactoId: string;
@@ -570,7 +655,8 @@ export async function sincronizarCrmAction(): Promise<void> {
   let mensaje: string;
   try {
     const repo = getRepository();
-    const [propiedades, leads] = await Promise.all([repo.properties.list(), repo.leads.list()]);
+    // Hasta 5000 leads: la sincronización es completa (el panel pagina, esto no).
+    const [propiedades, leads] = await Promise.all([repo.properties.list(), repo.leads.list({ limite: 5000 })]);
     const serviciosStore = getServiciosStore();
     const servicios = await serviciosStore.listar().catch(() => []);
     // Los planes sin fecha de pago de Wompi la completan ahora (los anteriores a 0008 solo tenían la de registro).

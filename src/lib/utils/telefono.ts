@@ -64,3 +64,18 @@ export function enlaceWhatsApp(crudo: string, mensaje?: string): string | undefi
   const base = `https://wa.me/${n.e164.slice(1)}`;
   return mensaje ? `${base}?text=${encodeURIComponent(mensaje)}` : base;
 }
+
+/** Las formas en que el teléfono de una persona puede estar guardado en un lead (el formulario guarda el legible). */
+export function variantesTelefono(...telefonos: (string | undefined)[]): string[] {
+  const out = new Set<string>();
+  for (const t of telefonos) {
+    if (!t?.trim()) continue;
+    out.add(t.trim());
+    const n = normalizarTelefono(t);
+    if (n) {
+      out.add(n.legible);
+      if (n.e164) out.add(n.e164);
+    }
+  }
+  return [...out];
+}
