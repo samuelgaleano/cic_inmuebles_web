@@ -4,7 +4,6 @@ import { sendPagosAlert } from "@/lib/notifications/payment";
 import { defaultDeps } from "@/lib/pagos/process";
 import { reconcile } from "@/lib/pagos/reconcile";
 import { getPagosStore, isPagosStoreConfigured } from "@/lib/pagos/store";
-import { revisarVencimientos } from "@/lib/servicios/procesar";
 import { registrarLatido } from "@/lib/salud/latidos";
 
 export const runtime = "nodejs";
@@ -17,9 +16,10 @@ export const maxDuration = 60;
  *   GET /api/pagos/wompi/reconciliar          -> corre la reconciliación
  *   GET /api/pagos/wompi/reconciliar?tx=<id>  -> traza completa de una transacción
  *
- * Tres tareas independientes, cada una en su try: la reconciliación, la purga
- * del payload crudo de más de 72 h (Ley 1581) y la revisión de vigencias. Que
- * falle una no impide las otras. Si alguna falla se avisa a Pixies con
+ * Dos tareas independientes, cada una en su try: la reconciliación y la purga
+ * del payload crudo de más de 72 h (Ley 1581). La revisión de vigencias corre
+ * aparte en /api/cron/vigencias (su propio cron y su propio latido). Que
+ * falle una no impide la otra. Si alguna falla se avisa a Pixies con
  * `sendPagosAlert`, sin datos personales ni mensajes de error (pueden traer
  * referencias o correos): solo qué tarea falló. El detalle queda en los logs.
  */
@@ -67,19 +67,6 @@ export async function GET(req: Request) {
     }
   }
 
-  // 3) Vigencias de las publicaciones (avisos y vencimientos), en la misma corrida diaria.
-  let vigencias: Awaited<ReturnType<typeof revisarVencimientos>> | { error: string };
-  try {
-    vigencias = await revisarVencimientos();
-    if (vigencias.disponible === false) {
-      console.warn("[vigencias] tablas de vigencias no disponibles: aplicar migracion 0004 en el SQL Editor de Supabase.");
-    }
-  } catch (err) {
-    console.error("[vigencias] la revisión diaria falló:", mensajeError(err));
-    vigencias = { error: "falló la revisión de vigencias" };
-    fallos.push("La revisión de vigencias de las publicaciones falló.");
-  }
-
   if (fallos.length) {
     try {
       await sendPagosAlert(
@@ -94,6 +81,6 @@ export async function GET(req: Request) {
   await registrarLatido("cron-diario", fallos.length === 0, fallos.length ? `${fallos.length} fallo(s)` : undefined);
 
   const at = new Date().toISOString();
-  if (!result) return NextResponse.json({ ok: false, at, error: errorPagos, rawPurgados, vigencias }, { status: 500 });
-  return NextResponse.json({ ok: true, at, ...result, vigencias });
+  if (!result) return NextResponse.json({ ok: false, at, error: errorPagos, rawPurgados }, { status: 500 });
+  return NextResponse.json({ ok: true, at, ...result });
 }

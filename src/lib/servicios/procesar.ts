@@ -6,7 +6,7 @@ import { sendPagosAlert } from "@/lib/notifications/payment";
 import { sendEmail } from "@/lib/notifications/resend";
 import { correoDeAviso, correoPagoRecibido, correoRenovacionPagada, type CorreoSaliente } from "./correos";
 import { fijarPublicacionDeFicha } from "./ficha";
-import { getServiciosStore, ServiciosNoDisponibleError, type ServiciosStore } from "./store";
+import { getServiciosStore, ServiciosNoDisponibleError, type FichaDePaquete, type ServiciosStore } from "./store";
 import { accionDeHoy, fechaLarga, ventanaDeRenovacion, type Servicio } from "./vigencia";
 
 export interface ServiciosDeps {
@@ -57,8 +57,8 @@ export async function registrarServicioDePago(
       if (await aplicarRenovacionPagada(tx, plan, opts.renuevaServicioId, deps)) return;
     } catch (err) {
       console.error(`[vigencias] renovación de ${tx.id} sin aplicar (se reintenta):`, describe(err));
-      // El aviso del pago ya salió y la conciliación diaria no vuelve sobre pagos avisados: sin esta alerta
-      // la renovación pagada podía quedarse sin aplicar y sin que nadie lo supiera.
+      // El aviso del pago ya salió: la conciliación diaria la reintenta (pagos aprobados sin servicio ni
+      // renovación registrada), pero CIC debe saberlo desde la primera vez.
       if (alertarSiFalla && !(err instanceof RenovacionYaAvisada)) {
         await deps
           .alertar(
@@ -102,7 +102,8 @@ export async function registrarServicioDePago(
     console.error(`[vigencias] no se pudo registrar el servicio de ${tx.id}:`, describe(err));
     // Los reintentos (recargar el retorno, webhook, cron) no repiten la alerta: basta una por transacción.
     if (!alertarSiFalla) return;
-    // El pago ya quedó avisado y la conciliación no vuelve a pasar por aquí: se avisa a CIC para registrarlo a mano.
+    // El pago ya quedó avisado: la conciliación diaria lo reintenta durante 7 días, pero se avisa a CIC por si
+    // hay que registrarlo a mano.
     await deps
       .alertar(
         "Pago aprobado sin vigencia registrada",
@@ -128,18 +129,14 @@ async function aplicarRenovacionPagada(tx: WompiTransaction, plan: Plan, servici
   const s = await deps.store.obtener(servicioId);
   // Solo se renueva el mismo plan y un servicio que ya corre o venció; si no, es una compra nueva.
   if (!s || s.planId !== plan.id || s.estado === "pendiente_publicar" || s.estado === "descartado") return false;
-  if (!(await deps.store.registrarRenovacion(tx.id, s.id))) return true; // ya aplicada por otro intento
 
-  // Si la extensión no se aplica (error de red o cambio simultáneo), se libera el reclamo: el siguiente
-  // intento (recarga del retorno o conciliación) la vuelve a aplicar en vez de darla por hecha.
-  let renovado: Servicio | null = null;
-  try {
-    renovado = await deps.store.renovar(s.id, ventanaDeRenovacion(s, deps.ahora()), s.venceAt, { tipo: "renovacion", txId: tx.id });
-  } catch (err) {
-    console.error(`[vigencias] no se pudo extender ${s.id}:`, describe(err));
-  }
+  // Reclamo, extensión condicionada y tramo en un solo paso (función SQL de 0011). Si la extensión no se
+  // aplica (cambio simultáneo) o la base falla, no queda nada reclamado: el siguiente intento (recarga del
+  // retorno, webhook o conciliación diaria) la vuelve a aplicar en vez de darla por hecha.
+  const r = await deps.store.aplicarRenovacion(tx.id, s.id, ventanaDeRenovacion(s, deps.ahora()), s.venceAt);
+  if (r.resultado === "ya_aplicada") return true; // ya aplicada por otro intento
+  const renovado: Servicio | null = r.resultado === "aplicada" ? r.servicio : null;
   if (!renovado) {
-    await deps.store.liberarRenovacion(tx.id).catch(() => undefined);
     await deps
       .alertar(
         "Renovación pagada pendiente de aplicar",
@@ -211,12 +208,30 @@ export async function revisarVencimientos(deps: ServiciosDeps = defaultServicios
     console.error("[vigencias] no se pudieron listar los pendientes:", describe(err));
   }
 
+  // Paquetes con algo que hacer hoy: sus fichas se listan en el aviso. Al vencer NO se despublican solas
+  // (decisión pendiente de CIC); CIC decide con el cliente qué pasa con cada una.
+  const paquetesHoy = servicios.filter((s) => {
+    if (s.propertySlug || !getPlan(s.planId)?.espacios) return false;
+    const a = accionDeHoy(s, ahora);
+    return a.vencer || a.aviso !== null;
+  });
+  let fichasDePaquete = new Map<string, FichaDePaquete[]>();
+  if (paquetesHoy.length > 0) {
+    try {
+      fichasDePaquete = await deps.store.fichasDePaquetes(paquetesHoy.map((s) => s.id));
+    } catch (err) {
+      console.error("[vigencias] no se pudieron leer las fichas de los paquetes:", describe(err));
+    }
+  }
+  const slugsDe = (id: string) => (fichasDePaquete.get(id) ?? []).map((f) => f.slug).filter((x): x is string => Boolean(x));
+
   for (const s of servicios) {
     const accion = accionDeHoy(s, ahora);
     if (!accion.vencer && !accion.aviso) continue;
     r.revisados += 1;
     const plan = getPlan(s.planId)?.nombre ?? s.planId;
     const quien = [s.clienteNombre, s.clienteEmail, s.clienteTelefono].filter(Boolean).join(" · ") || "(sin datos)";
+    const fichasPaquete = slugsDe(s.id);
 
     try {
       // Si otro servicio vigente cubre la misma ficha (una renovación), esta ya no se apaga:
@@ -242,11 +257,16 @@ export async function revisarVencimientos(deps: ServiciosDeps = defaultServicios
         }
         await deps.store.marcarVencido(s.id, { ahora });
         r.vencidos += 1;
-        lineas.push(`VENCIÓ ${plan}${s.propertySlug ? ` · ficha ${s.propertySlug} despublicada` : " · paquete: revisa sus fichas en el panel"}. Cliente: ${quien}`);
+        const detalle = s.propertySlug
+          ? ` · ficha ${s.propertySlug} despublicada`
+          : fichasPaquete.length
+            ? ` · paquete con ${fichasPaquete.length} ficha${fichasPaquete.length === 1 ? "" : "s"} que siguen publicadas (${fichasPaquete.join(", ")}): decide con el cliente`
+            : " · paquete: revisa sus fichas en el panel";
+        lineas.push(`VENCIÓ ${plan}${detalle}. Cliente: ${quien}`);
       }
 
       if (accion.aviso) {
-        const correo = correoDeAviso(s, accion.aviso, { gracia: accion.gracia });
+        const correo = correoDeAviso(s, accion.aviso, { gracia: accion.gracia, fichas: fichasPaquete });
         if (!correo) {
           await deps.store.marcarAviso(s.id, accion.aviso); // sin correo no se insiste cada día
           r.sinCorreo += 1;

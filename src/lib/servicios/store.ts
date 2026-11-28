@@ -17,6 +17,39 @@ export interface NuevoServicio {
 export class ServiciosNoDisponibleError extends Error {}
 export class ServiciosStoreError extends Error {}
 
+/** Resultado de aplicar una renovación pagada (ver `aplicarRenovacion`). */
+export type ResultadoRenovacion =
+  | { resultado: "aplicada"; servicio: Servicio }
+  /** Otra llamada ya aplicó esta transacción. */
+  | { resultado: "ya_aplicada" }
+  /** El vencimiento cambió entre la lectura y la escritura: no queda nada reclamado y el siguiente intento la retoma. */
+  | { resultado: "conflicto" };
+
+/** Ficha que ocupa un espacio de un paquete. `slug` es null si el inmueble ya no tiene dirección conocida. */
+export interface FichaDePaquete {
+  propertyId: string;
+  slug: string | null;
+}
+
+/** Lo que el cliente deja en /publica/agente/datos sobre el inmueble a publicar. */
+export interface DatosInmueble {
+  tipo: string;
+  ciudad: string;
+  sector: string | null;
+  /** Pesos colombianos. */
+  precio: number | null;
+  descripcion: string | null;
+  /** Contacto que irá en la ficha pública (no necesariamente quien pagó). */
+  contactoNombre: string;
+  contactoWhatsapp: string;
+}
+
+export interface DatosInmuebleGuardados extends DatosInmueble {
+  id: number;
+  servicioId: string;
+  createdAt: string;
+}
+
 export interface ServiciosStore {
   /** true si la tabla existe (migración 0004 aplicada). Nunca lanza. */
   disponible(): Promise<boolean>;
@@ -24,6 +57,23 @@ export interface ServiciosStore {
   registrarRenovacion(txId: string, servicioId: string): Promise<boolean>;
   /** Deshace el reclamo si la renovación no se pudo aplicar, para que el siguiente intento la retome. */
   liberarRenovacion(txId: string): Promise<void>;
+  /**
+   * Renovación pagada en un solo paso: reclama el tx_id, extiende la vigencia solo si sigue siendo
+   * `venceEsperado` y anota el tramo. Si la extensión no aplica, el reclamo no queda hecho.
+   * Lanza si la base falla (sin dejar el reclamo hecho).
+   */
+  aplicarRenovacion(txId: string, servicioId: string, v: { inicioAt: string | null; venceAt: string }, venceEsperado: string | null): Promise<ResultadoRenovacion>;
+  /** De esos tx_id, los que ya abrieron un servicio o aplicaron una renovación. */
+  txIdsRegistrados(txIds: string[]): Promise<Set<string>>;
+  /** Fichas que cubre cada paquete, en el orden en que se asignaron. Sin la tabla (0011), vacío. */
+  fichasDePaquetes(servicioIds: string[]): Promise<Map<string, FichaDePaquete[]>>;
+  /** Ocupa un espacio del paquete con esa ficha; false si ya estaba. El límite lo decide quien llama. */
+  agregarFichaAPaquete(servicioId: string, ficha: FichaDePaquete): Promise<boolean>;
+  quitarFichaDePaquete(servicioId: string, propertyId: string): Promise<void>;
+  /** Guarda los datos del inmueble que dejó el cliente después de pagar. */
+  guardarDatos(servicioId: string, d: DatosInmueble): Promise<void>;
+  /** Datos enviados por servicio, del más reciente al más antiguo. Sin la tabla (0011), vacío. */
+  datosDeServicios(servicioIds: string[]): Promise<Map<string, DatosInmuebleGuardados[]>>;
   /** Idempotente por tx_id: repetir el pago aprobado no crea otro servicio. */
   registrar(n: NuevoServicio): Promise<{ servicio: Servicio; creado: boolean }>;
   listar(): Promise<Servicio[]>;
@@ -131,6 +181,81 @@ function falla(op: string, error: { message: string; code?: string } | null): ne
 
 const AVISO_COLUMNA: Record<TipoAviso, string> = { "7d": "aviso_7d_at", "1d": "aviso_1d_at", vencido: "aviso_vencido_at" };
 
+/** La tabla todavía no existe o PostgREST aún no la ve (migración sin aplicar). */
+function sinTabla(error: { message: string; code?: string }): boolean {
+  return error.code === "42P01" || error.code === "PGRST205" || /schema cache|does not exist/i.test(error.message);
+}
+
+/** La función SQL no existe (migración 0011 sin aplicar): PostgREST responde PGRST202 y Postgres 42883. */
+function sinFuncion(error: { message: string; code?: string }): boolean {
+  return error.code === "PGRST202" || error.code === "42883";
+}
+
+/**
+ * Renovación por pasos (camino anterior a 0011 y semántica del store en memoria): reclamo, extensión
+ * condicionada y, si no se aplicó, se deshace el reclamo para que el siguiente intento la retome.
+ */
+async function renovacionPorPasos(
+  store: Pick<ServiciosStore, "registrarRenovacion" | "renovar" | "liberarRenovacion">,
+  txId: string,
+  servicioId: string,
+  v: { inicioAt: string | null; venceAt: string },
+  venceEsperado: string | null,
+): Promise<ResultadoRenovacion> {
+  if (!(await store.registrarRenovacion(txId, servicioId))) return { resultado: "ya_aplicada" };
+  let renovado: Servicio | null;
+  try {
+    renovado = await store.renovar(servicioId, v, venceEsperado, { tipo: "renovacion", txId });
+  } catch (err) {
+    await store.liberarRenovacion(txId).catch(() => undefined);
+    throw err;
+  }
+  if (!renovado) {
+    await store.liberarRenovacion(txId).catch(() => undefined);
+    return { resultado: "conflicto" };
+  }
+  return { resultado: "aplicada", servicio: renovado };
+}
+
+type DatosRow = {
+  id: number;
+  servicio_id: string;
+  tipo: string;
+  ciudad: string;
+  sector: string | null;
+  precio: number | null;
+  descripcion: string | null;
+  contacto_nombre: string;
+  contacto_whatsapp: string;
+  created_at: string;
+};
+
+function aDatos(r: DatosRow): DatosInmuebleGuardados {
+  return {
+    id: Number(r.id),
+    servicioId: r.servicio_id,
+    tipo: r.tipo,
+    ciudad: r.ciudad,
+    sector: r.sector,
+    precio: r.precio == null ? null : Number(r.precio),
+    descripcion: r.descripcion,
+    contactoNombre: r.contacto_nombre,
+    contactoWhatsapp: r.contacto_whatsapp,
+    createdAt: r.created_at,
+  };
+}
+
+function agrupar<T>(filas: T[], clave: (f: T) => string): Map<string, T[]> {
+  const m = new Map<string, T[]>();
+  for (const f of filas) {
+    const k = clave(f);
+    const lista = m.get(k);
+    if (lista) lista.push(f);
+    else m.set(k, [f]);
+  }
+  return m;
+}
+
 class SupabaseServiciosStore implements ServiciosStore {
   async disponible(): Promise<boolean> {
     try {
@@ -151,6 +276,101 @@ class SupabaseServiciosStore implements ServiciosStore {
   async liberarRenovacion(txId: string): Promise<void> {
     const { error } = await getSupabaseAdmin().from("servicios_renovaciones").delete().eq("tx_id", txId);
     if (error) falla("liberarRenovacion", error);
+  }
+
+  async aplicarRenovacion(txId: string, servicioId: string, v: { inicioAt: string | null; venceAt: string }, venceEsperado: string | null): Promise<ResultadoRenovacion> {
+    const { data, error } = await getSupabaseAdmin().rpc("aplicar_renovacion", {
+      p_tx_id: txId,
+      p_servicio_id: servicioId,
+      p_vence_esperado: venceEsperado,
+      p_inicio_at: v.inicioAt,
+      p_vence_at: v.venceAt,
+    });
+    if (error) {
+      // Sin la función (0011 sin aplicar) se sigue por el camino anterior, que no es atómico pero sí idempotente.
+      if (sinFuncion(error)) return renovacionPorPasos(this, txId, servicioId, v, venceEsperado);
+      falla("aplicarRenovacion", error);
+    }
+    const r = (data ?? {}) as { resultado?: string; servicio?: Row };
+    if (r.resultado === "aplicada" && r.servicio) return { resultado: "aplicada", servicio: aServicio(r.servicio) };
+    if (r.resultado === "ya_aplicada") return { resultado: "ya_aplicada" };
+    return { resultado: "conflicto" };
+  }
+
+  async txIdsRegistrados(txIds: string[]): Promise<Set<string>> {
+    if (txIds.length === 0) return new Set();
+    const db = getSupabaseAdmin();
+    const [servicios, renovaciones] = await Promise.all([
+      db.from("servicios_publicacion").select("tx_id").in("tx_id", txIds),
+      db.from("servicios_renovaciones").select("tx_id").in("tx_id", txIds),
+    ]);
+    if (servicios.error) falla("txIdsRegistrados", servicios.error);
+    if (renovaciones.error) falla("txIdsRegistrados", renovaciones.error);
+    const filas = [...(servicios.data ?? []), ...(renovaciones.data ?? [])] as { tx_id: string }[];
+    return new Set(filas.map((f) => f.tx_id));
+  }
+
+  async fichasDePaquetes(servicioIds: string[]): Promise<Map<string, FichaDePaquete[]>> {
+    if (servicioIds.length === 0) return new Map();
+    const { data, error } = await getSupabaseAdmin()
+      .from("servicio_fichas")
+      .select("servicio_id, property_id, properties(slug)")
+      .in("servicio_id", servicioIds)
+      .order("id", { ascending: true });
+    if (error) {
+      if (sinTabla(error)) return new Map();
+      falla("fichasDePaquetes", error);
+    }
+    type Fila = { servicio_id: string; property_id: string; properties: { slug: string | null } | { slug: string | null }[] | null };
+    const filas = (data ?? []) as unknown as Fila[];
+    const conSlug = filas.map((f) => {
+      const p = Array.isArray(f.properties) ? f.properties[0] : f.properties;
+      return { servicioId: f.servicio_id, ficha: { propertyId: f.property_id, slug: p?.slug ?? null } };
+    });
+    const m = new Map<string, FichaDePaquete[]>();
+    for (const [k, v] of agrupar(conSlug, (f) => f.servicioId)) m.set(k, v.map((f) => f.ficha));
+    return m;
+  }
+
+  async agregarFichaAPaquete(servicioId: string, ficha: FichaDePaquete): Promise<boolean> {
+    const { error } = await getSupabaseAdmin().from("servicio_fichas").insert({ servicio_id: servicioId, property_id: ficha.propertyId });
+    if (!error) return true;
+    if (error.code === "23505") return false; // ya estaba en el paquete
+    falla("agregarFichaAPaquete", error);
+  }
+
+  async quitarFichaDePaquete(servicioId: string, propertyId: string): Promise<void> {
+    const { error } = await getSupabaseAdmin().from("servicio_fichas").delete().eq("servicio_id", servicioId).eq("property_id", propertyId);
+    if (error) falla("quitarFichaDePaquete", error);
+  }
+
+  async guardarDatos(servicioId: string, d: DatosInmueble): Promise<void> {
+    const { error } = await getSupabaseAdmin().from("servicio_datos").insert({
+      servicio_id: servicioId,
+      tipo: d.tipo,
+      ciudad: d.ciudad,
+      sector: d.sector,
+      precio: d.precio,
+      descripcion: d.descripcion,
+      contacto_nombre: d.contactoNombre,
+      contacto_whatsapp: d.contactoWhatsapp,
+    });
+    if (error) falla("guardarDatos", error);
+  }
+
+  async datosDeServicios(servicioIds: string[]): Promise<Map<string, DatosInmuebleGuardados[]>> {
+    if (servicioIds.length === 0) return new Map();
+    const { data, error } = await getSupabaseAdmin()
+      .from("servicio_datos")
+      .select("id, servicio_id, tipo, ciudad, sector, precio, descripcion, contacto_nombre, contacto_whatsapp, created_at")
+      .in("servicio_id", servicioIds)
+      .order("created_at", { ascending: false })
+      .limit(1000);
+    if (error) {
+      if (sinTabla(error)) return new Map();
+      falla("datosDeServicios", error);
+    }
+    return agrupar(((data ?? []) as DatosRow[]).map(aDatos), (d) => d.servicioId);
   }
 
   async registrar(n: NuevoServicio): Promise<{ servicio: Servicio; creado: boolean }> {
@@ -357,8 +577,11 @@ export class MemoryServiciosStore implements ServiciosStore {
   filas: Servicio[] = [];
   renovaciones = new Map<string, string>();
   libro: Periodo[] = [];
+  fichas: (FichaDePaquete & { servicioId: string })[] = [];
+  datos: DatosInmuebleGuardados[] = [];
   private seq = 1;
   private seqPeriodo = 1;
+  private seqDatos = 1;
   now = () => Date.now();
 
   private anotar(servicioId: string, tipo: TipoPeriodo, desde: string, hasta: string, txId?: string | null): void {
@@ -377,6 +600,46 @@ export class MemoryServiciosStore implements ServiciosStore {
 
   async liberarRenovacion(txId: string): Promise<void> {
     this.renovaciones.delete(txId);
+  }
+
+  async aplicarRenovacion(txId: string, servicioId: string, v: { inicioAt: string | null; venceAt: string }, venceEsperado: string | null): Promise<ResultadoRenovacion> {
+    // Misma semántica que la función SQL: si no se extiende, el reclamo no queda hecho.
+    return renovacionPorPasos(this, txId, servicioId, v, venceEsperado);
+  }
+
+  async txIdsRegistrados(txIds: string[]): Promise<Set<string>> {
+    const pedidos = new Set(txIds);
+    const hay = [...this.filas.map((s) => s.txId), ...this.renovaciones.keys()];
+    return new Set(hay.filter((t) => pedidos.has(t)));
+  }
+
+  async fichasDePaquetes(servicioIds: string[]): Promise<Map<string, FichaDePaquete[]>> {
+    const ids = new Set(servicioIds);
+    const m = new Map<string, FichaDePaquete[]>();
+    for (const [k, v] of agrupar(this.fichas.filter((f) => ids.has(f.servicioId)), (f) => f.servicioId)) {
+      m.set(k, v.map(({ propertyId, slug }) => ({ propertyId, slug })));
+    }
+    return m;
+  }
+
+  async agregarFichaAPaquete(servicioId: string, ficha: FichaDePaquete): Promise<boolean> {
+    if (this.fichas.some((f) => f.servicioId === servicioId && f.propertyId === ficha.propertyId)) return false;
+    this.fichas.push({ servicioId, ...ficha });
+    return true;
+  }
+
+  async quitarFichaDePaquete(servicioId: string, propertyId: string): Promise<void> {
+    this.fichas = this.fichas.filter((f) => !(f.servicioId === servicioId && f.propertyId === propertyId));
+  }
+
+  async guardarDatos(servicioId: string, d: DatosInmueble): Promise<void> {
+    this.datos.push({ ...d, id: this.seqDatos++, servicioId, createdAt: new Date(this.now()).toISOString() });
+  }
+
+  async datosDeServicios(servicioIds: string[]): Promise<Map<string, DatosInmuebleGuardados[]>> {
+    const ids = new Set(servicioIds);
+    const filas = this.datos.filter((d) => ids.has(d.servicioId)).sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id - a.id);
+    return agrupar(filas, (d) => d.servicioId);
   }
 
   async registrar(n: NuevoServicio): Promise<{ servicio: Servicio; creado: boolean }> {

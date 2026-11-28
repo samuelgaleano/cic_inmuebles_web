@@ -6,8 +6,12 @@ const hace = (ms: number) => new Date(AHORA.getTime() - ms).toISOString();
 const HORA = 3_600_000;
 
 describe("LATIDOS", () => {
-  it("vigila los tres crons diarios (sync, pagos/vigencias y resumen del CRM)", () => {
-    expect([...LATIDOS]).toEqual(["cron-sync", "cron-diario", "cron-crm"]);
+  it("vigila los cuatro crons diarios (sync, pagos, resumen del CRM y vigencias)", () => {
+    expect([...LATIDOS]).toEqual(["cron-sync", "cron-diario", "cron-crm", "cron-vigencias"]);
+  });
+  it("el latido de vigencias sigue las mismas reglas", () => {
+    expect(estadoDeLatido({ nombre: "cron-vigencias", okAt: hace(HORA), falloAt: null }, AHORA)).toBe("ok");
+    expect(estadoDeLatido({ nombre: "cron-vigencias", okAt: hace(MAX_SIN_LATIDO_MS + 60_000), falloAt: null }, AHORA)).toBe("atrasado");
   });
   it("el latido del CRM sigue las mismas reglas", () => {
     expect(estadoDeLatido({ nombre: "cron-crm", okAt: hace(HORA), falloAt: null }, AHORA)).toBe("ok");

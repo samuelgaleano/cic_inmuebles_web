@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { Lead } from "@/lib/domain";
 import { armarResumenDiario, claveDelDia, reunirResumenDiario, type DatosResumen } from "./resumen";
+import { MemoryServiciosStore, ServiciosNoDisponibleError } from "@/lib/servicios/store";
+import type { Servicio } from "@/lib/servicios/vigencia";
 import { MemoryCrmStore } from "./store";
 
 // 23 nov 2026, 7:00 de Bogotá (la hora del cron).
@@ -76,6 +78,30 @@ describe("armarResumenDiario", () => {
     expect(r.text).not.toContain("SEGUIMIENTOS");
   });
 
+  it("incluye pagos sin publicar y planes por vencer, enlazados al panel de vigencias y escapados", () => {
+    const r = armarResumenDiario(
+      {
+        ...vacio,
+        pagosSinPublicar: [{ id: "s1", nombre: "Marta <i>", telefono: "300 123 4567", plan: "Alianza por resultados", diasDesdePago: 4 }],
+        planesPorVencer: [{ id: "s2", nombre: "Luis", plan: "Paquete Mensual 5", venceAt: "2026-11-26T12:00:00.000Z", diasRestantes: 3 }],
+      },
+      AHORA,
+      BASE,
+    )!;
+    expect(r.asunto).toBe("CRM de hoy: 2 pendientes");
+    expect(r.text).toContain("PAGOS SIN PUBLICAR (1)");
+    expect(r.text).toContain("Alianza por resultados · pagó hace 4 días");
+    expect(r.text).toContain("PLANES QUE VENCEN EN 7 DÍAS O MENOS (1)");
+    expect(r.text).toMatch(/Paquete Mensual 5 · vence en 3 días \(jueves,? 26 de noviembre de 2026\)/);
+    expect(r.text).toContain(`Vigencias: ${BASE}/admin/vigencias`);
+    expect(r.html).toContain("Marta &lt;i&gt;");
+    expect(r.html).not.toContain("<i>");
+  });
+
+  it("sin pagos ni planes (y sin el resto) sigue sin mandar correo", () => {
+    expect(armarResumenDiario({ ...vacio, pagosSinPublicar: [], planesPorVencer: [] }, AHORA, BASE)).toBeNull();
+  });
+
   it("la clave de idempotencia es por día de Bogotá", () => {
     expect(claveDelDia(AHORA)).toBe("crm-diario-2026-11-23");
     expect(claveDelDia(new Date("2026-11-24T03:00:00.000Z"))).toBe("crm-diario-2026-11-23");
@@ -115,5 +141,52 @@ describe("reunirResumenDiario", () => {
     crm.propiedadesValidas = null;
     await crm.proponer(b.id, "p1");
     expect((await reunirResumenDiario(crm, { list: async () => [] }, AHORA)).compradoresSinPropuestas).toEqual([]);
+  });
+
+  it("con el almacén de servicios: pagos sin publicar con días desde el pago y planes que vencen en 7 días o menos, sin correos", async () => {
+    const DIA = 86_400_000;
+    const servicios = new MemoryServiciosStore();
+    const fila = (extra: Partial<Servicio>): Servicio => ({
+      id: "s",
+      txId: "t",
+      reference: null,
+      planId: "alianza-90",
+      dias: 90,
+      clienteEmail: "cliente@correo.co",
+      clienteNombre: "Marta",
+      clienteTelefono: "3001234567",
+      estado: "activo",
+      propertySlug: null,
+      inicioAt: null,
+      venceAt: null,
+      aviso7dAt: null,
+      aviso1dAt: null,
+      avisoVencidoAt: null,
+      createdAt: new Date(AHORA.getTime() - 3 * DIA).toISOString(),
+      ...extra,
+    });
+    servicios.filas.push(
+      fila({ id: "pend", estado: "pendiente_publicar", pagadoAt: new Date(AHORA.getTime() - 5 * DIA).toISOString() }),
+      fila({ id: "pronto", venceAt: new Date(AHORA.getTime() + 2 * DIA).toISOString() }),
+      fila({ id: "gracia", venceAt: new Date(AHORA.getTime() - 3_600_000).toISOString() }),
+      fila({ id: "lejos", venceAt: new Date(AHORA.getTime() + 20 * DIA).toISOString() }),
+      fila({ id: "vencido", estado: "vencido", venceAt: new Date(AHORA.getTime() - 5 * DIA).toISOString() }),
+      fila({ id: "descartado", estado: "descartado" }),
+    );
+    const d = await reunirResumenDiario(new MemoryCrmStore(), { list: async () => [] }, AHORA, servicios);
+    expect(d.pagosSinPublicar).toEqual([{ id: "pend", nombre: "Marta", telefono: "3001234567", plan: "Alianza por resultados", diasDesdePago: 5 }]);
+    expect(d.planesPorVencer?.map((p) => [p.id, p.diasRestantes])).toEqual([
+      ["gracia", 0],
+      ["pronto", 2],
+    ]);
+    expect(JSON.stringify(d)).not.toContain("cliente@correo.co");
+    expect(armarResumenDiario(d, AHORA, BASE)!.text).toContain("venció: está en su día de gracia");
+  });
+
+  it("sin la tabla de servicios el resto del resumen sale igual", async () => {
+    const sinTabla = { listar: async () => Promise.reject(new ServiciosNoDisponibleError("sin tabla")) };
+    const d = await reunirResumenDiario(new MemoryCrmStore(), { list: async () => [] }, AHORA, sinTabla);
+    expect(d.pagosSinPublicar).toEqual([]);
+    expect(d.planesPorVencer).toEqual([]);
   });
 });

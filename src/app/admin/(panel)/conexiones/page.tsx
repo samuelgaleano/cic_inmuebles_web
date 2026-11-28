@@ -120,7 +120,7 @@ async function conexiones(): Promise<Conexion[]> {
       nombre: "Procesos programados",
       estado: process.env.CRON_SECRET ? "ok" : "falta",
       detalle:
-        "Cada día a la 1:00 a. m. (hora de Bogotá) se sincroniza Drive y el catálogo; a la 1:30 a. m. se concilian los pagos y se revisan los vencimientos (avisos, día de gracia y desactivación).",
+        "Cada día a la 1:00 a. m. (hora de Bogotá) se sincroniza Drive y el catálogo; a la 1:30 a. m. se concilian los pagos y a la 1:45 a. m. se revisan los vencimientos (avisos, día de gracia y desactivación); a las 7:00 a. m. sale el resumen del CRM.",
       acciones: (
         <form action={revisarVigenciasAhoraAction}>
           <BotonEnviar className={`${boton} bg-white`}>Revisar vencimientos ahora</BotonEnviar>

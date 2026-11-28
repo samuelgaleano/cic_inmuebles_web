@@ -14,7 +14,8 @@ const RETARDO_IA_S = 10;
  *  - Las variantes filtradas /inmuebles?… NO se bloquean: /inmuebles es ISR (se sirve desde la CDN sin invocar
  *    funciones) y un bloqueo impediría a Google leer su `X-Robots-Tag: noindex` y el canonical; además el
  *    SearchAction del sitio apunta a /inmuebles?q=.
- *  - /publica/agente/pago y /renovar: pantallas personales de retorno de pago y renovación.
+ *  - /publica/agente/pago, /renovar y /datos: pantallas personales de retorno de pago, renovación y datos
+ *    del inmueble después de pagar.
  */
 export const RUTAS_SIN_RASTREO = [
   "/admin",
@@ -23,6 +24,7 @@ export const RUTAS_SIN_RASTREO = [
   "/favoritos",
   "/publica/agente/pago",
   "/publica/agente/renovar",
+  "/publica/agente/datos",
 ];
 
 export default function robots(): MetadataRoute.Robots {

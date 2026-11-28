@@ -18,8 +18,11 @@ function secreto(): string | null {
   return process.env.RENOVACION_SECRET || process.env.CRON_SECRET || null;
 }
 
-function firma(id: string, exp: number, clave: string): string {
-  return createHmac("sha256", clave).update(`renovar:${id}:${exp}`).digest("hex").slice(0, 32);
+/** Cada enlace firma su propósito: un token de renovación no abre el formulario de datos ni al revés. */
+type Proposito = "renovar" | "datos";
+
+function firma(id: string, exp: number, clave: string, proposito: Proposito = "renovar"): string {
+  return createHmac("sha256", clave).update(`${proposito}:${id}:${exp}`).digest("hex").slice(0, 32);
 }
 
 /** null si no hay secreto configurado (entonces no se arman enlaces). */
@@ -34,12 +37,36 @@ export function tokenDeRenovacion(servicioId: string, opts: { venceAt?: string |
 
 /** Devuelve el id del servicio si el token es auténtico y no ha caducado; null si no. */
 export function servicioDeToken(token: string, ahora: Date = new Date()): string | null {
+  return verificar(token, "renovar", ahora);
+}
+
+/** El formulario de datos del inmueble sirve hasta 60 días después de emitido el correo del pago. */
+const VALIDEZ_DATOS_DIAS = 60;
+
+/**
+ * Enlace del correo de confirmación del pago al formulario donde el cliente deja los datos del
+ * inmueble a publicar. Mismo mecanismo que el de renovación (id + caducidad + HMAC), con otro propósito
+ * firmado. null si no hay secreto configurado.
+ */
+export function tokenDeDatos(servicioId: string, opts: { ahora?: Date } = {}): string | null {
+  const clave = secreto();
+  if (!clave || !UUID.test(servicioId)) return null;
+  const exp = Math.floor((opts.ahora ?? new Date()).getTime() / 1000) + VALIDEZ_DATOS_DIAS * DIA_S;
+  return `${servicioId}.${exp}.${firma(servicioId, exp, clave, "datos")}`;
+}
+
+/** Id del servicio si el token del formulario de datos es auténtico y no ha caducado; null si no. */
+export function servicioDeTokenDeDatos(token: string, ahora: Date = new Date()): string | null {
+  return verificar(token, "datos", ahora);
+}
+
+function verificar(token: string, proposito: Proposito, ahora: Date): string | null {
   const clave = secreto();
   if (!clave || typeof token !== "string" || token.length > 120) return null;
   const [id, expTxt, sig, ...resto] = token.split(".");
   if (resto.length || !id || !expTxt || !sig || !UUID.test(id) || !/^\d{9,11}$/.test(expTxt)) return null;
   const exp = Number(expTxt);
-  const esperado = Buffer.from(firma(id, exp, clave));
+  const esperado = Buffer.from(firma(id, exp, clave, proposito));
   const recibido = Buffer.from(sig);
   if (esperado.length !== recibido.length || !timingSafeEqual(esperado, recibido)) return null;
   if (exp * 1000 < ahora.getTime()) return null;

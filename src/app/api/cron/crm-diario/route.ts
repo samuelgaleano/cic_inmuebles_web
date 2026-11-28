@@ -5,12 +5,14 @@ import { armarResumenDiario, claveDelDia, reunirResumenDiario } from "@/lib/crm/
 import { getCrmStore } from "@/lib/crm/store";
 import { getRepository } from "@/lib/data";
 import { sendEmailConEstado } from "@/lib/notifications/resend";
+import { getServiciosStore } from "@/lib/servicios/store";
 import { registrarLatido } from "@/lib/salud/latidos";
 
 /**
  * Resumen diario del CRM por correo (cron de Vercel a las 12:00 UTC = 7:00 de Bogotá, ver vercel.json).
- * Seguimientos vencidos y de hoy, vendedores por aprobar, compradores sin inmuebles propuestos y leads de
- * las últimas 48 h sin atender. Si no hay nada, no se manda correo (el latido igual queda en verde).
+ * Seguimientos vencidos y de hoy, vendedores por aprobar, compradores sin inmuebles propuestos, leads de
+ * las últimas 48 h sin atender, pagos sin publicar y planes que vencen en 7 días o menos. Si no hay nada,
+ * no se manda correo (el latido igual queda en verde).
  *
  * Requiere CRON_SECRET (401 sin él). En la respuesta solo van conteos: ni nombres ni teléfonos.
  */
@@ -24,12 +26,14 @@ export async function GET(req: Request) {
 
   const ahora = new Date();
   try {
-    const datos = await reunirResumenDiario(getCrmStore(), getRepository().leads, ahora);
+    const datos = await reunirResumenDiario(getCrmStore(), getRepository().leads, ahora, getServiciosStore());
     const conteos = {
       seguimientos: datos.seguimientos.length,
       porAprobar: datos.porAprobar.length,
       compradoresSinPropuestas: datos.compradoresSinPropuestas.length,
       leadsNuevos: datos.leadsNuevos.length,
+      pagosSinPublicar: datos.pagosSinPublicar?.length ?? 0,
+      planesPorVencer: datos.planesPorVencer?.length ?? 0,
     };
     const correo = armarResumenDiario(datos, ahora);
     if (!correo) {

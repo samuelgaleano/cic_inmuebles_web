@@ -10,10 +10,15 @@ import {
   revisarVigenciasAhoraAction,
   vencerServicioAction,
 } from "@/lib/actions/admin-vigencias";
+import { asignarFichaAPaqueteAction, quitarFichaDePaqueteAction } from "@/lib/actions/admin-paquetes";
 import { getPlan } from "@/lib/config/plans";
 import { getRepository } from "@/lib/data";
+import { PROPERTY_TYPE_LABELS } from "@/lib/domain/property";
 import { enlaceDeRenovacion } from "@/lib/servicios/correos";
-import { getServiciosStore, ServiciosNoDisponibleError } from "@/lib/servicios/store";
+import { espaciosDe, MENSAJE_SIN_ESPACIO, textoEspacios } from "@/lib/servicios/paquetes";
+import { enlaceRecordatorio } from "@/lib/servicios/recordatorio";
+import { getServiciosStore, ServiciosNoDisponibleError, type DatosInmuebleGuardados, type FichaDePaquete } from "@/lib/servicios/store";
+import { formatPrice } from "@/lib/utils/format";
 import { diasRestantes, DIAS_DE_GRACIA, ETIQUETA_ESTADO, fechaLarga, finDeGracia, type Servicio } from "@/lib/servicios/vigencia";
 import { enlaceWhatsApp } from "@/lib/utils/telefono";
 
@@ -29,11 +34,91 @@ const ESTILO_ESTADO: Record<Servicio["estado"], string> = {
 const boton =
   "rounded-lg border border-line bg-white px-2.5 py-1.5 text-xs font-semibold text-ink-soft transition-colors hover:border-ink hover:text-ink";
 
-function Fila({ s, estimadoPrevio }: { s: Servicio; estimadoPrevio?: string }) {
+/** Lo que el cliente dejó en el formulario posterior al pago, del más reciente al más antiguo. */
+function DatosEnviados({ datos }: { datos: DatosInmuebleGuardados[] }) {
+  return (
+    <details className="mt-2 text-xs">
+      <summary className="cursor-pointer font-semibold text-brand-700">
+        Datos del inmueble ({datos.length})
+      </summary>
+      <ul className="mt-1.5 space-y-2">
+        {datos.map((d) => (
+          <li key={d.id} className="rounded-lg bg-surface p-2 text-ink-soft">
+            <p className="font-medium text-ink">
+              {PROPERTY_TYPE_LABELS[d.tipo as keyof typeof PROPERTY_TYPE_LABELS] ?? d.tipo} en {d.ciudad}
+              {d.sector ? ` · ${d.sector}` : ""}
+            </p>
+            {d.precio && <p>{formatPrice(d.precio)}</p>}
+            {d.descripcion && <p className="whitespace-pre-line">{d.descripcion}</p>}
+            <p>
+              Contacto de la ficha: {d.contactoNombre} · {d.contactoWhatsapp}
+            </p>
+            <p className="text-muted">Enviado {fechaLarga(d.createdAt)}</p>
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
+/** Fichas que cubre un paquete: «N de M espacios», quitar una y asignar otra mientras quede espacio. */
+function FichasDelPaquete({ s, espacios, fichas }: { s: Servicio; espacios: number; fichas: FichaDePaquete[] }) {
+  const lleno = fichas.length >= espacios;
+  return (
+    <div className="space-y-1.5">
+      <p className={`font-semibold ${lleno ? "text-accent-600" : "text-ink"}`}>{textoEspacios(fichas.length, espacios)}</p>
+      {fichas.length > 0 && (
+        <ul className="space-y-1">
+          {fichas.map((f) => (
+            <li key={f.propertyId} className="flex items-center gap-1.5">
+              {f.slug ? (
+                <a href={`/inmuebles/${f.slug}`} className="font-medium text-brand-700 underline underline-offset-2" target="_blank" rel="noreferrer">
+                  {f.slug}
+                </a>
+              ) : (
+                <span className="text-muted">(inmueble sin dirección)</span>
+              )}
+              <form action={quitarFichaDePaqueteAction}>
+                <input type="hidden" name="id" value={s.id} />
+                <input type="hidden" name="propertyId" value={f.propertyId} />
+                <BotonEnviar className="rounded px-1.5 py-0.5 text-[11px] font-semibold text-muted hover:bg-ink/[0.06] hover:text-ink">Quitar</BotonEnviar>
+              </form>
+            </li>
+          ))}
+        </ul>
+      )}
+      {s.estado === "activo" && !lleno && (
+        <form action={asignarFichaAPaqueteAction} className="flex items-center gap-1.5">
+          <input type="hidden" name="id" value={s.id} />
+          <input name="slug" list="fichas" placeholder="ficha (slug)" aria-label="Ficha a asignar al paquete" className="h-9 w-36 rounded-lg border border-line bg-surface px-2.5 text-xs focus:border-brand-500 focus:outline-none" />
+          <BotonEnviar className={boton}>Asignar</BotonEnviar>
+        </form>
+      )}
+      {s.estado === "activo" && lleno && <p className="text-muted">Sin espacios libres: quita una ficha para poner otra.</p>}
+      {s.estado !== "activo" && <p className="text-muted">Al vencer no se despublican solas: decide con el cliente.</p>}
+    </div>
+  );
+}
+
+function Fila({
+  s,
+  estimadoPrevio,
+  fichas = [],
+  datos = [],
+  ahora,
+}: {
+  s: Servicio;
+  estimadoPrevio?: string;
+  fichas?: FichaDePaquete[];
+  datos?: DatosInmuebleGuardados[];
+  ahora: Date;
+}) {
   const plan = getPlan(s.planId);
-  const restan = s.venceAt ? diasRestantes(s.venceAt, new Date()) : null;
+  const restan = s.venceAt ? diasRestantes(s.venceAt, ahora) : null;
   const wa = s.clienteTelefono ? enlaceWhatsApp(s.clienteTelefono, `Hola, te escribimos de CIC Inmuebles sobre tu publicación (${plan?.nombre ?? s.planId}).`) : undefined;
-  const esPaquete = Boolean(plan?.espacios);
+  const recordatorio = enlaceRecordatorio(s, ahora);
+  const espacios = espaciosDe(s);
+  const esPaquete = Boolean(espacios);
 
   return (
     <tr className="align-top transition-colors hover:bg-surface">
@@ -41,6 +126,7 @@ function Fila({ s, estimadoPrevio }: { s: Servicio; estimadoPrevio?: string }) {
         <p className="font-medium text-ink">{s.clienteNombre ?? "(sin nombre)"}</p>
         {s.clienteEmail && <p className="text-xs text-muted">{s.clienteEmail}</p>}
         {s.clienteTelefono && <p className="text-xs text-muted">{s.clienteTelefono}</p>}
+        {datos.length > 0 && <DatosEnviados datos={datos} />}
       </td>
       <td className="px-4 py-3 text-xs text-ink-soft">
         <p className="font-medium text-ink">{plan?.nombre ?? s.planId}</p>
@@ -56,7 +142,7 @@ function Fila({ s, estimadoPrevio }: { s: Servicio; estimadoPrevio?: string }) {
             <p className={restan !== null && restan <= 7 ? "font-semibold text-accent-600" : "text-muted"}>
               {restan !== null && restan > 0
                 ? `Faltan ${restan} día${restan === 1 ? "" : "s"}`
-                : s.estado === "activo" && new Date() < finDeGracia(s.venceAt)
+                : s.estado === "activo" && ahora < finDeGracia(s.venceAt)
                   ? `Venció · en gracia hasta ${fechaLarga(finDeGracia(s.venceAt).toISOString())}`
                   : "Ya venció"}
             </p>
@@ -71,8 +157,12 @@ function Fila({ s, estimadoPrevio }: { s: Servicio; estimadoPrevio?: string }) {
           <a href={`/inmuebles/${s.propertySlug}`} className="font-medium text-brand-700 underline underline-offset-2" target="_blank" rel="noreferrer">
             {s.propertySlug}
           </a>
-        ) : esPaquete ? (
-          <span className="text-muted">Paquete: sus fichas se gestionan en Inmuebles</span>
+        ) : espacios ? (
+          s.estado === "pendiente_publicar" ? (
+            <span className="text-muted">Paquete de {espacios} espacios: asigna sus fichas al activarlo</span>
+          ) : (
+            <FichasDelPaquete s={s} espacios={espacios} fichas={fichas} />
+          )
         ) : (
           <span className="text-muted">Sin ficha enlazada</span>
         )}
@@ -128,6 +218,16 @@ function Fila({ s, estimadoPrevio }: { s: Servicio; estimadoPrevio?: string }) {
               <BotonEnviar className={boton}>Enlazar</BotonEnviar>
             </form>
           )}
+          {recordatorio && (
+            <a
+              href={recordatorio}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-brand-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-800"
+            >
+              <MessageCircle className="h-3.5 w-3.5" aria-hidden /> Recordar por WhatsApp
+            </a>
+          )}
           <div className="flex items-center gap-1">
             {wa && (
               <a href={wa} target="_blank" rel="noreferrer" aria-label="Escribir por WhatsApp" className="flex h-9 w-9 items-center justify-center rounded-lg text-brand-700 hover:bg-brand-50">
@@ -146,16 +246,36 @@ function Fila({ s, estimadoPrevio }: { s: Servicio; estimadoPrevio?: string }) {
   );
 }
 
-export default async function AdminVigenciasPage({ searchParams }: { searchParams: Promise<{ ver?: string }> }) {
-  const verDescartados = (await searchParams).ver === "descartados";
+/** Mensajes que dejan las acciones de paquetes al volver al panel (?aviso=...). */
+const AVISOS: Record<string, string> = {
+  ...MENSAJE_SIN_ESPACIO,
+  ficha_inexistente: "No hay ningún inmueble con esa ficha (slug). Revisa cómo está escrita.",
+  sin_tabla: "No se pudo asignar la ficha. Si persiste, falta aplicar supabase/migrations/0011_pagos_y_servicios.sql.",
+};
+
+export default async function AdminVigenciasPage({ searchParams }: { searchParams: Promise<{ ver?: string; aviso?: string }> }) {
+  const sp = await searchParams;
+  const verDescartados = sp.ver === "descartados";
+  const aviso = sp.aviso && Object.hasOwn(AVISOS, sp.aviso) ? AVISOS[sp.aviso] : null;
+  const ahora = new Date();
+  const store = getServiciosStore();
   let servicios: Servicio[] = [];
   let disponible = true;
   try {
-    servicios = await getServiciosStore().listar();
+    servicios = await store.listar();
   } catch (err) {
     if (err instanceof ServiciosNoDisponibleError) disponible = false;
     else throw err;
   }
+
+  // Fichas de los paquetes y datos que dejaron los clientes (tablas de 0011: sin ellas, vacío).
+  const idsPaquetes = servicios.filter((s) => espaciosDe(s) && !s.propertySlug).map((s) => s.id);
+  const [fichasPorServicio, datosPorServicio] = disponible
+    ? await Promise.all([
+        store.fichasDePaquetes(idsPaquetes).catch(() => new Map<string, FichaDePaquete[]>()),
+        store.datosDeServicios(servicios.map((s) => s.id)).catch(() => new Map<string, DatosInmuebleGuardados[]>()),
+      ])
+    : [new Map<string, FichaDePaquete[]>(), new Map<string, DatosInmuebleGuardados[]>()];
 
   const fichas = (await getRepository().properties.list()).map((p) => p.slug);
   const orden = { pendiente_publicar: 0, activo: 1, vencido: 2, descartado: 3 } as const;
@@ -177,7 +297,8 @@ export default async function AdminVigenciasPage({ searchParams }: { searchParam
           <h1 className="text-2xl font-bold tracking-tight text-ink">Vigencias</h1>
           <p className="mt-0.5 text-sm text-muted">
             {servicios.length} servicio{servicios.length === 1 ? "" : "s"} · {pendientes} por activar. La vigencia empieza a contar al activarlo,
-            no al pagar. Se avisa 7 y 1 día antes; al vencer hay {DIAS_DE_GRACIA} día de gracia con la ficha publicada y después se desactiva.
+            no al pagar. Se avisa 7 y 1 día antes; al vencer hay {DIAS_DE_GRACIA} día de gracia con la ficha publicada y después se desactiva. Las
+            fichas de un paquete no se desactivan solas: el aviso las lista para decidir con el cliente.
             {descartados > 0 && (
               <>
                 {" "}
@@ -194,6 +315,12 @@ export default async function AdminVigenciasPage({ searchParams }: { searchParam
           </form>
         )}
       </div>
+
+      {aviso && (
+        <p role="status" className="rounded-2xl border border-accent-500/40 bg-accent-500/10 p-4 text-sm text-ink">
+          {aviso}
+        </p>
+      )}
 
       {!disponible && (
         <p role="status" className="rounded-2xl border border-line bg-surface p-4 text-sm text-ink-soft">
@@ -217,7 +344,14 @@ export default async function AdminVigenciasPage({ searchParams }: { searchParam
             </thead>
             <tbody className="divide-y divide-line">
               {servicios.map((s) => (
-                <Fila key={s.id} s={s} estimadoPrevio={s.estado === "pendiente_publicar" ? previoDe(s) : undefined} />
+                <Fila
+                  key={s.id}
+                  s={s}
+                  ahora={ahora}
+                  fichas={fichasPorServicio.get(s.id)}
+                  datos={datosPorServicio.get(s.id)}
+                  estimadoPrevio={s.estado === "pendiente_publicar" ? previoDe(s) : undefined}
+                />
               ))}
               {servicios.length === 0 && (
                 <tr>

@@ -1,7 +1,11 @@
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/data/supabase/client";
 
-/** Procesos que deben latir al menos una vez al dia. */
-export const LATIDOS = ["cron-sync", "cron-diario", "cron-crm"] as const;
+/**
+ * Procesos que deben latir al menos una vez al dia. "cron-diario" es la conciliacion de pagos
+ * (/api/pagos/wompi/reconciliar; conserva el nombre para no romper el monitor) y "cron-vigencias"
+ * la revision de vencimientos (/api/cron/vigencias).
+ */
+export const LATIDOS = ["cron-sync", "cron-diario", "cron-crm", "cron-vigencias"] as const;
 export type NombreLatido = (typeof LATIDOS)[number];
 
 /** Un cron de Vercel corre una vez al dia con hasta ±59 min de desfase: 27 h sin latido es un fallo. */

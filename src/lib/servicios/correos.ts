@@ -3,7 +3,7 @@ import { siteConfig, whatsappLink } from "@/lib/config/site";
 import { formatPrice } from "@/lib/utils/format";
 import { normalizarTelefono } from "@/lib/utils/telefono";
 import { htmlDeCorreo, type BloqueCorreo } from "./correo-html";
-import { tokenDeRenovacion } from "./token";
+import { tokenDeDatos, tokenDeRenovacion } from "./token";
 import { DIAS_DE_GRACIA, fechaHora, finDeGracia, type Servicio, type TipoAviso } from "./vigencia";
 
 export interface CorreoSaliente {
@@ -63,6 +63,12 @@ export function enlaceDeRenovacion(s: Servicio): string {
   return token ? `${siteConfig.url}/publica/agente/renovar?renovar=${token}` : `${siteConfig.url}/publica/agente`;
 }
 
+/** Enlace firmado al formulario donde el cliente deja los datos del inmueble; null sin secreto configurado. */
+export function enlaceDeDatos(s: Pick<Servicio, "id">, ahora?: Date): string | null {
+  const token = tokenDeDatos(s.id, { ahora });
+  return token ? `${siteConfig.url}/publica/agente/datos?t=${token}` : null;
+}
+
 function nombreDePlan(s: Servicio): string {
   return getPlan(s.planId)?.nombre ?? "tu plan de publicación";
 }
@@ -81,6 +87,8 @@ export function correoPagoRecibido(s: Servicio): CorreoSaliente | null {
   const plan = nombreDePlan(s);
   const precio = getPlan(s.planId)?.precioCOP;
   const tel = s.clienteTelefono ? normalizarTelefono(s.clienteTelefono)?.legible : undefined;
+  // Con el formulario, el cliente adelanta los datos sin esperar al asesor; sin secreto, sigue el camino de WhatsApp.
+  const datos = enlaceDeDatos(s);
   return armar(s, `Recibimos tu pago: ${plan}`, {
     preheader: `Plan «${plan}»${precio ? ` · ${formatPrice(precio)}` : ""}. Así sigue tu publicación.`,
     titulo: "Recibimos tu pago",
@@ -97,12 +105,18 @@ export function correoPagoRecibido(s: Servicio): CorreoSaliente | null {
       { etiqueta: "Vigencia", valor: `${s.dias} días desde la publicación` },
     ],
     pasosTitulo: "Cómo sigue",
-    pasos: [
-      `Un asesor te escribe por WhatsApp${tel ? ` al ${tel}` : ""} para recibir los datos y las fotos del inmueble.`,
-      "Creamos la ficha y la publicamos.",
-      "Te confirmamos por este correo la fecha en que empieza y vence tu vigencia.",
-    ],
-    boton: { texto: "Escribir a un asesor", url: WHATSAPP_DUDAS() },
+    pasos: datos
+      ? [
+          "Déjanos los datos del inmueble en el formulario (tipo, ciudad, precio y el contacto que irá en la ficha). Te toma dos minutos.",
+          `Un asesor te escribe por WhatsApp${tel ? ` al ${tel}` : ""} para recibir las fotos.`,
+          "Creamos la ficha, la publicamos y te confirmamos por este correo la fecha en que empieza y vence tu vigencia.",
+        ]
+      : [
+          `Un asesor te escribe por WhatsApp${tel ? ` al ${tel}` : ""} para recibir los datos y las fotos del inmueble.`,
+          "Creamos la ficha y la publicamos.",
+          "Te confirmamos por este correo la fecha en que empieza y vence tu vigencia.",
+        ],
+    boton: datos ? { texto: "Enviar los datos del inmueble", url: datos } : { texto: "Escribir a un asesor", url: WHATSAPP_DUDAS() },
     nota: "Antes de que venza te escribiremos 7 días y 1 día antes, con un enlace para renovar con un clic.",
   });
 }
@@ -131,7 +145,7 @@ export function correoPublicacionActiva(s: Servicio): CorreoSaliente | null {
  * Aviso de vencimiento próximo o consumado, con el enlace de renovación. `gracia` es true cuando el
  * servicio ya venció pero la ficha sigue publicada durante el día de gracia.
  */
-export function correoDeAviso(s: Servicio, tipo: TipoAviso, opts: { gracia?: boolean } = {}): CorreoSaliente | null {
+export function correoDeAviso(s: Servicio, tipo: TipoAviso, opts: { gracia?: boolean; fichas?: string[] } = {}): CorreoSaliente | null {
   if (!s.venceAt) return null;
   const plan = nombreDePlan(s);
   const vence = fechaHora(s.venceAt);
@@ -192,6 +206,8 @@ export function correoDeAviso(s: Servicio, tipo: TipoAviso, opts: { gracia?: boo
       { etiqueta: tipo === "vencido" ? "Venció" : "Vence", valor: vence },
       ...(opts.gracia ? [{ etiqueta: "Publicada hasta", valor: fechaHora(finDeGracia(s.venceAt).toISOString()) }] : []),
       ...(ficha ? [{ etiqueta: "Inmueble", valor: "Ver la ficha", url: ficha }] : []),
+      // Las fichas que cubre el paquete, para que el cliente sepa cuáles dependen de la renovación.
+      ...(paquete ? (opts.fichas ?? []).map((slug, i) => ({ etiqueta: `Inmueble ${i + 1}`, valor: slug, url: `${siteConfig.url}/inmuebles/${slug}` })) : []),
     ],
     boton: { texto: t.boton, url: enlaceDeRenovacion(s) },
     nota: t.nota,

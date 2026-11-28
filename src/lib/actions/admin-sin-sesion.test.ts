@@ -38,6 +38,11 @@ vi.mock("@/lib/crm/store", () => ({
   CrmNoDisponibleError: class extends Error {},
   CrmStoreError: class extends Error {},
 }));
+vi.mock("@/lib/servicios/store", () => ({
+  getServiciosStore: () => espia("servicios"),
+  ServiciosNoDisponibleError: class extends Error {},
+  ServiciosStoreError: class extends Error {},
+}));
 vi.mock("@/lib/integrations/drive", () => ({
   isDriveConfigured: () => true,
   ensurePropertyArchive: async () => {
@@ -63,6 +68,7 @@ import * as crm from "./admin-crm";
 import * as datos from "./admin-datos";
 import * as drive from "./admin-drive";
 import * as leads from "./admin-leads";
+import * as paquetes from "./admin-paquetes";
 import * as properties from "./admin-properties";
 import * as sheets from "./admin-sheets";
 import * as templates from "./admin-templates";
@@ -109,7 +115,7 @@ function invocar(nombre: string, fn: (...args: unknown[]) => Promise<unknown>): 
   }
 }
 
-const modulos = { agenda, crm, datos, drive, leads, properties, sheets, templates };
+const modulos = { agenda, crm, datos, drive, leads, paquetes, properties, sheets, templates };
 const acciones = Object.entries(modulos).flatMap(([modulo, m]) =>
   Object.entries(m)
     .filter(([, v]) => typeof v === "function")

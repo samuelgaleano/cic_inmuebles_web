@@ -8,6 +8,7 @@ import {
 } from "@/lib/integrations/wompi";
 import { sendPagosAlert as sendPagosAlertReal, sendPaymentNotification as sendPaymentNotificationReal, type PaymentNotice } from "@/lib/notifications/payment";
 import { registrarServicioDePago } from "@/lib/servicios/procesar";
+import { getServiciosStore } from "@/lib/servicios/store";
 import { getPagosStore, type PagoEstado, type PagoSource, type PagosStore } from "./store";
 
 export interface ProcessDeps {
@@ -18,6 +19,11 @@ export interface ProcessDeps {
   sendPagosAlert: (subject: string, text: string) => Promise<boolean>;
   /** Crea o renueva el servicio de publicación (vigencia y avisos) de un pago aprobado. Opcional: nunca debe romper el pago. */
   registrarServicio?: (tx: WompiTransaction, plan: Plan, opts: { renuevaServicioId: string | null; alertarSiFalla: boolean }) => Promise<void>;
+  /**
+   * De esos tx_id, los que ya abrieron un servicio o aplicaron una renovación. La conciliación lo usa para
+   * retomar pagos aprobados cuyo servicio no quedó registrado. Opcional, como `registrarServicio`.
+   */
+  txIdsConServicio?: (txIds: string[]) => Promise<Set<string>>;
 }
 
 export type ProcessOutcome = PagoEstado | "dedup" | "store_error";
@@ -50,6 +56,7 @@ export function defaultDeps(): ProcessDeps {
     sendPaymentNotification: sendPaymentNotificationReal,
     sendPagosAlert: sendPagosAlertReal,
     registrarServicio: (tx, plan, opts) => registrarServicioDePago(tx, plan, undefined, opts),
+    txIdsConServicio: (txIds) => getServiciosStore().txIdsRegistrados(txIds),
   };
 }
 
