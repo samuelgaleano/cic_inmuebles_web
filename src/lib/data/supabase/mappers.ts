@@ -13,11 +13,24 @@ import type {
   TemplateInput,
 } from "@/lib/domain";
 import { normalizarInmueble } from "@/lib/domain/normalizar";
-
-/* eslint-disable @typescript-eslint/no-explicit-any */
+import type {
+  AgentRow,
+  AgentWrite,
+  AppointmentRow,
+  AppointmentWrite,
+  AvailabilityRow,
+  LeadRow,
+  LeadWrite,
+  PropertyMediaInsert,
+  PropertyMediaRow,
+  PropertyRowLectura,
+  PropertyWrite,
+  TemplateRow,
+  TemplateWrite,
+} from "./filas";
 
 /** Fila de la tabla `property_media` -> dominio. */
-export function mediaRowToDomain(row: any): PropertyMedia {
+export function mediaRowToDomain(row: PropertyMediaRow): PropertyMedia {
   return {
     id: row.id,
     type: row.tipo,
@@ -31,10 +44,10 @@ export function mediaRowToDomain(row: any): PropertyMedia {
 }
 
 /** Fila de `properties` (con `property_media` anidado) -> dominio. */
-export function propertyRowToDomain(row: any): Property {
+export function propertyRowToDomain(row: PropertyRowLectura): Property {
   const medios: PropertyMedia[] = (row.property_media ?? [])
     .map(mediaRowToDomain)
-    .sort((a: PropertyMedia, b: PropertyMedia) => a.order - b.order);
+    .sort((a, b) => a.order - b.order);
 
   // Lo ya guardado con errores de digitación ("BogotÁ", "BELLA SUIZA") se
   // corrige al leer: ver src/lib/domain/normalizar.ts.
@@ -78,7 +91,7 @@ export function propertyRowToDomain(row: any): Property {
 }
 
 /** PropertyInput -> fila de `properties` (sin medios, que van aparte). */
-export function propertyInputToRow(entrada: PropertyInput): Record<string, unknown> {
+export function propertyInputToRow(entrada: PropertyInput): PropertyWrite {
   // Se guarda ya corregido: cubre el panel admin y la importación desde Drive.
   const input = normalizarInmueble(entrada);
   return {
@@ -110,7 +123,7 @@ export function propertyInputToRow(entrada: PropertyInput): Record<string, unkno
 export function mediaInputToRows(
   propertyId: string,
   medios: PropertyMedia[],
-): Record<string, unknown>[] {
+): PropertyMediaInsert[] {
   return medios.map((m, i) => ({
     property_id: propertyId,
     tipo: m.type,
@@ -124,7 +137,7 @@ export function mediaInputToRows(
 }
 
 /** Fila de `leads` -> dominio. */
-export function leadRowToDomain(row: any): Lead {
+export function leadRowToDomain(row: LeadRow): Lead {
   return {
     id: row.id,
     tipo: row.tipo,
@@ -145,7 +158,7 @@ export function leadRowToDomain(row: any): Lead {
 }
 
 /** LeadInput -> fila de `leads`. */
-export function leadInputToRow(input: LeadInput): Record<string, unknown> {
+export function leadInputToRow(input: LeadInput): LeadWrite {
   return {
     tipo: input.tipo,
     nombre: input.nombre,
@@ -163,7 +176,7 @@ export function leadInputToRow(input: LeadInput): Record<string, unknown> {
 }
 
 /** Fila de `agents` -> dominio. */
-export function agentRowToDomain(row: any): Agent {
+export function agentRowToDomain(row: AgentRow): Agent {
   return {
     id: row.id,
     userId: row.user_id ?? undefined,
@@ -178,7 +191,7 @@ export function agentRowToDomain(row: any): Agent {
 }
 
 /** AgentInput -> fila de `agents`. */
-export function agentInputToRow(input: AgentInput): Record<string, unknown> {
+export function agentInputToRow(input: AgentInput): AgentWrite {
   return {
     user_id: input.userId ?? null,
     nombre: input.nombre,
@@ -191,7 +204,7 @@ export function agentInputToRow(input: AgentInput): Record<string, unknown> {
 }
 
 /** Fila de `agent_availability` -> dominio. */
-export function availabilityRowToDomain(row: any): AgentAvailability {
+export function availabilityRowToDomain(row: AvailabilityRow): AgentAvailability {
   return {
     id: row.id,
     agentId: row.agent_id,
@@ -202,7 +215,7 @@ export function availabilityRowToDomain(row: any): AgentAvailability {
 }
 
 /** Fila de `appointments` -> dominio. */
-export function appointmentRowToDomain(row: any): Appointment {
+export function appointmentRowToDomain(row: AppointmentRow): Appointment {
   return {
     id: row.id,
     propertyId: row.property_id,
@@ -220,7 +233,7 @@ export function appointmentRowToDomain(row: any): Appointment {
 }
 
 /** AppointmentInput -> fila de `appointments`. */
-export function appointmentInputToRow(input: AppointmentInput): Record<string, unknown> {
+export function appointmentInputToRow(input: AppointmentInput): AppointmentWrite {
   return {
     property_id: input.propertyId,
     agent_id: input.agentId ?? null,
@@ -236,7 +249,7 @@ export function appointmentInputToRow(input: AppointmentInput): Record<string, u
 }
 
 /** Fila de `templates` -> dominio. */
-export function templateRowToDomain(row: any): Template {
+export function templateRowToDomain(row: TemplateRow): Template {
   return {
     id: row.id,
     nombre: row.nombre,
@@ -248,7 +261,7 @@ export function templateRowToDomain(row: any): Template {
 }
 
 /** TemplateInput -> fila de `templates`. */
-export function templateInputToRow(input: TemplateInput): Record<string, unknown> {
+export function templateInputToRow(input: TemplateInput): TemplateWrite {
   return {
     nombre: input.nombre,
     tipo: input.tipo,

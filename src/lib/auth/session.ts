@@ -8,11 +8,10 @@ import crypto from "node:crypto";
  * cambiar las vistas, ya que la sesión se consume vía `getAdminSession()`.
  */
 
-// Valores por defecto SOLO para desarrollo local: estan publicados en el
-// repositorio, asi que en produccion no se usan nunca (ver `adminConfig`).
-const DEV_SECRET = "dev-insecure-secret-cambia-esto-en-produccion";
+// Correo por defecto SOLO para desarrollo local (no es secreto). La contrasena y
+// el secreto de firma NO tienen valor por defecto en el codigo: si faltan en
+// local se generan al azar en memoria (ver `valoresDeDesarrollo`).
 const DEV_EMAIL = "admin@cicinmuebles.com";
-const DEV_PASSWORD = "cic-admin-2026";
 
 interface AdminConfig {
   secret: string;
@@ -20,11 +19,35 @@ interface AdminConfig {
   password: string;
 }
 
+interface ValoresDesarrollo {
+  secret: string;
+  password: string;
+  avisado: boolean;
+}
+
+const global = globalThis as typeof globalThis & { __cicAdminDesarrollo?: ValoresDesarrollo };
+
+/**
+ * Secreto y contrasena de desarrollo generados al azar una vez por proceso. Viven
+ * en `globalThis` para que el proxy y las acciones del servidor (bundles distintos
+ * del mismo proceso) firmen y verifiquen con el mismo secreto. Reiniciar el
+ * servidor de desarrollo los cambia y cierra la sesion: para algo estable, define
+ * ADMIN_PASSWORD y ADMIN_SESSION_SECRET en `.env.local`.
+ */
+function valoresDeDesarrollo(): ValoresDesarrollo {
+  global.__cicAdminDesarrollo ??= {
+    secret: crypto.randomBytes(48).toString("base64url"),
+    password: crypto.randomBytes(12).toString("base64url"),
+    avisado: false,
+  };
+  return global.__cicAdminDesarrollo;
+}
+
 /**
  * Configuracion efectiva del panel. En produccion **falla cerrado**: si falta
  * cualquiera de las tres variables devuelve `null` y el panel queda inaccesible
- * (nadie entra, ni siquiera con los valores por defecto del repo). Fuera de
- * produccion cae a los valores de desarrollo para poder trabajar en local.
+ * (nadie entra). Fuera de produccion, lo que falte se genera en memoria y se
+ * avisa una vez en la consola (con la contrasena temporal, para poder entrar).
  *
  * Se lee en cada llamada (no al cargar el modulo) para que rotar el secreto o
  * las credenciales tenga efecto sin reconstruir el bundle.
@@ -45,10 +68,22 @@ function adminConfig(): AdminConfig | null {
     return { secret, email, password };
   }
 
+  if (secret && password) return { secret, email: email || DEV_EMAIL, password };
+
+  const dev = valoresDeDesarrollo();
+  if (!dev.avisado && process.env.NODE_ENV !== "test") {
+    dev.avisado = true;
+    console.warn(
+      "[seguridad] Panel admin en modo desarrollo: falta " +
+        [!secret && "ADMIN_SESSION_SECRET", !password && "ADMIN_PASSWORD"].filter(Boolean).join(" y ") +
+        " en .env.local; se generaron valores temporales que duran hasta reiniciar el servidor." +
+        (password ? "" : ` Entra con ${email || DEV_EMAIL} y la clave temporal ${dev.password}`),
+    );
+  }
   return {
-    secret: secret || DEV_SECRET,
+    secret: secret || dev.secret,
     email: email || DEV_EMAIL,
-    password: password || DEV_PASSWORD,
+    password: password || dev.password,
   };
 }
 

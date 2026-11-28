@@ -35,17 +35,54 @@ import {
   templateInputToRow,
   templateRowToDomain,
 } from "./supabase/mappers";
+import {
+  SELECT_AGENTE,
+  SELECT_CITA,
+  SELECT_DISPONIBILIDAD,
+  SELECT_INMUEBLE,
+  SELECT_INMUEBLE_PUBLICO,
+  SELECT_LEAD,
+  SELECT_PLANTILLA,
+  type AgentRow,
+  type AppointmentRow,
+  type AvailabilityInsert,
+  type AvailabilityRow,
+  type LeadRow,
+  type PropertyRow,
+  type PropertyRowLectura,
+  type TemplateRow,
+} from "./supabase/filas";
 import { matchesFilters, sortByRelevance } from "./filtering";
-import type {
-  AgentRepository,
-  AppointmentRepository,
-  LeadRepository,
-  PropertyRepository,
-  Repository,
-  TemplateRepository,
+import {
+  LEADS_LIMITE_POR_DEFECTO,
+  type AgentRepository,
+  type AppointmentRepository,
+  type LeadRepository,
+  type ListarLeadsOpciones,
+  type PropertyRepository,
+  type Repository,
+  type TemplateRepository,
 } from "./repository";
 
-const PROPERTY_SELECT = "*, property_media(*)";
+/** Filas por pagina al listar leads: el tope por respuesta de la API de Supabase ("Max rows", 1.000 por defecto). */
+const PAGINA_LEADS = 1000;
+
+/**
+ * Codigos con los que PostgREST/Postgres dicen que una funcion RPC no existe: la migracion 0014 aun no
+ * se aplico en esa base. Solo en ese caso se usa el camino de respaldo; cualquier otro error se lanza.
+ */
+const CODIGOS_FUNCION_INEXISTENTE = new Set(["PGRST202", "42883"]);
+
+export function esFuncionInexistente(error: { code?: string } | null | undefined): boolean {
+  return Boolean(error?.code && CODIGOS_FUNCION_INEXISTENTE.has(error.code));
+}
+
+const avisadas = new Set<string>();
+function avisarRespaldo(funcion: string): void {
+  if (avisadas.has(funcion)) return;
+  avisadas.add(funcion);
+  console.warn(`[datos] la funcion ${funcion}() no existe en la base (falta aplicar 0014_infra.sql): se usa el camino sin transaccion.`);
+}
 
 /**
  * Implementación del repositorio sobre Supabase (PostgreSQL).
@@ -53,13 +90,16 @@ const PROPERTY_SELECT = "*, property_media(*)";
  * Mantiene paridad con la versión en memoria. Para el volumen esperado
  * (decenas de inmuebles) el filtrado se hace en memoria tras traer el
  * catálogo, reutilizando exactamente la misma lógica.
+ *
+ * Cada consulta pide columnas explícitas (ver `supabase/filas.ts`): la lectura
+ * pública no trae al servidor propietario, dirección, notas ni carpeta de Drive.
  */
 class SupabasePropertyRepository implements PropertyRepository {
   private async fetchAll(soloPublicados = false): Promise<Property[]> {
-    let q = getSupabaseAdmin().from("properties").select(PROPERTY_SELECT);
+    let q = getSupabaseAdmin().from("properties").select(soloPublicados ? SELECT_INMUEBLE_PUBLICO : SELECT_INMUEBLE);
     // El filtro viaja en la consulta: la lectura pública no trae borradores ni sus fotos.
     if (soloPublicados) q = q.eq("publicado", true);
-    const { data, error } = await q;
+    const { data, error } = await q.overrideTypes<PropertyRowLectura[], { merge: false }>();
     if (error) throw error;
     return (data ?? []).map(propertyRowToDomain);
   }
@@ -77,9 +117,10 @@ class SupabasePropertyRepository implements PropertyRepository {
   async getBySlug(slug: string): Promise<Property | null> {
     const { data, error } = await getSupabaseAdmin()
       .from("properties")
-      .select(PROPERTY_SELECT)
+      .select(SELECT_INMUEBLE)
       .eq("slug", slug)
-      .maybeSingle();
+      .maybeSingle()
+      .overrideTypes<PropertyRow, { merge: false }>();
     if (error) throw error;
     return data ? propertyRowToDomain(data) : null;
   }
@@ -87,42 +128,60 @@ class SupabasePropertyRepository implements PropertyRepository {
   async getById(id: string): Promise<Property | null> {
     const { data, error } = await getSupabaseAdmin()
       .from("properties")
-      .select(PROPERTY_SELECT)
+      .select(SELECT_INMUEBLE)
       .eq("id", id)
-      .maybeSingle();
+      .maybeSingle()
+      .overrideTypes<PropertyRow, { merge: false }>();
     if (error) throw error;
     return data ? propertyRowToDomain(data) : null;
   }
 
   async getPublicBySlug(slug: string): Promise<PublicProperty | null> {
-    const p = await this.getBySlug(slug);
-    if (!p || !p.publicado) return null;
-    return toPublicProperty(p);
+    const { data, error } = await getSupabaseAdmin()
+      .from("properties")
+      .select(SELECT_INMUEBLE_PUBLICO)
+      .eq("slug", slug)
+      .eq("publicado", true)
+      .maybeSingle()
+      .overrideTypes<PropertyRowLectura, { merge: false }>();
+    if (error) throw error;
+    return data ? toPublicProperty(propertyRowToDomain(data)) : null;
   }
 
   async listCities(): Promise<string[]> {
-    const { data, error } = await getSupabaseAdmin().from("properties").select("ciudad");
+    const { data, error } = await getSupabaseAdmin()
+      .from("properties")
+      .select("ciudad")
+      .overrideTypes<Pick<PropertyRow, "ciudad">[], { merge: false }>();
     if (error) throw error;
     // Misma corrección que el mapper: "BogotÁ" y "Bogotá" son una sola ciudad en el filtro.
-    return [...new Set((data ?? []).map((r) => formatLugar(r.ciudad as string) ?? ""))].filter(Boolean).sort();
+    return [...new Set((data ?? []).map((r) => formatLugar(r.ciudad) ?? ""))].filter(Boolean).sort();
   }
 
+  /**
+   * Siguiente código CIC-NNNN. Se calcula con el máximo NUMÉRICO de todos los códigos (son decenas):
+   * ordenar el texto daría un máximo equivocado después de CIC-9999.
+   */
   private async nextCodigo(): Promise<string> {
-    const { data } = await getSupabaseAdmin()
+    const { data, error } = await getSupabaseAdmin()
       .from("properties")
       .select("codigo")
-      .order("codigo", { ascending: false })
-      .limit(1);
-    const last = data?.[0]?.codigo as string | undefined;
-    const n = last ? Number(last.replace(/\D/g, "")) || 0 : 0;
-    return `CIC-${String(n + 1).padStart(4, "0")}`;
+      .overrideTypes<Pick<PropertyRow, "codigo">[], { merge: false }>();
+    if (error) throw error;
+    const max = (data ?? []).reduce((acc, r) => {
+      const n = Number(String(r.codigo ?? "").replace(/\D/g, ""));
+      return Number.isFinite(n) && n > acc ? n : acc;
+    }, 0);
+    return `CIC-${String(max + 1).padStart(4, "0")}`;
   }
 
   private async uniqueSlug(base: string, ignoreId?: string): Promise<string> {
-    const { data } = await getSupabaseAdmin()
+    const { data, error } = await getSupabaseAdmin()
       .from("properties")
       .select("id, slug")
-      .like("slug", `${base}%`);
+      .like("slug", `${base}%`)
+      .overrideTypes<Pick<PropertyRow, "id" | "slug">[], { merge: false }>();
+    if (error) throw error;
     const taken = new Set((data ?? []).filter((r) => r.id !== ignoreId).map((r) => r.slug));
     if (!taken.has(base)) return base;
     let i = 2;
@@ -130,12 +189,39 @@ class SupabasePropertyRepository implements PropertyRepository {
     return `${base}-${i}`;
   }
 
+  /**
+   * Reemplaza los medios de un inmueble.
+   *
+   * Camino normal: la función `reemplazar_medios` (migración 0014) borra e inserta en UNA transacción,
+   * así que si algo falla el inmueble conserva sus fotos anteriores.
+   * Respaldo (base sin 0014): inserta primero las nuevas y solo después borra las anteriores por id,
+   * revisando el error de cada paso. Un fallo a mitad deja fotos de más, nunca un inmueble sin fotos.
+   */
   private async replaceMedia(propertyId: string, medios: PropertyMedia[]) {
     const db = getSupabaseAdmin();
-    await db.from("property_media").delete().eq("property_id", propertyId);
-    if (medios.length > 0) {
-      const { error } = await db.from("property_media").insert(mediaInputToRows(propertyId, medios));
-      if (error) throw error;
+    const filas = mediaInputToRows(propertyId, medios);
+    const { error } = await db.rpc("reemplazar_medios", {
+      p_property: propertyId,
+      p_medios: filas.map(({ property_id: _propiedad, ...resto }) => resto),
+    });
+    if (!error) return;
+    if (!esFuncionInexistente(error)) throw error;
+
+    avisarRespaldo("reemplazar_medios");
+    const previos = await db
+      .from("property_media")
+      .select("id")
+      .eq("property_id", propertyId)
+      .overrideTypes<{ id: string }[], { merge: false }>();
+    if (previos.error) throw previos.error;
+    if (filas.length > 0) {
+      const insertado = await db.from("property_media").insert(filas);
+      if (insertado.error) throw insertado.error;
+    }
+    const ids = (previos.data ?? []).map((r) => r.id);
+    if (ids.length > 0) {
+      const borrado = await db.from("property_media").delete().in("id", ids);
+      if (borrado.error) throw borrado.error;
     }
   }
 
@@ -148,11 +234,20 @@ class SupabasePropertyRepository implements PropertyRepository {
       .from("properties")
       .insert({ ...propertyInputToRow(input), codigo: input.codigo ?? codigo, slug })
       .select("id")
-      .single();
+      .single()
+      .overrideTypes<{ id: string }, { merge: false }>();
     if (error) throw error;
 
-    const id = data.id as string;
-    await this.replaceMedia(id, input.medios);
+    const id = data.id;
+    try {
+      await this.replaceMedia(id, input.medios);
+    } catch (err) {
+      // Sin esto quedaría un inmueble creado sin sus fotos. Se deshace el alta (compensación) y se
+      // propaga el error: el panel lo muestra y el siguiente intento parte de cero.
+      const deshecho = await db.from("properties").delete().eq("id", id);
+      if (deshecho.error) console.error("[datos] no se pudo deshacer el alta sin fotos:", deshecho.error.message);
+      throw err;
+    }
 
     const created = await this.getById(id);
     if (!created) throw new Error("No se pudo recuperar el inmueble creado.");
@@ -197,19 +292,39 @@ class SupabaseLeadRepository implements LeadRepository {
     const { data, error } = await getSupabaseAdmin()
       .from("leads")
       .insert(leadInputToRow(input))
-      .select("*")
-      .single();
+      .select(SELECT_LEAD)
+      .single()
+      .overrideTypes<LeadRow, { merge: false }>();
     if (error) throw error;
     return leadRowToDomain(data);
   }
 
-  async list(): Promise<Lead[]> {
-    const { data, error } = await getSupabaseAdmin()
-      .from("leads")
-      .select("*")
-      .order("created_at", { ascending: false });
-    if (error) throw error;
-    return (data ?? []).map(leadRowToDomain);
+  /**
+   * Los más recientes primero, hasta `limite`. Pagina de a 1.000 con un orden estable
+   * (fecha y luego id) para no cortarse en el tope por respuesta de la API.
+   */
+  async list(opciones?: ListarLeadsOpciones): Promise<Lead[]> {
+    const limite = Math.max(0, Math.floor(opciones?.limite ?? LEADS_LIMITE_POR_DEFECTO));
+    const filas: LeadRow[] = [];
+    while (filas.length < limite) {
+      const desde = filas.length;
+      const pedidas = Math.min(PAGINA_LEADS, limite - desde);
+      const { data, error } = await getSupabaseAdmin()
+        .from("leads")
+        .select(SELECT_LEAD)
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .range(desde, desde + pedidas - 1)
+        .overrideTypes<LeadRow[], { merge: false }>();
+      if (error) throw error;
+      const pagina = data ?? [];
+      filas.push(...pagina);
+      if (pagina.length < pedidas) break;
+    }
+    if (limite > 0 && filas.length >= limite) {
+      console.warn(`[leads] el listado llegó al tope de ${limite}: los más antiguos no se incluyen.`);
+    }
+    return filas.map(leadRowToDomain);
   }
 
   async countSince(iso: string): Promise<number> {
@@ -226,8 +341,9 @@ class SupabaseLeadRepository implements LeadRepository {
       .from("leads")
       .update({ estado })
       .eq("id", id)
-      .select("*")
-      .maybeSingle();
+      .select(SELECT_LEAD)
+      .maybeSingle()
+      .overrideTypes<LeadRow, { merge: false }>();
     if (error) throw error;
     return data ? leadRowToDomain(data) : null;
   }
@@ -243,8 +359,9 @@ class SupabaseAgentRepository implements AgentRepository {
   async list(): Promise<Agent[]> {
     const { data, error } = await getSupabaseAdmin()
       .from("agents")
-      .select("*")
-      .order("nombre");
+      .select(SELECT_AGENTE)
+      .order("nombre")
+      .overrideTypes<AgentRow[], { merge: false }>();
     if (error) throw error;
     return (data ?? []).map(agentRowToDomain);
   }
@@ -252,9 +369,10 @@ class SupabaseAgentRepository implements AgentRepository {
   async getById(id: string): Promise<Agent | null> {
     const { data, error } = await getSupabaseAdmin()
       .from("agents")
-      .select("*")
+      .select(SELECT_AGENTE)
       .eq("id", id)
-      .maybeSingle();
+      .maybeSingle()
+      .overrideTypes<AgentRow, { merge: false }>();
     if (error) throw error;
     return data ? agentRowToDomain(data) : null;
   }
@@ -263,8 +381,9 @@ class SupabaseAgentRepository implements AgentRepository {
     const { data, error } = await getSupabaseAdmin()
       .from("agents")
       .insert(agentInputToRow(input))
-      .select("*")
-      .single();
+      .select(SELECT_AGENTE)
+      .single()
+      .overrideTypes<AgentRow, { merge: false }>();
     if (error) throw error;
     return agentRowToDomain(data);
   }
@@ -276,8 +395,9 @@ class SupabaseAgentRepository implements AgentRepository {
       .from("agents")
       .update(agentInputToRow({ ...current, ...patch }))
       .eq("id", id)
-      .select("*")
-      .maybeSingle();
+      .select(SELECT_AGENTE)
+      .maybeSingle()
+      .overrideTypes<AgentRow, { merge: false }>();
     if (error) throw error;
     return data ? agentRowToDomain(data) : null;
   }
@@ -291,25 +411,48 @@ class SupabaseAgentRepository implements AgentRepository {
   async listAvailability(agentId: string): Promise<AgentAvailability[]> {
     const { data, error } = await getSupabaseAdmin()
       .from("agent_availability")
-      .select("*")
+      .select(SELECT_DISPONIBILIDAD)
       .eq("agent_id", agentId)
-      .order("dia_semana");
+      .order("dia_semana")
+      .overrideTypes<AvailabilityRow[], { merge: false }>();
     if (error) throw error;
     return (data ?? []).map(availabilityRowToDomain);
   }
 
+  /**
+   * Misma estrategia que los medios: `fijar_disponibilidad` (0014) en una transacción y, si la base
+   * aún no la tiene, insertar las nuevas y luego borrar las anteriores por id, revisando cada error.
+   */
   async setAvailability(agentId: string, slots: AvailabilitySlot[]): Promise<void> {
     const db = getSupabaseAdmin();
-    await db.from("agent_availability").delete().eq("agent_id", agentId);
-    if (slots.length > 0) {
-      const rows = slots.map((s) => ({
-        agent_id: agentId,
-        dia_semana: s.diaSemana,
-        hora_inicio: s.horaInicio,
-        hora_fin: s.horaFin,
-      }));
-      const { error } = await db.from("agent_availability").insert(rows);
-      if (error) throw error;
+    const filas: AvailabilityInsert[] = slots.map((s) => ({
+      agent_id: agentId,
+      dia_semana: s.diaSemana,
+      hora_inicio: s.horaInicio,
+      hora_fin: s.horaFin,
+    }));
+    const { error } = await db.rpc("fijar_disponibilidad", {
+      p_agent: agentId,
+      p_slots: filas.map(({ agent_id: _agente, ...resto }) => resto),
+    });
+    if (!error) return;
+    if (!esFuncionInexistente(error)) throw error;
+
+    avisarRespaldo("fijar_disponibilidad");
+    const previas = await db
+      .from("agent_availability")
+      .select("id")
+      .eq("agent_id", agentId)
+      .overrideTypes<{ id: string }[], { merge: false }>();
+    if (previas.error) throw previas.error;
+    if (filas.length > 0) {
+      const insertado = await db.from("agent_availability").insert(filas);
+      if (insertado.error) throw insertado.error;
+    }
+    const ids = (previas.data ?? []).map((r) => r.id);
+    if (ids.length > 0) {
+      const borrado = await db.from("agent_availability").delete().in("id", ids);
+      if (borrado.error) throw borrado.error;
     }
   }
 }
@@ -318,8 +461,9 @@ class SupabaseAppointmentRepository implements AppointmentRepository {
   async list(): Promise<Appointment[]> {
     const { data, error } = await getSupabaseAdmin()
       .from("appointments")
-      .select("*")
-      .order("inicio_en");
+      .select(SELECT_CITA)
+      .order("inicio_en")
+      .overrideTypes<AppointmentRow[], { merge: false }>();
     if (error) throw error;
     return (data ?? []).map(appointmentRowToDomain);
   }
@@ -328,8 +472,9 @@ class SupabaseAppointmentRepository implements AppointmentRepository {
     const { data, error } = await getSupabaseAdmin()
       .from("appointments")
       .insert(appointmentInputToRow(input))
-      .select("*")
-      .single();
+      .select(SELECT_CITA)
+      .single()
+      .overrideTypes<AppointmentRow, { merge: false }>();
     if (error) throw error;
     return appointmentRowToDomain(data);
   }
@@ -339,8 +484,9 @@ class SupabaseAppointmentRepository implements AppointmentRepository {
       .from("appointments")
       .update({ estado })
       .eq("id", id)
-      .select("*")
-      .maybeSingle();
+      .select(SELECT_CITA)
+      .maybeSingle()
+      .overrideTypes<AppointmentRow, { merge: false }>();
     if (error) throw error;
     return data ? appointmentRowToDomain(data) : null;
   }
@@ -354,7 +500,11 @@ class SupabaseAppointmentRepository implements AppointmentRepository {
 
 class SupabaseTemplateRepository implements TemplateRepository {
   async list(): Promise<Template[]> {
-    const { data, error } = await getSupabaseAdmin().from("templates").select("*").order("nombre");
+    const { data, error } = await getSupabaseAdmin()
+      .from("templates")
+      .select(SELECT_PLANTILLA)
+      .order("nombre")
+      .overrideTypes<TemplateRow[], { merge: false }>();
     if (error) throw error;
     return (data ?? []).map(templateRowToDomain);
   }
@@ -362,9 +512,10 @@ class SupabaseTemplateRepository implements TemplateRepository {
   async getById(id: string): Promise<Template | null> {
     const { data, error } = await getSupabaseAdmin()
       .from("templates")
-      .select("*")
+      .select(SELECT_PLANTILLA)
       .eq("id", id)
-      .maybeSingle();
+      .maybeSingle()
+      .overrideTypes<TemplateRow, { merge: false }>();
     if (error) throw error;
     return data ? templateRowToDomain(data) : null;
   }
@@ -373,8 +524,9 @@ class SupabaseTemplateRepository implements TemplateRepository {
     const { data, error } = await getSupabaseAdmin()
       .from("templates")
       .insert(templateInputToRow(input))
-      .select("*")
-      .single();
+      .select(SELECT_PLANTILLA)
+      .single()
+      .overrideTypes<TemplateRow, { merge: false }>();
     if (error) throw error;
     return templateRowToDomain(data);
   }
@@ -386,8 +538,9 @@ class SupabaseTemplateRepository implements TemplateRepository {
       .from("templates")
       .update(templateInputToRow({ ...current, ...patch }))
       .eq("id", id)
-      .select("*")
-      .maybeSingle();
+      .select(SELECT_PLANTILLA)
+      .maybeSingle()
+      .overrideTypes<TemplateRow, { merge: false }>();
     if (error) throw error;
     return data ? templateRowToDomain(data) : null;
   }

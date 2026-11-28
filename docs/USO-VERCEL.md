@@ -6,7 +6,9 @@ uso no se pueden leer por API: se revisan a mano en el panel (ver «Cómo leer l
 
 Límites Hobby de referencia (confirmar en vercel.com/docs/limits y vercel.com/pricing, cambian): ~1 M invocaciones
 de función/mes, ~1 M solicitudes edge, ~100 GB de transferencia rápida, ~4 h de CPU activa, 360 GB-h de memoria,
-~1 M lecturas y ~200 k escrituras ISR, 1000 imágenes fuente optimizadas, máximo 2 crons y una vez al día.
+~1 M lecturas y ~200 k escrituras ISR, 5.000 transformaciones de imagen al mes (CIC no las usa: loader propio),
+hasta 100 crons por proyecto, cada uno **una vez al día** (Vercel puede correrlo hasta ±59 min de su hora), y en el
+Firewall **una sola regla de límite de tasa**.
 
 ## Causas probables (de mayor a menor)
 
@@ -22,7 +24,9 @@ de función/mes, ~1 M solicitudes edge, ~100 GB de transferencia rápida, ~4 h d
    `router.refresh()` cada 30 s (re-render completo en el servidor).
 7. Fuera del código: tráfico de bots/scrapers sin Firewall (no hay reglas configuradas). No medible desde el repo.
 
-Los dos crons (06:00 y 06:30 UTC) cumplen el máximo Hobby y suman ~60 invocaciones/mes: no son la causa.
+Los tres crons (06:00, 06:30 y 12:00 UTC, ver `vercel.json`) corren una vez al día cada uno, como exige Hobby, y
+suman ~90 invocaciones/mes: no son la causa. Hay margen para más (el tope es 100 por proyecto), pero ninguno puede
+correr más de una vez al día.
 
 ## Qué se cambió (rama `optimizar-uso-vercel`)
 
@@ -51,8 +55,11 @@ pagar o renovar), `/comparar`, `/favoritos`, home, fichas, sectores y sitemap IS
 ### Lo que NO se cambió (y por qué)
 
 - `dynamicParams = false` en fichas: una ficha publicada después del build daría 404 hasta un redeploy.
-- Sheets en el cron: reescribir el catálogo a diario sigue siendo la garantía de que las ediciones del panel llegan a la hoja.
-- Límite por IP en `/api/pagos/*`: se resuelve en el Firewall (abajo), no en código.
+- Sheets en el cron: sigue corriendo a diario como garantía de que las ediciones del panel llegan a la hoja, pero
+  desde noviembre de 2026 primero lee la hoja y solo escribe si algo cambió (el día normal es una sola lectura).
+- Límite por IP en `/api/pagos/*`: se resuelve en el Firewall (abajo), no en código. Hobby admite **una sola regla
+  de límite de tasa**, así que debe cubrir las rutas que más importan (p. ej. `/api/pagos/wompi` y el formulario de
+  leads) con una sola condición.
 
 ## Cómo leer los medidores (vercel.com → Usage)
 
@@ -80,5 +87,6 @@ pagar o renovar), `/comparar`, `/favoritos`, home, fichas, sectores y sitemap IS
 
 ## Pasos solo en el panel de Vercel
 
-Ver el resumen entregado con el cambio (Firewall/Bot Protection, reglas de rate limit, Spend Management y
-Observability). Reglas clave: no aplicar challenge ni bloqueo a `/api/pagos/wompi/webhook` ni a `/api/cron/*`.
+Ver el resumen entregado con el cambio (Firewall/Bot Protection, la regla de límite de tasa —una sola en Hobby—,
+Spend Management y Observability). Reglas clave: no aplicar challenge ni bloqueo a `/api/pagos/wompi/webhook`, a
+`/api/cron/*`, a `/api/pagos/wompi/reconciliar` ni a `/api/salud` (lo consulta el monitor externo).
