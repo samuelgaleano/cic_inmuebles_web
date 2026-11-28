@@ -45,6 +45,11 @@ describe("GET /api/cron/crm-diario", () => {
     expect(registrarLatido).toHaveBeenCalledWith("cron-crm", true, "sin pendientes");
   });
 
+  it("la respuesta cuenta también los pagos sin publicar y los planes por vencer", async () => {
+    const res = await get("Bearer cron-secret");
+    expect(await res.json()).toMatchObject({ pagosSinPublicar: 0, planesPorVencer: 0 });
+  });
+
   it("con un seguimiento vencido manda el resumen al equipo con clave de idempotencia del día", async () => {
     const crm = estado.crm as MemoryCrmStore;
     const { contacto } = await crm.crearContacto({ nombre: "Marta", telefono: "+57 300 123 4567", origen: "manual" });

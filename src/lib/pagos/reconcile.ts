@@ -1,3 +1,4 @@
+import { getPlan } from "@/lib/config/plans";
 import { processTransaction, type ProcessDeps } from "./process";
 import type { EventoPagoRow } from "./store";
 
@@ -12,6 +13,10 @@ export interface ReconcileResult {
   referenciasAbandonadas: string[];
   /** Referencias cuya búsqueda en Wompi no respondió; se reintentan mañana. */
   referenciasSinRespuesta: string[];
+  /** Pagos aprobados sin servicio registrado que se volvieron a procesar, con su resultado. */
+  serviciosRetomados: Record<string, string>;
+  /** De esos, los que siguen sin vigencia registrada después del intento. */
+  sinServicio: string[];
   rawPurgados: number;
 }
 
@@ -32,7 +37,8 @@ function describe(err: unknown): string {
  *     sin_verificar, o aprobado sin aviso enviado).
  *  2. Busca en Wompi por referencia los checkouts que nunca recibieron
  *     confirmación por ningún camino y procesa las transacciones que aparezcan.
- *  3. Purga el payload crudo viejo y avisa a Pixies de lo que quedó sin resolver.
+ *  3. Retoma los pagos aprobados (estado ok) sin servicio ni renovación registrada.
+ *  4. Purga el payload crudo viejo y avisa a Pixies de lo que quedó sin resolver.
  * Un fallo en una transacción no detiene a las demás.
  */
 export async function reconcile(deps: ProcessDeps): Promise<ReconcileResult> {
@@ -81,6 +87,11 @@ export async function reconcile(deps: ProcessDeps): Promise<ReconcileResult> {
     }
   }
 
+  // 3) Pagos aprobados por el monto correcto cuyo servicio no quedó registrado (la base falló justo en ese
+  //    momento, o la renovación chocó con otro cambio). Se procesan como lo hace el retorno: el aviso al
+  //    negocio ya salió y su reclamo atómico impide reenviarlo; solo se registra el servicio o la renovación.
+  const { retomados: serviciosRetomados, sinServicio } = await retomarServicios(eventos, resultados, deps);
+
   let rawPurgados = 0;
   try {
     rawPurgados = await store.purgeRaw();
@@ -96,10 +107,12 @@ export async function reconcile(deps: ProcessDeps): Promise<ReconcileResult> {
     .map((e) => e.txId)
     .filter((id, i, a) => a.indexOf(id) === i && !resultados[id]?.endsWith("notificado"));
 
-  if (referenciasAbandonadas.length > 0 || referenciasSinRespuesta.length > 0 || sinResolver.length > 0 || aprobadasSinAviso.length > 0) {
+  if (referenciasAbandonadas.length > 0 || referenciasSinRespuesta.length > 0 || sinResolver.length > 0 || aprobadasSinAviso.length > 0 || sinServicio.length > 0) {
     await deps.sendPagosAlert(
-      `Reconciliación: ${aprobadasSinAviso.length} aprobadas sin aviso, ${sinResolver.length} sin resolver, ${referenciasAbandonadas.length} checkouts abandonados`,
+      `Reconciliación: ${aprobadasSinAviso.length} aprobadas sin aviso, ${sinResolver.length} sin resolver, ${referenciasAbandonadas.length} checkouts abandonados${sinServicio.length ? `, ${sinServicio.length} sin vigencia` : ""}`,
       [
+        sinServicio.length ? "Pagos aprobados sin vigencia registrada (se reintentan cada día; si persisten, regístralos a mano en /admin/vigencias):" : null,
+        ...sinServicio.map((id) => `- ${id}: ${serviciosRetomados[id] ?? "sin resultado"}`),
         aprobadasSinAviso.length ? "Aprobadas sin aviso enviado (revisar Resend / panel de Wompi):" : null,
         ...aprobadasSinAviso.map((id) => `- ${id}: ${resultados[id] ?? "sin resultado"}`),
         sinResolver.length ? "Transacciones sin resolver:" : null,
@@ -114,5 +127,58 @@ export async function reconcile(deps: ProcessDeps): Promise<ReconcileResult> {
     );
   }
 
-  return { revisadas: [...aRevisar], resultados, referenciasAbandonadas, referenciasSinRespuesta, rawPurgados };
+  return { revisadas: [...aRevisar], resultados, referenciasAbandonadas, referenciasSinRespuesta, serviciosRetomados, sinServicio, rawPurgados };
+}
+
+/** Solo los planes de pago con vigencia abren un servicio; los demás nunca aparecerían como registrados. */
+function abreServicio(planId: string | null): boolean {
+  const plan = planId ? getPlan(planId) : undefined;
+  return Boolean(plan && plan.mode === "pago" && plan.dias);
+}
+
+/**
+ * Busca los pagos APPROVED con estado ok de la ventana cuyo tx_id no está ni en los servicios ni en las
+ * renovaciones, y los vuelve a procesar con fuente cron. Lo que ya se procesó en esta corrida no se repite.
+ * Nunca lanza: si no se puede saber qué tiene servicio, se deja para mañana.
+ */
+async function retomarServicios(
+  eventos: EventoPagoRow[],
+  yaProcesadas: Record<string, string>,
+  deps: ProcessDeps,
+): Promise<{ retomados: Record<string, string>; sinServicio: string[] }> {
+  const retomados: Record<string, string> = {};
+  if (!deps.registrarServicio || !deps.txIdsConServicio) return { retomados, sinServicio: [] };
+
+  const candidatos = [
+    ...new Set(eventos.filter((e) => e.status === "APPROVED" && e.estado === "ok" && abreServicio(e.planId)).map((e) => e.txId)),
+  ].filter((id) => !(id in yaProcesadas));
+  if (candidatos.length === 0) return { retomados, sinServicio: [] };
+
+  let faltan: string[];
+  try {
+    const registrados = await deps.txIdsConServicio(candidatos);
+    faltan = candidatos.filter((id) => !registrados.has(id));
+  } catch (err) {
+    console.error("[pago] no se pudo revisar qué pagos tienen vigencia registrada:", describe(err));
+    return { retomados, sinServicio: [] };
+  }
+
+  for (const txId of faltan) {
+    try {
+      const r = await processTransaction(txId, { source: "cron" }, deps);
+      retomados[txId] = `${r.outcome}${r.status ? ":" + r.status : ""}`;
+    } catch (err) {
+      retomados[txId] = `error:${describe(err)}`;
+    }
+  }
+  if (faltan.length === 0) return { retomados, sinServicio: [] };
+
+  // Lo que sigue sin servicio después del intento se reporta (sin datos personales: solo el id de Wompi).
+  try {
+    const ahora = await deps.txIdsConServicio(faltan);
+    return { retomados, sinServicio: faltan.filter((id) => !ahora.has(id)) };
+  } catch (err) {
+    console.error("[pago] no se pudo comprobar la vigencia de los pagos retomados:", describe(err));
+    return { retomados, sinServicio: [] };
+  }
 }

@@ -3,6 +3,8 @@ import { MemoryPagosStore } from "./memory-store";
 import { reconcile } from "./reconcile";
 import type { ProcessDeps } from "./process";
 import type { WompiTransaction } from "@/lib/integrations/wompi";
+import { registrarServicioDePago, type ServiciosDeps } from "@/lib/servicios/procesar";
+import { MemoryServiciosStore } from "@/lib/servicios/store";
 
 const base: WompiTransaction = {
   id: "1234-1610641025-49201",
@@ -129,6 +131,94 @@ describe("reconcile", () => {
     const r = await reconcile(deps);
     expect(r.rawPurgados).toBe(1);
     expect(store.eventos[0].raw).toBeNull();
+  });
+
+  describe("pagos aprobados sin servicio registrado", () => {
+    const avisada = async (txId: string, planId = "alianza-90", ts = 7) => {
+      await store.recordEvent({ txId, status: "APPROVED", eventTimestamp: ts, source: "webhook", reference: base.reference, amountInCents: 1_000_000, planId, amountOk: true, estado: "ok", raw: null });
+      await store.claimNotification(txId);
+      await store.markNotified(txId);
+    };
+
+    function conServicios() {
+      const servicios = new MemoryServiciosStore();
+      const serviciosDeps: ServiciosDeps = {
+        store: servicios,
+        enviarCorreo: vi.fn(async () => true),
+        despublicarFicha: vi.fn(async () => true),
+        publicarFicha: vi.fn(async () => true),
+        alertar: vi.fn(async () => true),
+        ahora: () => new Date(now),
+      };
+      deps.registrarServicio = vi.fn<NonNullable<ProcessDeps["registrarServicio"]>>((tx, plan, opts) => registrarServicioDePago(tx, plan, serviciosDeps, opts));
+      deps.txIdsConServicio = (ids) => servicios.txIdsRegistrados(ids);
+      return servicios;
+    }
+
+    it("retoma un pago avisado cuyo servicio no quedó registrado, sin reenviar el aviso", async () => {
+      const servicios = conServicios();
+      await avisada("tx-s1");
+
+      const r = await reconcile(deps);
+
+      expect(deps.fetchTransaction).toHaveBeenCalledWith("tx-s1");
+      expect(deps.registrarServicio).toHaveBeenCalledTimes(1);
+      expect(servicios.filas.map((s) => s.txId)).toEqual(["tx-s1"]);
+      expect(deps.sendPaymentNotification).not.toHaveBeenCalled();
+      expect(store.eventos.filter((e) => e.txId === "tx-s1" && e.source === "cron")).toHaveLength(1);
+      expect(r.serviciosRetomados["tx-s1"]).toBe("ok:APPROVED");
+      expect(r.sinServicio).toEqual([]);
+      expect(deps.sendPagosAlert).not.toHaveBeenCalled();
+
+      // Al día siguiente ya tiene servicio: no se vuelve a consultar.
+      (deps.fetchTransaction as ReturnType<typeof vi.fn>).mockClear();
+      await reconcile(deps);
+      expect(deps.fetchTransaction).not.toHaveBeenCalled();
+    });
+
+    it("una renovación ya aplicada (tx en servicios_renovaciones) no se retoma", async () => {
+      const servicios = conServicios();
+      await servicios.registrarRenovacion("tx-ren", "00000000-0000-4000-8000-000000000009");
+      await avisada("tx-ren");
+      await reconcile(deps);
+      expect(deps.fetchTransaction).not.toHaveBeenCalled();
+      expect(deps.registrarServicio).not.toHaveBeenCalled();
+    });
+
+    it("no retoma planes sin vigencia, montos a revisar ni lo que ya procesó en la misma corrida", async () => {
+      conServicios();
+      await avisada("tx-contacto", "contenido-profesional", 1);
+      await store.recordEvent({ txId: "tx-rev", status: "APPROVED", eventTimestamp: 2, source: "webhook", reference: base.reference, amountInCents: 5, planId: "alianza-90", amountOk: false, estado: "revisar", raw: null });
+      await store.claimNotification("tx-rev");
+      await store.markNotified("tx-rev");
+      await evento("tx-pend", "APPROVED", "ok", 3); // sin aviso: la revisa el paso 1, que ya registra su servicio
+      const r = await reconcile(deps);
+      expect(deps.fetchTransaction).toHaveBeenCalledTimes(1);
+      expect(deps.fetchTransaction).toHaveBeenCalledWith("tx-pend");
+      expect(r.serviciosRetomados).toEqual({});
+    });
+
+    it("si sigue sin servicio después del intento, la alerta lo lista (solo el id de Wompi)", async () => {
+      const servicios = conServicios();
+      servicios.registrar = vi.fn().mockRejectedValue(new Error("base caída"));
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      await avisada("tx-s2");
+      const r = await reconcile(deps);
+      expect(r.sinServicio).toEqual(["tx-s2"]);
+      const [asunto, texto] = (deps.sendPagosAlert as ReturnType<typeof vi.fn>).mock.calls.at(-1)!;
+      expect(asunto).toContain("1 sin vigencia");
+      expect(texto).toContain("- tx-s2:");
+    });
+
+    it("si no se puede saber qué tiene servicio, no procesa nada y lo deja para mañana", async () => {
+      conServicios();
+      deps.txIdsConServicio = vi.fn().mockRejectedValue(new Error("sin tabla"));
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      await avisada("tx-s3");
+      const r = await reconcile(deps);
+      expect(deps.fetchTransaction).not.toHaveBeenCalled();
+      expect(r.sinServicio).toEqual([]);
+    });
   });
 
   it("no alerta cuando no hay nada pendiente", async () => {

@@ -52,7 +52,7 @@ describe("GET /api/pagos/wompi/reconciliar", () => {
   it("corre la reconciliación con el Bearer correcto y no alerta si todo sale bien", async () => {
     const res = await get("/api/pagos/wompi/reconciliar", "Bearer cron-secret");
     expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({ ok: true, revisadas: [], vigencias: OK_VIGENCIAS });
+    expect(await res.json()).toMatchObject({ ok: true, revisadas: [] });
     expect(sendPagosAlert).not.toHaveBeenCalled();
     // La purga ya la hizo reconcile: no se repite.
     expect(purgeRaw).not.toHaveBeenCalled();
@@ -65,13 +65,12 @@ describe("GET /api/pagos/wompi/reconciliar", () => {
     expect(body.eventos[0].status).toBe("APPROVED");
   });
 
-  it("si reconcile falla, igual purga, revisa vigencias y alerta sin el mensaje de error", async () => {
+  it("si reconcile falla, igual purga y alerta sin el mensaje de error", async () => {
     reconcile.mockRejectedValue(new Error("fallo con ana@correo.com y ref CIC-123"));
     const res = await get("/api/pagos/wompi/reconciliar", "Bearer cron-secret");
     expect(res.status).toBe(500);
-    expect(await res.json()).toMatchObject({ ok: false, rawPurgados: 3, vigencias: OK_VIGENCIAS });
+    expect(await res.json()).toMatchObject({ ok: false, rawPurgados: 3 });
     expect(purgeRaw).toHaveBeenCalledTimes(1);
-    expect(revisarVencimientos).toHaveBeenCalledTimes(1);
     expect(sendPagosAlert).toHaveBeenCalledTimes(1);
     const [asunto, texto] = sendPagosAlert.mock.calls[0];
     expect(`${asunto}\n${texto}`).not.toContain("ana@correo.com");
@@ -79,13 +78,11 @@ describe("GET /api/pagos/wompi/reconciliar", () => {
     expect(texto).toContain("reconciliación de pagos falló");
   });
 
-  it("si la revisión de vigencias falla, la reconciliación sigue y se alerta", async () => {
-    revisarVencimientos.mockRejectedValue(new Error("boom"));
+  it("ya no revisa vigencias: eso corre en /api/cron/vigencias", async () => {
     const res = await get("/api/pagos/wompi/reconciliar", "Bearer cron-secret");
     expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({ ok: true, vigencias: { error: "falló la revisión de vigencias" } });
-    expect(sendPagosAlert).toHaveBeenCalledTimes(1);
-    expect(sendPagosAlert.mock.calls[0][1]).toContain("vigencias");
+    expect(await res.json()).not.toHaveProperty("vigencias");
+    expect(revisarVencimientos).not.toHaveBeenCalled();
   });
 
   it("si reconcile y la purga fallan, la alerta lista ambas", async () => {
@@ -98,19 +95,11 @@ describe("GET /api/pagos/wompi/reconciliar", () => {
     expect(texto).toContain("72 h");
   });
 
-  it("sin la migración 0004 avisa en el log y no lo trata como fallo", async () => {
-    revisarVencimientos.mockResolvedValue({ ...OK_VIGENCIAS, disponible: false });
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const res = await get("/api/pagos/wompi/reconciliar", "Bearer cron-secret");
-    expect(res.status).toBe(200);
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining("aplicar migracion 0004"));
-    expect(sendPagosAlert).not.toHaveBeenCalled();
-  });
-
   it("un fallo al enviar la alerta no tumba la respuesta", async () => {
-    revisarVencimientos.mockRejectedValue(new Error("boom"));
+    reconcile.mockRejectedValue(new Error("boom"));
     sendPagosAlert.mockRejectedValue(new Error("resend caído"));
     const res = await get("/api/pagos/wompi/reconciliar", "Bearer cron-secret");
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(500);
+    expect(await res.json()).toMatchObject({ ok: false, rawPurgados: 3 });
   });
 });

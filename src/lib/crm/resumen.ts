@@ -1,6 +1,9 @@
+import { getPlan } from "@/lib/config/plans";
 import { siteConfig } from "@/lib/config/site";
 import type { Lead } from "@/lib/domain";
 import { escapeHtml } from "@/lib/servicios/correo-html";
+import { ServiciosNoDisponibleError } from "@/lib/servicios/store";
+import { diasRestantes, fechaLarga, type Servicio } from "@/lib/servicios/vigencia";
 import { enlaceWhatsApp } from "@/lib/utils/telefono";
 import { diasDeAtraso, diaBogota, finDelDiaBogota } from "./reglas";
 import type { CrmStore } from "./store";
@@ -19,11 +22,58 @@ export interface PersonaDelResumen {
   telefono?: string;
 }
 
+/** Quien pagó un plan (servicio de publicación). Sin correo: solo lo que el equipo necesita para llamar. */
+export interface PlanDelResumen {
+  /** id del servicio. */
+  id: string;
+  nombre: string;
+  telefono?: string;
+  plan: string;
+}
+
 export interface DatosResumen {
   seguimientos: (PersonaDelResumen & { at: string; nota?: string })[];
   porAprobar: (PersonaDelResumen & { inmueble?: string })[];
   compradoresSinPropuestas: (PersonaDelResumen & { busca?: string })[];
   leadsNuevos: { nombre: string; telefono?: string; tipo: Lead["tipo"]; creadoEn: string }[];
+  /** Planes pagados que siguen sin publicar (el reloj no corre hasta activarlos). */
+  pagosSinPublicar?: (PlanDelResumen & { diasDesdePago: number })[];
+  /** Planes activos que vencen en 7 días o menos (o ya vencieron y siguen en su día de gracia). */
+  planesPorVencer?: (PlanDelResumen & { venceAt: string; diasRestantes: number })[];
+}
+
+/** Días hacia adelante en los que un plan activo entra en el resumen. */
+export const DIAS_PLANES_POR_VENCER = 7;
+
+const DIA_MS = 86_400_000;
+
+/** Regla pura: qué planes van al resumen (pendientes de publicar y por vencer), más urgentes primero. */
+export function planesDelResumen(servicios: Servicio[], ahora: Date): Required<Pick<DatosResumen, "pagosSinPublicar" | "planesPorVencer">> {
+  const base = (s: Servicio): PlanDelResumen => ({
+    id: s.id,
+    nombre: s.clienteNombre?.trim() || "(sin nombre)",
+    ...(s.clienteTelefono ? { telefono: s.clienteTelefono } : {}),
+    plan: getPlan(s.planId)?.nombre ?? s.planId,
+  });
+  const pagosSinPublicar = servicios
+    .filter((s) => s.estado === "pendiente_publicar")
+    .map((s) => ({ ...base(s), diasDesdePago: Math.max(0, Math.floor((ahora.getTime() - new Date(s.pagadoAt ?? s.createdAt).getTime()) / DIA_MS)) }))
+    .sort((a, b) => b.diasDesdePago - a.diasDesdePago);
+  const planesPorVencer = servicios
+    .filter((s) => s.estado === "activo" && s.venceAt && new Date(s.venceAt).getTime() - ahora.getTime() <= DIAS_PLANES_POR_VENCER * DIA_MS)
+    .map((s) => ({ ...base(s), venceAt: s.venceAt as string, diasRestantes: diasRestantes(s.venceAt as string, ahora) || 0 })) // || 0: sin «-0» en la hora de gracia
+    .sort((a, b) => a.venceAt.localeCompare(b.venceAt));
+  return { pagosSinPublicar, planesPorVencer };
+}
+
+function desdeElPago(dias: number): string {
+  return dias === 0 ? "pagó hoy" : dias === 1 ? "pagó ayer" : `pagó hace ${dias} días`;
+}
+
+function cuandoVencePlan(p: { venceAt: string; diasRestantes: number }): string {
+  if (p.diasRestantes <= 0) return "venció: está en su día de gracia";
+  if (p.diasRestantes === 1) return `vence en menos de 24 horas (${fechaLarga(p.venceAt)})`;
+  return `vence en ${p.diasRestantes} días (${fechaLarga(p.venceAt)})`;
 }
 
 export interface CorreoResumen {
@@ -61,6 +111,8 @@ interface Linea {
   nombre: string;
   telefono?: string;
   url?: string;
+  /** Cómo se presenta el enlace en el texto plano (por defecto, «Ficha»). */
+  etiquetaUrl?: string;
   detalle: string[];
   urgente?: boolean;
 }
@@ -104,6 +156,16 @@ export function armarResumenDiario(datos: DatosResumen, ahora: Date, base: strin
       verTodo: `${base}/admin/leads`,
       lineas: datos.leadsNuevos.map((l) => ({ nombre: l.nombre, telefono: l.telefono, detalle: [l.tipo === "vendedor" ? "quiere vender" : "quiere comprar", hace(l.creadoEn, ahora)] })),
     },
+    {
+      titulo: `Pagos sin publicar (${datos.pagosSinPublicar?.length ?? 0})`,
+      verTodo: `${base}/admin/vigencias`,
+      lineas: (datos.pagosSinPublicar ?? []).map((p) => ({ nombre: p.nombre, telefono: p.telefono, url: `${base}/admin/vigencias`, etiquetaUrl: "Vigencias", detalle: [p.plan, desdeElPago(p.diasDesdePago)] })),
+    },
+    {
+      titulo: `Planes que vencen en ${DIAS_PLANES_POR_VENCER} días o menos (${datos.planesPorVencer?.length ?? 0})`,
+      verTodo: `${base}/admin/vigencias`,
+      lineas: (datos.planesPorVencer ?? []).map((p) => ({ nombre: p.nombre, telefono: p.telefono, url: `${base}/admin/vigencias`, etiquetaUrl: "Vigencias", detalle: [p.plan, cuandoVencePlan(p)] })),
+    },
   ].filter((g) => g.lineas.length > 0);
 
   if (!grupos.length) return null;
@@ -120,7 +182,7 @@ export function armarResumenDiario(datos: DatosResumen, ahora: Date, base: strin
       const wa = l.telefono ? enlaceWhatsApp(l.telefono) : undefined;
       texto.push(`- ${l.urgente ? "[VENCIDO] " : ""}${l.nombre}${l.telefono ? ` · ${l.telefono}` : ""}${l.detalle.length ? ` · ${l.detalle.join(" · ")}` : ""}`);
       if (wa) texto.push(`  WhatsApp: ${wa}`);
-      if (l.url) texto.push(`  Ficha: ${l.url}`);
+      if (l.url) texto.push(`  ${l.etiquetaUrl ?? "Ficha"}: ${l.url}`);
     }
     if (g.lineas.length > TOPE) texto.push(`  y ${g.lineas.length - TOPE} más: ${g.verTodo}`);
     texto.push("");
@@ -181,14 +243,34 @@ ${secciones}
   return { asunto, text: texto.join("\n"), html };
 }
 
-/** Lee lo que va en el resumen: seguimientos hasta hoy, vendedores por aprobar, compradores sin propuestas y leads sin atender. */
-export async function reunirResumenDiario(crm: CrmStore, leads: { list(): Promise<Lead[]> }, ahora: Date): Promise<DatosResumen> {
-  const [seguimientos, contactos, captaciones, busquedas, todosLeads] = await Promise.all([
+/** Planes del resumen; sin la tabla de servicios (0004 sin aplicar) el resto del resumen sale igual. */
+async function leerServicios(servicios: { listar(): Promise<Servicio[]> } | undefined): Promise<Servicio[]> {
+  if (!servicios) return [];
+  try {
+    return await servicios.listar();
+  } catch (err) {
+    if (err instanceof ServiciosNoDisponibleError) return [];
+    throw err;
+  }
+}
+
+/**
+ * Lee lo que va en el resumen: seguimientos hasta hoy, vendedores por aprobar, compradores sin propuestas,
+ * leads sin atender y, si se pasa el almacén de servicios, pagos sin publicar y planes por vencer.
+ */
+export async function reunirResumenDiario(
+  crm: CrmStore,
+  leads: { list(): Promise<Lead[]> },
+  ahora: Date,
+  servicios?: { listar(): Promise<Servicio[]> },
+): Promise<DatosResumen> {
+  const [seguimientos, contactos, captaciones, busquedas, todosLeads, planes] = await Promise.all([
     crm.listarSeguimientos(finDelDiaBogota(ahora)),
     crm.listarContactos({ incluirArchivados: true }),
     crm.listarCaptaciones(),
     crm.listarBusquedas(),
     leads.list(),
+    leerServicios(servicios),
   ]);
   const activos = new Map(contactos.filter((c) => !c.archivado).map((c) => [c.id, c]));
   const persona = (id: string): PersonaDelResumen | undefined => {
@@ -231,6 +313,7 @@ export async function reunirResumenDiario(crm: CrmStore, leads: { list(): Promis
     porAprobar,
     compradoresSinPropuestas,
     leadsNuevos,
+    ...planesDelResumen(planes, ahora),
   };
 }
 
