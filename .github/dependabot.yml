@@ -1,0 +1,34 @@
+# Actualizaciones de dependencias: una revision por semana.
+# Las menores y parches de npm llegan agrupados en un solo PR; las mayores, una por una
+# (suelen traer cambios que rompen y conviene revisarlas aparte). El CI corre en cada PR.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/Bogota
+    open-pull-requests-limit: 5
+    groups:
+      menores-y-parches:
+        update-types:
+          - minor
+          - patch
+    commit-message:
+      prefix: deps
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/Bogota
+    groups:
+      acciones:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: ci

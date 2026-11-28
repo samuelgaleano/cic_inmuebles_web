@@ -44,7 +44,8 @@ describe("en producción falla cerrado si faltan las variables", () => {
     vi.stubEnv("ADMIN_PASSWORD", undefined);
     vi.stubEnv("ADMIN_SESSION_SECRET", undefined);
 
-    expect(validateCredentials("admin@cicinmuebles.com", "cic-admin-2026")).toBe(false);
+    expect(validateCredentials("admin@cicinmuebles.com", "")).toBe(false);
+    expect(validateCredentials("admin@cicinmuebles.com", "cualquier-clave")).toBe(false);
   });
 
   it("rechaza cualquier credencial si falta solo ADMIN_SESSION_SECRET", () => {
@@ -71,6 +72,34 @@ describe("en producción falla cerrado si faltan las variables", () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("ADMIN_SESSION_SECRET", undefined);
     expect(() => createSessionToken("jefe@cic.com")).toThrow();
+  });
+});
+
+describe("en desarrollo, sin variables, no hay contraseña ni secreto fijos en el código", () => {
+  function sinVariables() {
+    vi.stubEnv("ADMIN_EMAIL", undefined);
+    vi.stubEnv("ADMIN_PASSWORD", undefined);
+    vi.stubEnv("ADMIN_SESSION_SECRET", undefined);
+  }
+
+  it("ninguna contraseña adivinable entra (la temporal es aleatoria)", () => {
+    sinVariables();
+    for (const clave of ["", "admin", "cic-admin", "password", "cambia-esto"]) {
+      expect(validateCredentials("admin@cicinmuebles.com", clave)).toBe(false);
+    }
+  });
+
+  it("igual se pueden emitir y verificar sesiones con el secreto generado en memoria", () => {
+    sinVariables();
+    const token = createSessionToken("admin@cicinmuebles.com");
+    expect(verifySessionToken(token)?.email).toBe("admin@cicinmuebles.com");
+  });
+
+  it("un token de desarrollo no vale contra un secreto configurado", () => {
+    sinVariables();
+    const token = createSessionToken("jefe@cic.com");
+    configurar("jefe@cic.com", "clave-fuerte", "secreto-largo");
+    expect(verifySessionToken(token)).toBeNull();
   });
 });
 

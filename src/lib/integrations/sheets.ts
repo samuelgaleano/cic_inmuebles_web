@@ -111,8 +111,13 @@ function spreadsheetId(): string {
   return process.env.GOOGLE_SHEETS_SPREADSHEET_ID!;
 }
 
-async function valuesGet(token: string, range: string): Promise<Cell[][]> {
-  const res = await fetch(`${API}/${spreadsheetId()}/values/${encodeURIComponent(range)}`, {
+/**
+ * Lee un rango. `sinFormato` pide los valores tal cual (números como número, no "350.000.000"),
+ * que es lo que hace falta para comparar la hoja con lo que se escribiría.
+ */
+async function valuesGet(token: string, range: string, sinFormato = false): Promise<Cell[][]> {
+  const opciones = sinFormato ? "?valueRenderOption=UNFORMATTED_VALUE" : "";
+  const res = await fetch(`${API}/${spreadsheetId()}/values/${encodeURIComponent(range)}${opciones}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) throw new Error(`Sheets get error: ${res.status} ${await res.text()}`);
@@ -145,10 +150,11 @@ async function valuesAppend(token: string, values: Cell[][]): Promise<void> {
 }
 
 async function valuesClear(token: string, range: string): Promise<void> {
-  await fetch(`${API}/${spreadsheetId()}/values/${encodeURIComponent(range)}:clear`, {
+  const res = await fetch(`${API}/${spreadsheetId()}/values/${encodeURIComponent(range)}:clear`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
   });
+  if (!res.ok) throw new Error(`Sheets clear error: ${res.status} ${await res.text()}`);
 }
 
 async function ensureHeader(token: string): Promise<void> {
@@ -181,18 +187,70 @@ export async function syncPropertyToSheet(p: Property): Promise<void> {
   }
 }
 
+/** Última fila que el catálogo puede ocupar (límite práctico de la hoja). */
+const ULTIMA_FILA = 100000;
+
 /**
- * Reescribe todo el catálogo (encabezado + todas las filas). Se usa al eliminar
- * y para la sincronización manual completa. Best-effort.
+ * Forma comparable de una tabla de la hoja: todo como texto, sin celdas vacías al final de cada fila
+ * ni filas vacías al final (la API de Sheets las omite al leer).
  */
-export async function syncAllPropertiesToSheet(properties: Property[]): Promise<void> {
-  if (!isSheetsConfigured()) return;
+export function normalizarTabla(filas: Cell[][]): string[][] {
+  const tabla = filas.map((fila) => {
+    // La API puede devolver celdas nulas aunque el tipo diga string | number.
+    const celdas = fila.map((c) => String(c ?? ""));
+    while (celdas.length && celdas[celdas.length - 1] === "") celdas.pop();
+    return celdas;
+  });
+  while (tabla.length && tabla[tabla.length - 1].length === 0) tabla.pop();
+  return tabla;
+}
+
+/** ¿La hoja ya tiene exactamente estas filas? */
+export function mismaTabla(a: Cell[][], b: Cell[][]): boolean {
+  return JSON.stringify(normalizarTabla(a)) === JSON.stringify(normalizarTabla(b));
+}
+
+export type ResultadoSyncHoja = "escrito" | "sin-cambios" | "omitido" | "fallo";
+
+export interface OpcionesSyncHoja {
+  /** Lee la hoja antes y no escribe nada si ya coincide con el catálogo (el día normal del cron). */
+  soloSiCambio?: boolean;
+  /** Propaga el error en vez de solo registrarlo (para que el cron lo cuente como fallo). */
+  lanzarErrores?: boolean;
+}
+
+/**
+ * Reescribe todo el catálogo (encabezado + todas las filas). Se usa al eliminar,
+ * en la sincronización manual completa y en el cron diario. Best-effort salvo con
+ * `lanzarErrores`.
+ *
+ * Orden seguro: PRIMERO se escribe el bloque nuevo encima del anterior y DESPUÉS se
+ * limpian solo las filas sobrantes por debajo. Si la escritura falla, la hoja queda
+ * como estaba (nunca vacía); si falla la limpieza, quedan filas viejas al final y el
+ * error se informa. Las dos respuestas se comprueban.
+ */
+export async function syncAllPropertiesToSheet(
+  properties: Property[],
+  opciones: OpcionesSyncHoja = {},
+): Promise<ResultadoSyncHoja> {
+  if (!isSheetsConfigured()) return "omitido";
   try {
     const token = await getGoogleAccessToken(SHEETS_SCOPE);
-    await valuesClear(token, `A1:${LAST_COL}100000`);
     const values: Cell[][] = [[...SHEET_HEADER], ...properties.map(propertyToSheetRow)];
+
+    if (opciones.soloSiCambio) {
+      const actual = await valuesGet(token, `A1:${LAST_COL}${ULTIMA_FILA}`, true);
+      if (mismaTabla(actual, values)) return "sin-cambios";
+    }
+
     await valuesUpdate(token, `A1:${LAST_COL}${values.length}`, values);
+    if (values.length < ULTIMA_FILA) {
+      await valuesClear(token, `A${values.length + 1}:${LAST_COL}${ULTIMA_FILA}`);
+    }
+    return "escrito";
   } catch (err) {
+    if (opciones.lanzarErrores) throw err;
     console.error("[sheets] No se pudo reescribir el catálogo:", err);
+    return "fallo";
   }
 }

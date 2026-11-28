@@ -52,10 +52,11 @@ export async function GET(req: Request) {
     fallos.push(`Importación desde Drive: ${result.errors.length} carpeta(s) con error.`);
   }
 
-  // Reescribe el catálogo de Sheets completo (refleja estados/ediciones).
+  // Refleja el catálogo en Sheets (estados/ediciones). Lee la hoja primero y solo escribe si algo
+  // cambió: el día normal es una sola lectura. Con `lanzarErrores` un fallo cuenta como fallo del cron.
   if (isSheetsConfigured()) {
     try {
-      await syncAllPropertiesToSheet(await getRepository().properties.list());
+      await syncAllPropertiesToSheet(await getRepository().properties.list(), { soloSiCambio: true, lanzarErrores: true });
     } catch (err) {
       console.error("[cron/sync] Sheets:", err instanceof Error ? err.message : err);
       fallos.push("Sincronización con Google Sheets: falló.");

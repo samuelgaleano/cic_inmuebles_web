@@ -39,6 +39,11 @@ describe("GET /api/cron/sync", () => {
     expect(sendPagosAlert).not.toHaveBeenCalled();
   });
 
+  it("pide a Sheets escribir solo si cambió y que un fallo se propague", async () => {
+    await get("Bearer cron-secret");
+    expect(syncAll).toHaveBeenCalledWith([], { soloSiCambio: true, lanzarErrores: true });
+  });
+
   it("si la importación lanza: 500, Sheets igual corre y se alerta", async () => {
     runDriveImport.mockRejectedValue(new Error("drive caído"));
     const res = await get("Bearer cron-secret");

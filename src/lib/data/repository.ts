@@ -21,8 +21,9 @@ import type {
  * Contratos de acceso a datos (patrón repositorio).
  *
  * El sitio depende SOLO de estas interfaces, no de una base de datos concreta.
- * Hoy se implementan en memoria (datos de ejemplo); en Fase 1b se añade la
- * implementación con Supabase sin tocar la UI. Ver docs/ARQUITECTURA.md.
+ * Hay dos implementaciones: Supabase (producción, `supabase-repository.ts`) y
+ * memoria con datos de ejemplo (local y pruebas, `memory-repository.ts`). La
+ * elección la hace `elegir-implementacion.ts`. Ver docs/ARQUITECTURA.md.
  */
 
 export interface PropertyRepository {
@@ -45,9 +46,21 @@ export interface PropertyRepository {
   remove(id: string): Promise<boolean>;
 }
 
+export interface ListarLeadsOpciones {
+  /**
+   * Máximo de leads a devolver, los más recientes primero. Por defecto `LEADS_LIMITE_POR_DEFECTO`.
+   * La implementación Supabase pagina de a 1.000 (el tope de filas por respuesta de la API), así que
+   * el límite puede pasar de 1.000 sin que el listado se corte en silencio.
+   */
+  limite?: number;
+}
+
+/** Tope por defecto de `leads.list()`. Si se alcanza, el repositorio lo avisa en el log. */
+export const LEADS_LIMITE_POR_DEFECTO = 5000;
+
 export interface LeadRepository {
   create(input: LeadInput): Promise<Lead>;
-  list(): Promise<Lead[]>;
+  list(opciones?: ListarLeadsOpciones): Promise<Lead[]>;
   /** Cuántos leads llegaron desde ese instante (tope de avisos por correo). */
   countSince(iso: string): Promise<number>;
   updateStatus(id: string, estado: LeadStatus): Promise<Lead | null>;

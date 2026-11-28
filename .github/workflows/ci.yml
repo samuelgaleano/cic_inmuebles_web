@@ -1,0 +1,72 @@
+# Integracion continua: lint, tipos, pruebas y build en cada push y pull request a main.
+#
+# No usa secretos: el build y las pruebas corren sin variables de entorno (repositorio en
+# memoria con datos de ejemplo; Supabase, Wompi, Resend y Google quedan desactivados).
+# Para que Vercel solo publique lo que paso por aqui, marcar el job "verificar" como
+# check requerido en la proteccion de la rama main (Settings > Branches).
+#
+# Las acciones van fijadas al commit de su version (el comentario dice cual); Dependabot
+# (.github/dependabot.yml) propone las actualizaciones.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Un push nuevo a la misma rama o PR cancela la corrida anterior que siga en curso.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  verificar:
+    name: verificar
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Traer el codigo
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Instalar pnpm
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          # La misma version con la que se genera pnpm-lock.yaml en local (npx pnpm).
+          version: 12.23.0
+
+      - name: Instalar Node 24 con cache del almacen de pnpm
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Instalar dependencias (exactas del lockfile)
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Tipos
+        run: pnpm typecheck
+
+      - name: Pruebas
+        run: pnpm test
+        env:
+          # Las pruebas de fechas y vigencias asumen UTC.
+          TZ: UTC
+
+      - name: Build
+        run: pnpm build
+
+      - name: Auditoria de dependencias de produccion
+        # Solo falla con avisos criticos; los demas los propone Dependabot.
+        run: pnpm audit --prod --audit-level=critical

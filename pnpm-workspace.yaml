@@ -3,3 +3,13 @@ allowBuilds:
   # de instalacion. Se mantienen desactivados (igual que en produccion).
   sharp: false
   unrs-resolver: false
+
+# Versiones corregidas de dependencias transitivas de Next (avisos de `pnpm audit --prod`,
+# todas de tiempo de compilacion). Estan aqui (pnpm 10+, que es lo que lee pnpm 11/12) y
+# repetidas en package.json > pnpm.overrides (lo que lee pnpm 9). Deben ser IGUALES en los
+# dos sitios: si no, `pnpm install --frozen-lockfile` falla por configuracion distinta.
+# Se pueden quitar cuando Next traiga estas versiones por su cuenta.
+overrides:
+  browserslist@<4.28.7: ^4.28.7
+  source-map-js@<1.2.2: ^1.2.2
+  baseline-browser-mapping@<2.11.0: ^2.11.0

@@ -22,13 +22,15 @@ import {
 import { slugify } from "@/lib/utils/slug";
 import { seedProperties } from "./seed";
 import { matchesFilters, sortByRelevance } from "./filtering";
-import type {
-  AgentRepository,
-  AppointmentRepository,
-  LeadRepository,
-  PropertyRepository,
-  Repository,
-  TemplateRepository,
+import {
+  LEADS_LIMITE_POR_DEFECTO,
+  type AgentRepository,
+  type AppointmentRepository,
+  type LeadRepository,
+  type ListarLeadsOpciones,
+  type PropertyRepository,
+  type Repository,
+  type TemplateRepository,
 } from "./repository";
 
 /**
@@ -146,8 +148,8 @@ class MemoryLeadRepository implements LeadRepository {
     return lead;
   }
 
-  async list(): Promise<Lead[]> {
-    return [...this.leads];
+  async list(opciones?: ListarLeadsOpciones): Promise<Lead[]> {
+    return this.leads.slice(0, opciones?.limite ?? LEADS_LIMITE_POR_DEFECTO);
   }
 
   async countSince(iso: string): Promise<number> {
