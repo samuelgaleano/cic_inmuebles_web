@@ -10,6 +10,44 @@ import { isDriveConfigured } from "@/lib/integrations/drive";
 import { isSheetsConfigured, sheetUrl } from "@/lib/integrations/sheets";
 import { isWompiConfigured, wompiEnvironment } from "@/lib/integrations/wompi";
 import { getServiciosStore } from "@/lib/servicios/store";
+import { getSupabaseAdmin } from "@/lib/data/supabase/client";
+import { estadoDeLatido, LATIDOS, leerLatidos, type EstadoLatido, type Latido } from "@/lib/salud/latidos";
+import { formatoBogota } from "@/lib/utils/hora-bogota";
+
+const NOMBRE_PROCESO: Record<string, string> = {
+  "cron-sync": "Drive, catálogo y hoja (1:00 a. m.)",
+  "cron-diario": "Conciliación de pagos (1:30 a. m.)",
+  "cron-vigencias": "Vencimientos de planes (1:45 a. m.)",
+  "cron-crm": "Resumen diario del CRM (7:00 a. m.)",
+};
+const TEXTO_LATIDO: Record<EstadoLatido | "sin-tabla", string> = {
+  ok: "Al día",
+  atrasado: "No corre hace más de 27 h",
+  "con-fallos": "Última corrida con fallos",
+  "sin-dato": "Aún sin corridas",
+  "sin-tabla": "Falta la migración 0009",
+};
+const ESTILO_LATIDO: Record<EstadoLatido | "sin-tabla", string> = {
+  ok: "bg-brand-50 text-brand-700",
+  atrasado: "bg-rose-50 text-rose-700",
+  "con-fallos": "bg-rose-50 text-rose-700",
+  "sin-dato": "bg-ink/[0.07] text-muted",
+  "sin-tabla": "bg-accent-500/15 text-accent-600",
+};
+
+/** Lo mismo que vigila el monitor externo (/api/salud), visto desde el panel, más las migraciones aplicadas. */
+async function salud(): Promise<{ latidos: Latido[] | null; migraciones: { nombre: string; aplicada_at: string }[] | null } | null> {
+  if (!isSupabaseConfigured()) return null;
+  const [latidos, migraciones] = await Promise.all([
+    leerLatidos().catch(() => null),
+    getSupabaseAdmin()
+      .from("migraciones_aplicadas")
+      .select("nombre, aplicada_at")
+      .order("nombre")
+      .then(({ data, error }) => (error ? null : ((data ?? []) as { nombre: string; aplicada_at: string }[]))),
+  ]);
+  return { latidos, migraciones };
+}
 
 export const dynamic = "force-dynamic";
 
@@ -131,7 +169,8 @@ async function conexiones(): Promise<Conexion[]> {
 }
 
 export default async function AdminConexionesPage() {
-  const lista = await conexiones();
+  const [lista, estadoSalud] = await Promise.all([conexiones(), salud()]);
+  const ahora = new Date();
   const icono = (e: Estado) => (e === "ok" ? <CheckCircle2 className="h-5 w-5 text-brand-600" /> : e === "opcional" ? <CircleDashed className="h-5 w-5 text-muted" /> : <TriangleAlert className="h-5 w-5 text-accent-600" />);
 
   return (
@@ -159,6 +198,38 @@ export default async function AdminConexionesPage() {
           </li>
         ))}
       </ul>
+
+      {estadoSalud && (
+        <section aria-labelledby="salud-titulo" className="rounded-2xl border border-line bg-white p-5">
+          <h2 id="salud-titulo" className="font-semibold text-ink">Salud de los procesos</h2>
+          <p className="mt-1 text-sm text-muted">
+            Cada proceso deja aquí su última corrida. Un monitor externo revisa lo mismo cada pocas horas y avisa por correo si algo se detiene.
+          </p>
+          <ul className="mt-4 divide-y divide-line">
+            {LATIDOS.map((n) => {
+              const l = estadoSalud.latidos?.find((x) => x.nombre === n);
+              const estado = estadoSalud.latidos === null ? "sin-tabla" : estadoDeLatido(l, ahora);
+              return (
+                <li key={n} className="flex flex-col gap-1 py-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-ink">{NOMBRE_PROCESO[n] ?? n}</p>
+                    <p className="text-xs text-muted">
+                      {l?.okAt ? `Última corrida buena: ${formatoBogota(l.okAt)}` : "Sin corrida buena registrada"}
+                      {l?.falloAt ? ` · Último fallo: ${formatoBogota(l.falloAt)}` : ""}
+                    </p>
+                  </div>
+                  <span className={`w-fit shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${ESTILO_LATIDO[estado]}`}>{TEXTO_LATIDO[estado]}</span>
+                </li>
+              );
+            })}
+          </ul>
+          <p className="mt-3 text-xs text-muted">
+            {estadoSalud.migraciones
+              ? `Base de datos: ${estadoSalud.migraciones.length} migraciones registradas (última: ${estadoSalud.migraciones.at(-1)?.nombre ?? "ninguna"}).`
+              : "Base de datos: falta el registro de migraciones (migración 0014)."}
+          </p>
+        </section>
+      )}
     </div>
   );
 }

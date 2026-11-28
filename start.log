@@ -1,0 +1,6 @@
+▲ Next.js 16.4.5
+- Local:         http://localhost:3123
+- Network:       http://172.22.80.1:3123
+✓ Ready in 284ms
+✓ Running next.config.ts took 53ms
+[correo] no enviado: falta RESEND_API_KEY
