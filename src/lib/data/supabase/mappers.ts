@@ -13,6 +13,7 @@ import type {
   TemplateInput,
 } from "@/lib/domain";
 import { normalizarInmueble } from "@/lib/domain/normalizar";
+import { limpiarOrigen } from "@/lib/leads/origen";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -70,6 +71,10 @@ export function propertyRowToDomain(row: any): Property {
       : undefined,
     notasInternas: row.notas_internas ?? undefined,
     driveFolderId: row.drive_folder_id ?? undefined,
+    // Columnas de 0012: sin la migración no vienen y el inmueble queda sin anunciante.
+    anunciante: row.anunciante_whatsapp
+      ? { nombre: row.anunciante_nombre ?? undefined, whatsapp: row.anunciante_whatsapp }
+      : undefined,
     destacado: Boolean(row.destacado),
     publicado: Boolean(row.publicado),
     creadoEn: row.created_at,
@@ -101,9 +106,43 @@ export function propertyInputToRow(entrada: PropertyInput): Record<string, unkno
     propietario_email: input.propietario?.email ?? null,
     notas_internas: input.notasInternas ?? null,
     drive_folder_id: input.driveFolderId ?? null,
+    anunciante_nombre: input.anunciante?.whatsapp ? (input.anunciante.nombre ?? null) : null,
+    anunciante_whatsapp: input.anunciante?.whatsapp ?? null,
     destacado: input.destacado,
     publicado: input.publicado,
   };
+}
+
+/**
+ * Columnas que llegan con la migración 0012. Si la base aún no la tiene, PostgREST rechaza la escritura
+ * (PGRST204, "Could not find the 'x' column") o Postgres responde 42703: el repositorio reintenta sin ellas
+ * para que un despliegue antes de la migración no frene leads, cobros ni el panel.
+ */
+export const COLUMNAS_0012_PROPERTIES = ["anunciante_nombre", "anunciante_whatsapp"] as const;
+export const COLUMNAS_0012_LEADS = [
+  "utm_source",
+  "utm_medium",
+  "utm_campaign",
+  "referente",
+  "pagina_entrada",
+  "consentimiento_at",
+  "consentimiento_version",
+] as const;
+
+/** true si el error es «esa columna no existe» para alguna de `columnas`. */
+export function faltaColumna(error: unknown, columnas: readonly string[]): boolean {
+  const e = error as { code?: string; message?: string } | null;
+  if (!e) return false;
+  if (e.code !== "PGRST204" && e.code !== "42703") return false;
+  const msg = e.message ?? "";
+  return columnas.some((c) => msg.includes(c));
+}
+
+/** La misma fila sin las columnas indicadas. */
+export function sinColumnas(fila: Record<string, unknown>, columnas: readonly string[]): Record<string, unknown> {
+  const copia = { ...fila };
+  for (const c of columnas) delete copia[c];
+  return copia;
 }
 
 /** Medios del input -> filas de `property_media` para un inmueble dado. */
@@ -139,6 +178,16 @@ export function leadRowToDomain(row: any): Lead {
     tipoInmueble: row.tipo_inmueble ?? undefined,
     ciudad: row.ciudad ?? undefined,
     fuente: row.fuente ?? "web",
+    origen: limpiarOrigen({
+      utmSource: row.utm_source,
+      utmMedium: row.utm_medium,
+      utmCampaign: row.utm_campaign,
+      referente: row.referente,
+      paginaEntrada: row.pagina_entrada,
+    }),
+    consentimientoAt: row.consentimiento_at ?? undefined,
+    consentimientoVersion: row.consentimiento_version ?? undefined,
+    primerContactoAt: row.primer_contacto_at ?? undefined,
     estado: row.estado ?? "nuevo",
     creadoEn: row.created_at,
   };
@@ -159,6 +208,14 @@ export function leadInputToRow(input: LeadInput): Record<string, unknown> {
     tipo_inmueble: input.tipoInmueble ?? null,
     ciudad: input.ciudad ?? null,
     fuente: input.fuente,
+    // Columnas de 0012 (ver COLUMNAS_0012_LEADS). primer_contacto_at no la escribe el formulario.
+    utm_source: input.origen?.utmSource ?? null,
+    utm_medium: input.origen?.utmMedium ?? null,
+    utm_campaign: input.origen?.utmCampaign ?? null,
+    referente: input.origen?.referente ?? null,
+    pagina_entrada: input.origen?.paginaEntrada ?? null,
+    consentimiento_at: input.consentimientoAt ?? null,
+    consentimiento_version: input.consentimientoVersion ?? null,
   };
 }
 

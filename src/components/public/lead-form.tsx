@@ -8,10 +8,15 @@ import { buttonVariants } from "@/components/ui/button";
 import type { LeadIntent, LeadType } from "@/lib/domain";
 import { cn } from "@/lib/utils/cn";
 import { whatsappLink } from "@/lib/config/site";
+import { ENLACE_POLITICA, TEXTO_AUTORIZACION } from "@/lib/config/legal";
+import { CamposOrigen } from "./origen-visita";
 
 const initialState: LeadFormState = { status: "idle" };
 
-const CAMPOS_VISIBLES = ["nombre", "telefono", "email", "ciudad", "tipoInmueble", "preferencia", "mensaje"] as const;
+const CAMPOS_VISIBLES = ["nombre", "telefono", "email", "ciudad", "tipoInmueble", "preferencia", "mensaje", "consentimiento"] as const;
+
+/** Tipos de inmueble del formulario de vendedores: un toque en vez de escribir. */
+const TIPOS_VENDEDOR = ["Apartamento", "Casa", "Lote", "Local", "Otro"] as const;
 
 /**
  * Si la pestaña quedó abierta durante un despliegue, Next ya no encuentra la acción
@@ -102,7 +107,9 @@ export function LeadForm({
       ? "Te escribimos al número que dejaste para conocer tu inmueble y agendar la visita de fotos."
       : intencion === "visita"
         ? "Te escribimos para confirmar el horario de la visita."
-        : "Te escribimos con la información que pediste.";
+        : intencion === "alerta"
+          ? "Guardamos lo que buscas y te escribimos cuando llegue un inmueble así."
+          : "Te escribimos con la información que pediste.";
     return (
       <div
         ref={successRef}
@@ -140,6 +147,8 @@ export function LeadForm({
       {propertyId && <input type="hidden" name="propertyId" value={propertyId} />}
       {propertySlug && <input type="hidden" name="propertySlug" value={propertySlug} />}
       {preferencia && <input type="hidden" name="preferencia" value={preferencia} />}
+      {/* De dónde llegó la visita (campaña, referente, página de entrada): lo mide el propio sitio. */}
+      <CamposOrigen />
       {/* Honeypot anti-spam (oculto) */}
       <input type="text" name="website" tabIndex={-1} autoComplete="off" className="hidden" aria-hidden="true" />
 
@@ -204,7 +213,30 @@ export function LeadForm({
       </div>
 
       {isSeller && (
-        <div className="grid gap-4 sm:grid-cols-2">
+        <>
+          {/* Radios nativos con aspecto de chip: se eligen con un toque o con las flechas, sin JavaScript. */}
+          <fieldset className="min-w-0">
+            <legend className={etiqueta}>
+              Tipo de inmueble <span className="font-normal text-muted">(opcional)</span>
+            </legend>
+            <div className="flex flex-wrap gap-2">
+              {TIPOS_VENDEDOR.map((t) => (
+                <label
+                  key={t}
+                  className="relative inline-flex h-11 cursor-pointer items-center rounded-full border border-line-strong bg-white px-4 text-[15px] font-medium text-ink transition-colors duration-200 hover:border-ink has-[:checked]:border-ink has-[:checked]:bg-ink has-[:checked]:text-white has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-brand-700/25"
+                >
+                  <input
+                    type="radio"
+                    name="tipoInmueble"
+                    value={t}
+                    defaultChecked={val("tipoInmueble") === t}
+                    className="sr-only"
+                  />
+                  {t}
+                </label>
+              ))}
+            </div>
+          </fieldset>
           <div>
             <label htmlFor={`${formId}-ciudad`} className={etiqueta}>Ciudad del inmueble</label>
             <input
@@ -216,18 +248,7 @@ export function LeadForm({
               defaultValue={val("ciudad")}
             />
           </div>
-          <div>
-            <label htmlFor={`${formId}-tipoInmueble`} className={etiqueta}>Tipo de inmueble</label>
-            <input
-              id={`${formId}-tipoInmueble`}
-              name="tipoInmueble"
-              placeholder="Apartamento, casa, lote…"
-              className={cn(campo, "h-12")}
-              maxLength={120}
-              defaultValue={val("tipoInmueble")}
-            />
-          </div>
-        </div>
+        </>
       )}
 
       {!isSeller && intencion === "visita" && !preferencia && !sinPreferenciaLibre && (
@@ -261,6 +282,34 @@ export function LeadForm({
         />
       </div>
 
+      {/* Autorización expresa (Ley 1581): sin marcar por defecto y obligatoria; el servidor la vuelve a validar
+          y guarda la fecha y la versión de la política. */}
+      <div>
+        <label htmlFor={`${formId}-consentimiento`} className="flex cursor-pointer items-start gap-3 text-[14px] leading-snug text-ink-soft">
+          <input
+            id={`${formId}-consentimiento`}
+            type="checkbox"
+            name="consentimiento"
+            value="si"
+            required
+            defaultChecked={val("consentimiento") === "si"}
+            aria-invalid={Boolean(err("consentimiento"))}
+            aria-describedby={err("consentimiento") ? `${formId}-consentimiento-err` : undefined}
+            className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer rounded border-field accent-brand-700 aria-[invalid=true]:outline aria-[invalid=true]:outline-2 aria-[invalid=true]:outline-rose-600"
+          />
+          <span>
+            {TEXTO_AUTORIZACION}{" "}
+            <Link href="/privacidad" target="_blank" className="font-medium text-ink underline underline-offset-2 hover:text-brand-700">
+              {ENLACE_POLITICA}
+            </Link>
+            .
+          </span>
+        </label>
+        {err("consentimiento") && (
+          <p id={`${formId}-consentimiento-err`} className="mt-1.5 pl-8 text-[13px] font-medium text-rose-700">{err("consentimiento")}</p>
+        )}
+      </div>
+
       <p id={`${formId}-status`} aria-live="polite" className="min-h-0">
         {state.status === "error" && state.message && (
           <span className="text-[14px] font-medium text-rose-700">{state.message}</span>
@@ -288,11 +337,7 @@ export function LeadForm({
         {isPending ? "Enviando…" : (submitLabel ?? (isSeller ? "Quiero vender mi inmueble" : "Enviar solicitud"))}
       </button>
       <p className="text-center text-[13px] leading-snug text-muted">
-        Guardamos tu solicitud y te dejamos WhatsApp con el mensaje listo, por si quieres adelantarlo. Al enviar aceptas la{" "}
-        <Link href="/privacidad" className="font-medium text-ink-soft underline underline-offset-2 hover:text-brand-700">
-          política de tratamiento de datos
-        </Link>
-        .
+        Guardamos tu solicitud y te dejamos WhatsApp con el mensaje listo, por si quieres adelantarlo.
       </p>
     </form>
   );

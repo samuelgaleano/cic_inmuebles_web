@@ -39,6 +39,7 @@ export function TarjetaInmueble({
   proporcion = "5/4",
   parallax = false,
   comparar = true,
+  sizes,
   className,
 }: {
   datos: DatosTarjeta;
@@ -50,6 +51,8 @@ export function TarjetaInmueble({
   parallax?: boolean;
   /** Muestra el botón "Comparar" (la tira de la home lo omite para quedar limpia). */
   comparar?: boolean;
+  /** Ancho real de la foto cuando la tarjeta va en otra rejilla (p. ej. la prueba de /vender). */
+  sizes?: string;
   className?: string;
 }) {
   const vendido = datos.estado === "vendido";
@@ -75,7 +78,14 @@ export function TarjetaInmueble({
             fill
             loading={prioridad ? "eager" : undefined}
             fetchPriority={prioridad ? "high" : undefined}
-            sizes={proporcion === "4/5" ? "(max-width: 640px) 72vw, 344px" : "(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 380px"}
+            // Anchos de la rejilla: 1 columna hasta 640 px, 2 hasta 1024 px y 3 en la caja de 75rem (≈365 px).
+            // La tira de la home: 72vw hasta 21,5rem (344 px).
+            sizes={
+              sizes ??
+              (proporcion === "4/5"
+                ? "(max-width: 639px) 72vw, 344px"
+                : "(max-width: 639px) calc(100vw - 2.5rem), (max-width: 1023px) calc(50vw - 2.75rem), 370px")
+            }
             className={cn(
               "object-cover",
               parallax ? "parallax-x" : "transition-transform duration-[900ms] ease-[var(--ease-fluid)] group-hover:scale-[1.035]",

@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ChevronDown } from "lucide-react";
+import { ArrowRight, ChevronDown } from "lucide-react";
 import { LeadForm } from "@/components/public/lead-form";
+import { TarjetaInmueble } from "@/components/public/tarjeta-inmueble";
+import { getPublicInventoryOrThrow } from "@/lib/data/public-inventory";
+import { construirIndice } from "@/lib/search/indice";
+import { fichasDeMuestra } from "@/lib/utils/elegir-fotos";
 import { WhatsAppButton } from "@/components/public/whatsapp-button";
 import { JsonLd } from "@/components/seo/json-ld";
 import { siteConfig } from "@/lib/config/site";
@@ -67,7 +71,18 @@ const beneficios = [
   { t: "Acompañamiento legal", d: "Te guiamos en la promesa de compraventa y el cierre." },
 ];
 
-export default function VenderPage() {
+// Igual que la portada: 6 h en la caché, y los cambios del panel la renuevan por la etiqueta `inventario`.
+export const revalidate = 21600;
+
+export default async function VenderPage() {
+  // La prueba son fichas reales del portafolio de hoy (misma lectura cacheada que la portada). Si la base de
+  // datos falla al regenerar, se lanza el error y Next conserva la versión anterior de la página.
+  const todos = await getPublicInventoryOrThrow();
+  const muestra = fichasDeMuestra(
+    construirIndice(todos).map(({ texto: _texto, ...resto }) => resto),
+    3,
+  );
+
   return (
     <>
       <JsonLd data={faqJsonLd} />
@@ -122,6 +137,34 @@ export default function VenderPage() {
               <strong className="font-semibold text-ink">3% cuando se cierra la venta</strong>.
             </p>
           </section>
+
+          {/* Prueba real: así se ve un inmueble cuando CIC lo publica. Solo fichas del portafolio actual. */}
+          {muestra.length > 0 && (
+            <section aria-labelledby="asi-publicamos">
+              <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
+                <h2 id="asi-publicamos" className="t-headline">Así publicamos</h2>
+                <Link href="/inmuebles" className="link-arrow py-2 text-[15px]">
+                  Ver el portafolio <ArrowRight className="h-4 w-4" aria-hidden />
+                </Link>
+              </div>
+              <p className="mt-3 max-w-xl text-muted">
+                {muestra.length === 1 ? "Una ficha real" : "Fichas reales"} del portafolio de hoy: fotos, precio y datos
+                verificados, como quedaría la tuya.
+              </p>
+              <ul className="mt-8 grid grid-cols-2 gap-x-4 gap-y-10 sm:grid-cols-3">
+                {muestra.map((p, i) => (
+                  <li key={p.slug} className={i === 2 ? "max-sm:hidden" : undefined}>
+                    <TarjetaInmueble
+                      datos={p}
+                      proporcion="4/5"
+                      comparar={false}
+                      sizes="(max-width: 639px) calc(50vw - 1.75rem), (max-width: 1023px) calc(33vw - 2rem), 200px"
+                    />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           <section aria-labelledby="por-que">
             <h2 id="por-que" className="t-headline">Por qué vender con CIC</h2>

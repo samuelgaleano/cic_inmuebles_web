@@ -27,6 +27,10 @@ import {
   appointmentInputToRow,
   appointmentRowToDomain,
   availabilityRowToDomain,
+  COLUMNAS_0012_LEADS,
+  COLUMNAS_0012_PROPERTIES,
+  faltaColumna,
+  sinColumnas,
   leadInputToRow,
   leadRowToDomain,
   mediaInputToRows,
@@ -44,6 +48,23 @@ import type {
   Repository,
   TemplateRepository,
 } from "./repository";
+
+type Resultado<T> = { data: T | null; error: unknown };
+
+/**
+ * Escribe una fila con las columnas de la migración 0012 y, si la base todavía no las tiene, repite la
+ * escritura sin ellas: desplegar el código antes de aplicar la migración no debe frenar un lead ni el panel.
+ */
+async function escribirConRespaldo<T>(
+  fila: Record<string, unknown>,
+  columnas: readonly string[],
+  escribir: (f: Record<string, unknown>) => PromiseLike<Resultado<T>>,
+): Promise<Resultado<T>> {
+  const r = await escribir(fila);
+  if (!r.error || !faltaColumna(r.error, columnas)) return r;
+  console.warn("[datos] la migración 0012 no está aplicada: se guarda sin sus columnas nuevas");
+  return escribir(sinColumnas(fila, columnas));
+}
 
 const PROPERTY_SELECT = "*, property_media(*)";
 
@@ -144,12 +165,12 @@ class SupabasePropertyRepository implements PropertyRepository {
     const base = slugify(input.slug || input.titulo) || "inmueble";
     const [slug, codigo] = await Promise.all([this.uniqueSlug(base), this.nextCodigo()]);
 
-    const { data, error } = await db
-      .from("properties")
-      .insert({ ...propertyInputToRow(input), codigo: input.codigo ?? codigo, slug })
-      .select("id")
-      .single();
-    if (error) throw error;
+    const { data, error } = await escribirConRespaldo<{ id: string }>(
+      { ...propertyInputToRow(input), codigo: input.codigo ?? codigo, slug },
+      COLUMNAS_0012_PROPERTIES,
+      (fila) => db.from("properties").insert(fila).select("id").single(),
+    );
+    if (error || !data) throw error ?? new Error("No se pudo crear el inmueble.");
 
     const id = data.id as string;
     await this.replaceMedia(id, input.medios);
@@ -174,10 +195,11 @@ class SupabasePropertyRepository implements PropertyRepository {
     const base = slugify(patch.slug || patch.titulo || current.slug) || current.slug;
     const slug = await this.uniqueSlug(base, id);
 
-    const { error } = await db
-      .from("properties")
-      .update({ ...propertyInputToRow(merged), slug })
-      .eq("id", id);
+    const { error } = await escribirConRespaldo<null>(
+      { ...propertyInputToRow(merged), slug },
+      COLUMNAS_0012_PROPERTIES,
+      (fila) => db.from("properties").update(fila).eq("id", id),
+    );
     if (error) throw error;
 
     if (patch.medios) await this.replaceMedia(id, patch.medios);
@@ -194,12 +216,11 @@ class SupabasePropertyRepository implements PropertyRepository {
 
 class SupabaseLeadRepository implements LeadRepository {
   async create(input: LeadInput): Promise<Lead> {
-    const { data, error } = await getSupabaseAdmin()
-      .from("leads")
-      .insert(leadInputToRow(input))
-      .select("*")
-      .single();
-    if (error) throw error;
+    const db = getSupabaseAdmin();
+    const { data, error } = await escribirConRespaldo<Record<string, unknown>>(leadInputToRow(input), COLUMNAS_0012_LEADS, (fila) =>
+      db.from("leads").insert(fila).select("*").single(),
+    );
+    if (error || !data) throw error ?? new Error("No se pudo crear el lead.");
     return leadRowToDomain(data);
   }
 

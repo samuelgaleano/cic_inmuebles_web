@@ -5,8 +5,12 @@ import type { PublicProperty } from "@/lib/domain";
 import { construirIndice } from "@/lib/search/indice";
 import { TarjetaInmueble } from "./tarjeta-inmueble";
 
-/** Rejilla de tarjetas para páginas de servidor (sectores, similares). El catálogo usa <Catalogo>. */
-export function RejillaInmuebles({ inmuebles }: { inmuebles: PublicProperty[] }) {
+/**
+ * Rejilla de tarjetas para páginas de servidor (sectores, similares). El catálogo usa <Catalogo>.
+ * `conPrioridad`: cuántas tarjetas cargan su foto de inmediato. 3 cuando la rejilla abre la página (sector);
+ * 0 cuando va al final (parecidos de la ficha), para no competir con la foto principal.
+ */
+export function RejillaInmuebles({ inmuebles, conPrioridad = 3 }: { inmuebles: PublicProperty[]; conPrioridad?: number }) {
   const items = construirIndice(inmuebles);
 
   if (items.length === 0) {
@@ -32,7 +36,7 @@ export function RejillaInmuebles({ inmuebles }: { inmuebles: PublicProperty[] })
     <ul className="grid gap-x-6 gap-y-14 sm:grid-cols-2 lg:grid-cols-3">
       {items.map((item, i) => (
         <li key={item.slug}>
-          <TarjetaInmueble datos={item} prioridad={i < 3} />
+          <TarjetaInmueble datos={item} prioridad={i < conPrioridad} />
         </li>
       ))}
     </ul>

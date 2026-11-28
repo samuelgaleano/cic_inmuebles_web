@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
+import { AccionesFichaMovil } from "@/components/public/acciones-ficha-movil";
 import { AgendarVisita } from "@/components/public/agendar-visita";
 import { BarraMovil } from "@/components/public/barra-movil";
 import { BotonCompartir } from "@/components/public/boton-compartir";
@@ -28,7 +29,7 @@ import { propertyUrl, siteConfig } from "@/lib/config/site";
 import { getPublicInventoryOrThrow, getPublicPropertyBySlug } from "@/lib/data/public-inventory";
 import { agruparPorSector, encontrarSector, sectorPath } from "@/lib/seo/sectores";
 import { encabezadoFicha, recortarEnPalabra } from "@/lib/seo/textos-seo";
-import { ogImageUrl } from "@/lib/utils/image-loader";
+import { ogImagen } from "@/lib/utils/image-loader";
 
 // La ficha dura 6 h en la caché: los cambios del panel la invalidan al instante (revalidatePublic + etiqueta
 // `inventario`), así que el tiempo es solo la red de seguridad. Regenerarla cada hora costaba una función por ficha.
@@ -128,10 +129,8 @@ export async function generateMetadata({
       // Si el inmueble no tiene fotos, usamos la imagen de marca del sitio
       // (este openGraph reemplaza por completo al del layout raíz). La foto sale ya
       // recortada a 1200×630: antes WhatsApp recibía el original vertical.
-      images:
-        images.length > 0
-          ? [{ url: ogImageUrl(images[0]), width: 1200, height: 630, alt: property.titulo }]
-          : [siteConfig.ogImage],
+      // Las medidas solo se declaran cuando la foto de verdad sale recortada a 1200×630 (Cloudinary).
+      images: images.length > 0 ? [{ ...ogImagen(images[0]), alt: `${meta.title} — foto principal` }] : [siteConfig.ogImage],
     },
   };
 }
@@ -143,6 +142,12 @@ function youtubeId(media: PropertyMedia): string | null {
   if (!url.includes("/") && !url.includes("=")) return url; // ya es un ID
   const match = url.match(/(?:youtu\.be\/|v=|embed\/)([\w-]{11})/);
   return match?.[1] ?? null;
+}
+
+/** "Bogotá", "BOGOTA", "Bogotá D.C." → true. Solo para la región del JSON-LD. */
+function esBogota(ciudad: string): boolean {
+  const c = ciudad.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().replace(/[\s.,]/g, "");
+  return c === "bogota" || c === "bogotadc";
 }
 
 /** Hasta 3 inmuebles parecidos: primero los del mismo sector, luego los de precio más cercano. */
@@ -220,6 +225,9 @@ export default async function PropertyDetailPage({
   const ubicacionTexto = encabezado.lugar;
   const fichaUrl = propertyUrl(property.slug);
   const parecidos = similares(property, todos);
+  // Base del texto alternativo de cada foto: «Apartamento en Bella Suiza, Bogotá» (+ «foto 3 de 12» en la galería).
+  const lugarFotos = [ubicacion.sector, ubicacion.ciudad].filter(Boolean).join(", ");
+  const descripcionFotos = `${PROPERTY_TYPE_LABELS[property.tipo]}${lugarFotos ? ` en ${lugarFotos}` : ""}`;
 
   // Datos estructurados (schema.org): la ficha como aviso inmobiliario (RealEstateListing) con su oferta
   // (Offer + itemOffered, no Product: Google no admite Product para finca raíz) + migas de pan con el sector.
@@ -252,6 +260,9 @@ export default async function PropertyDetailPage({
         address: {
           "@type": "PostalAddress",
           addressLocality: ubicacion.ciudad,
+          // La región solo se afirma cuando es segura: Bogotá es su propio distrito capital. Para otros municipios
+          // no se adivina el departamento.
+          ...(esBogota(ubicacion.ciudad) && { addressRegion: "Bogotá D.C." }),
           addressCountry: "CO",
         },
       }),
@@ -284,6 +295,23 @@ export default async function PropertyDetailPage({
         { "@type": "ListItem", position: sector ? 4 : 3, name: property.titulo, item: fichaUrl },
       ],
     },
+    // El recorrido en video, para que pueda salir en los resultados de video. uploadDate es la fecha de
+    // creación de la ficha (no se sabe cuándo se subió a YouTube); sin esa fecha no se publica el nodo.
+    ...(videoId && property.creadoEn
+      ? [
+          {
+            "@context": "https://schema.org",
+            "@type": "VideoObject",
+            "@id": `${fichaUrl}#video`,
+            name: `Recorrido en video: ${property.titulo}`,
+            description: meta.description,
+            thumbnailUrl: [`https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`],
+            uploadDate: property.creadoEn,
+            embedUrl: `https://www.youtube-nocookie.com/embed/${videoId}`,
+            inLanguage: "es-CO",
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -343,9 +371,21 @@ export default async function PropertyDetailPage({
 
       <Galeria
         titulo={property.titulo}
+        descripcion={descripcionFotos}
         slug={property.slug}
         fotos={images.map((m) => ({ id: m.id, url: m.url, alt: m.alt }))}
       />
+
+      {property.estado !== "vendido" && (
+        <AccionesFichaMovil
+          titulo={property.titulo}
+          codigo={property.codigo}
+          url={fichaUrl}
+          precio={formatPriceOrConsult(property.precio)}
+          estado={property.estado}
+          anunciante={property.anunciante}
+        />
+      )}
 
       <div className="wrap mt-16 grid grid-cols-[minmax(0,1fr)] gap-16 lg:grid-cols-[minmax(0,1fr)_25rem] lg:gap-20">
         <div className="min-w-0 space-y-20">
@@ -405,6 +445,7 @@ export default async function PropertyDetailPage({
             url={fichaUrl}
             precio={formatPriceOrConsult(property.precio)}
             vendido={property.estado === "vendido"}
+            anunciante={property.anunciante}
           />
         </div>
       </div>
@@ -414,13 +455,23 @@ export default async function PropertyDetailPage({
           <div className="wrap section-y">
             <h2 id="parecidos-titulo" className="t-headline max-w-2xl">Otros inmuebles que podrían interesarte</h2>
             <div className="mt-12">
-              <RejillaInmuebles inmuebles={parecidos} />
+              {/* Al final de la ficha: sus fotos no compiten con la principal (sin carga anticipada). */}
+              <RejillaInmuebles inmuebles={parecidos} conPrioridad={0} />
             </div>
           </div>
         </section>
       )}
 
-      {property.estado !== "vendido" && <BarraMovil titulo={property.titulo} precio={formatPriceOrConsult(property.precio)} codigo={property.codigo} url={fichaUrl} />}
+      {property.estado !== "vendido" && (
+        <BarraMovil
+          titulo={property.titulo}
+          precio={formatPriceOrConsult(property.precio)}
+          codigo={property.codigo}
+          url={fichaUrl}
+          anunciante={property.anunciante}
+          ocultarCon={["#acciones-movil"]}
+        />
+      )}
     </>
   );
 }

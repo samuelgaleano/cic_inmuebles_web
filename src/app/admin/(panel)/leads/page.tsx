@@ -6,6 +6,7 @@ import { BotonEnviar } from "@/components/admin/boton-enviar";
 import { LeadStatusForm } from "@/components/admin/lead-status-form";
 import { LEAD_INTENT_LABELS } from "@/lib/domain";
 import { enlaceWhatsApp } from "@/lib/utils/telefono";
+import { resumenOrigen } from "@/lib/leads/origen";
 
 export const dynamic = "force-dynamic";
 
@@ -65,6 +66,18 @@ export default async function AdminLeadsPage() {
                   {l.tipoInmueble && <p>{l.tipoInmueble}{l.ciudad ? ` · ${l.ciudad}` : ""}</p>}
                   {l.preferencia && <p className="text-muted">{l.preferencia}</p>}
                   {l.mensaje && <p className="mt-1 max-w-xs italic text-muted">“{l.mensaje}”</p>}
+                  {/* Solo lectura: lo anota el sitio en la primera página que vio la persona (sin terceros). */}
+                  {resumenOrigen(l.origen) && (
+                    <p className="mt-1.5 max-w-xs text-muted">
+                      <span className="font-medium text-ink-soft">Origen:</span> {resumenOrigen(l.origen)}
+                    </p>
+                  )}
+                  {l.consentimientoAt && (
+                    <p className="mt-0.5 text-muted">
+                      Autorizó datos el {formatDate(l.consentimientoAt)}
+                      {l.consentimientoVersion ? ` (política ${l.consentimientoVersion})` : ""}
+                    </p>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-xs text-muted">{formatDate(l.creadoEn)}</td>
                 <td className="px-4 py-3"><LeadStatusForm id={l.id} estado={l.estado} /></td>

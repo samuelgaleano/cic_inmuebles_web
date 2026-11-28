@@ -9,6 +9,8 @@ import {
 } from "@/lib/integrations/wompi";
 import { getPagosStore, isPagosStoreConfigured } from "@/lib/pagos/store";
 import { servicioDeToken } from "@/lib/servicios/token";
+import { ERROR_AUTORIZACION, POLITICA_VERSION } from "@/lib/config/legal";
+import { limpiarOrigen } from "@/lib/leads/origen";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -57,6 +59,9 @@ export async function POST(req: Request) {
   const plan = getPlan(planId);
   if (!plan) return mal("Plan no encontrado.", 404);
   if (plan.mode !== "pago") return mal("Este plan se cotiza por WhatsApp, no se paga en línea.", 400);
+  // Autorización expresa de tratamiento de datos (Ley 1581): la casilla del paso de pago. Sin ella no se prepara el cobro.
+  if (datos?.consentimiento !== true) return mal(ERROR_AUTORIZACION, 400);
+  const origen = limpiarOrigen(datos?.origen && typeof datos.origen === "object" ? (datos.origen as Record<string, unknown>) : undefined);
 
   // Renovación desde el correo: se liga el pago al servicio que renueva. Un token inválido o vencido
   // no impide pagar; solo hace que el pago se trate como una compra nueva.
@@ -75,7 +80,15 @@ export async function POST(req: Request) {
   // al sitio. Si no se puede registrar, no se entrega la firma: un pago imposible de rastrear es peor.
   if (isPagosStoreConfigured()) {
     try {
-      await getPagosStore().recordReference({ reference, planId: plan.id, amountInCents, renuevaServicioId });
+      await getPagosStore().recordReference({
+        reference,
+        planId: plan.id,
+        amountInCents,
+        renuevaServicioId,
+        consentimientoAt: new Date().toISOString(),
+        consentimientoVersion: POLITICA_VERSION,
+        origen,
+      });
     } catch (err) {
       console.error("[pago] no se pudo registrar la referencia:", err instanceof Error ? err.message : err);
       return mal("No pudimos preparar el pago en este momento. No se hizo ningún cobro; inténtalo de nuevo en unos minutos.", 503);

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { Lead, Property } from "@/lib/domain";
 import type { Servicio } from "@/lib/servicios/vigencia";
 import { MemoryCrmStore } from "./store";
-import { estadoCaptacionDe, sincronizarTodo, vincularInmueble, vincularLead, vincularServicio } from "./vinculos";
+import { especificacionDeAlerta, estadoCaptacionDe, sincronizarTodo, vincularInmueble, vincularLead, vincularServicio } from "./vinculos";
 
 function inmueble(extra: Partial<Property> = {}): Property {
   return {
@@ -128,6 +128,22 @@ describe("vínculos del CRM", () => {
       expect(crm.captaciones).toHaveLength(1);
       expect(crm.captaciones[0].ubicacion).toBe("Apartamento · Bogotá");
       expect(crm.busquedas).toHaveLength(1);
+    });
+
+    it("un lead «alerta» del catálogo entra como búsqueda con lo que buscaba", async () => {
+      await vincularLead(crm, lead({ id: "l-alerta", intencion: "alerta", mensaje: "Avísenme si llega: casa con patio en Chía" }));
+      expect(crm.busquedas).toHaveLength(1);
+      expect(crm.busquedas[0]).toMatchObject({ tipo: "comprador", estado: "activa", especificacion: "casa con patio en Chía" });
+      expect(crm.busquedas[0].notas).toMatch(/catálogo/);
+      expect(crm.actividades[0].detalle).toContain("avisen cuando llegue");
+    });
+
+    it("especificacionDeAlerta quita solo el arranque del formulario", () => {
+      expect(especificacionDeAlerta("Avísenme si llega: apto en Cedritos")).toBe("apto en Cedritos");
+      expect(especificacionDeAlerta("avisenme: 3 habitaciones")).toBe("3 habitaciones");
+      expect(especificacionDeAlerta("Busco casa")).toBe("Busco casa");
+      expect(especificacionDeAlerta("Avísenme si llega: ")).toBeUndefined();
+      expect(especificacionDeAlerta(undefined)).toBeUndefined();
     });
 
     it("un inmueble propuesto que ya no existe no rompe el lead", async () => {
