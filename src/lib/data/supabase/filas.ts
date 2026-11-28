@@ -85,6 +85,9 @@ export const COLUMNAS_INMUEBLE_PUBLICAS = [
   "updated_at",
 ] as const;
 
+/** Contacto del anunciante (0012): publico a proposito (boton de la ficha), pero sin permiso para la llave anonima. */
+export const COLUMNAS_INMUEBLE_ANUNCIANTE = ["anunciante_nombre", "anunciante_whatsapp"] as const;
+
 /** Columnas privadas: solo el panel las necesita. Nunca viajan en la lectura publica. */
 export const COLUMNAS_INMUEBLE_PRIVADAS = [
   "direccion",
@@ -116,6 +119,8 @@ export interface PropertyPublicRow {
   publicado: boolean | null;
   created_at: string;
   updated_at: string;
+  anunciante_nombre?: string | null;
+  anunciante_whatsapp?: string | null;
   property_media?: PropertyMediaRow[] | null;
 }
 
@@ -135,10 +140,10 @@ export type PropertyRowLectura = PropertyPublicRow & Partial<Omit<PropertyRow, k
 export type PropertyWrite = Omit<PropertyRow, "id" | "codigo" | "slug" | "created_at" | "updated_at" | "property_media">;
 
 /** Select del inmueble completo con sus medios (panel). */
-export const SELECT_INMUEBLE = `${columnas([...COLUMNAS_INMUEBLE_PUBLICAS, ...COLUMNAS_INMUEBLE_PRIVADAS])}, property_media(${columnas(COLUMNAS_MEDIA)})`;
+export const SELECT_INMUEBLE = `${columnas([...COLUMNAS_INMUEBLE_PUBLICAS, ...COLUMNAS_INMUEBLE_ANUNCIANTE, ...COLUMNAS_INMUEBLE_PRIVADAS])}, property_media(${columnas(COLUMNAS_MEDIA)})`;
 
 /** Select del inmueble publico con sus medios: sin propietario, direccion, notas ni carpeta de Drive. */
-export const SELECT_INMUEBLE_PUBLICO = `${columnas(COLUMNAS_INMUEBLE_PUBLICAS)}, property_media(${columnas(COLUMNAS_MEDIA)})`;
+export const SELECT_INMUEBLE_PUBLICO = `${columnas([...COLUMNAS_INMUEBLE_PUBLICAS, ...COLUMNAS_INMUEBLE_ANUNCIANTE])}, property_media(${columnas(COLUMNAS_MEDIA)})`;
 
 // --- leads (0001; contacto_id llega en 0008 y lo maneja el CRM) ---------------------------------
 
@@ -158,9 +163,18 @@ export interface LeadRow {
   fuente: LeadSource | null;
   estado: LeadStatus | null;
   created_at: string;
+  // 0012: origen de la visita, prueba de la autorizacion de datos y primera respuesta del equipo.
+  utm_source?: string | null;
+  utm_medium?: string | null;
+  utm_campaign?: string | null;
+  referente?: string | null;
+  pagina_entrada?: string | null;
+  consentimiento_at?: string | null;
+  consentimiento_version?: string | null;
+  primer_contacto_at?: string | null;
 }
 
-export type LeadWrite = Omit<LeadRow, "id" | "estado" | "created_at">;
+export type LeadWrite = Omit<LeadRow, "id" | "estado" | "created_at" | "primer_contacto_at">;
 
 export const SELECT_LEAD = columnas([
   "id",
@@ -178,6 +192,14 @@ export const SELECT_LEAD = columnas([
   "fuente",
   "estado",
   "created_at",
+  "utm_source",
+  "utm_medium",
+  "utm_campaign",
+  "referente",
+  "pagina_entrada",
+  "consentimiento_at",
+  "consentimiento_version",
+  "primer_contacto_at",
 ]);
 
 // --- agents y agent_availability (0001) ---------------------------------------------------------

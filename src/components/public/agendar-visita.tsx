@@ -6,6 +6,8 @@ import { buttonVariants } from "@/components/ui/button";
 import { siteConfig, whatsappLink } from "@/lib/config/site";
 import { componerPreferencia, FRANJAS, proximosDias, type DiaVisita, type FranjaId } from "@/lib/ficha/visitas";
 import { cn } from "@/lib/utils/cn";
+import { whatsappAnunciante } from "@/lib/ficha/contacto";
+import type { PropertyAdvertiser } from "@/lib/domain";
 import { LeadForm } from "./lead-form";
 
 type Modo = "visita" | "info";
@@ -23,6 +25,7 @@ export function AgendarVisita({
   url,
   precio,
   vendido = false,
+  anunciante,
 }: {
   propertyId: string;
   propertySlug: string;
@@ -32,6 +35,8 @@ export function AgendarVisita({
   precio: string;
   /** Ya se vendió: no hay visita que agendar, solo pedir información de opciones parecidas. */
   vendido?: boolean;
+  /** Plan de publicación independiente: muestra «Escribir al anunciante» además de CIC. */
+  anunciante?: PropertyAdvertiser;
 }) {
   const [modoElegido, setModo] = useState<Modo>("visita");
   const modo: Modo = vendido ? "info" : modoElegido;
@@ -49,6 +54,8 @@ export function AgendarVisita({
   const dias = useMemo(() => (horaActual ? proximosDias(new Date(Number(horaActual) * 3_600_000), 10) : []), [horaActual]);
 
   const preferencia = useMemo(() => componerPreferencia(dia, franja), [dia, franja]);
+
+  const alAnunciante = vendido ? undefined : whatsappAnunciante(anunciante, { titulo, codigo, url });
 
   const mensajeWhatsapp =
     `Hola ${siteConfig.name}, me interesa «${titulo}» (${codigo}).` +
@@ -168,14 +175,30 @@ export function AgendarVisita({
         <span className="h-px flex-1 bg-line" />
       </div>
 
+      {/* Plan de publicación independiente: el contacto directo con quien publica, prometido en el plan. */}
+      {alAnunciante && (
+        <>
+          <a
+            href={alAnunciante}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={buttonVariants({ variant: "whatsapp", size: "lg", className: "mt-5 w-full" })}
+          >
+            <MessageCircle className="h-5 w-5" aria-hidden />
+            Escribir al anunciante
+          </a>
+          {anunciante?.nombre && <p className="mt-2 text-center text-[13px] text-muted">Publica: {anunciante.nombre}</p>}
+        </>
+      )}
+
       <a
         href={whatsappLink(mensajeWhatsapp)}
         target="_blank"
         rel="noopener noreferrer"
-        className={buttonVariants({ variant: "outline", size: "lg", className: "mt-5 w-full" })}
+        className={buttonVariants({ variant: "outline", size: "lg", className: alAnunciante ? "mt-3 w-full" : "mt-5 w-full" })}
       >
         <MessageCircle className="h-5 w-5 text-[#1a9e4f]" aria-hidden />
-        Escribir por WhatsApp
+        {alAnunciante ? "Escribir a CIC por WhatsApp" : "Escribir por WhatsApp"}
       </a>
     </section>
   );

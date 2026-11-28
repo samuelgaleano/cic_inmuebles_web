@@ -185,6 +185,26 @@ export function PropertyForm({
         </div>
       </section>
 
+      {/* Anunciante: planes de publicación independiente (agentes e inmobiliarias). Público a propósito. */}
+      <section className="rounded-2xl border border-line bg-white p-6">
+        <h2 className="text-lg font-bold tracking-tight text-ink">Anunciante (público)</h2>
+        <p className="mb-4 mt-1 text-sm text-muted">
+          Solo para inmuebles de un plan de publicación independiente. Si escribes un WhatsApp, la ficha muestra
+          «Escribir al anunciante» con ese número, además del contacto de CIC. Déjalo vacío en los inmuebles de CIC.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field name="anuncianteNombre" label="Nombre visible (agente o inmobiliaria)" defaultValue={property?.anunciante?.nombre} />
+          <Field
+            name="anuncianteWhatsapp"
+            label="WhatsApp del anunciante"
+            type="tel"
+            defaultValue={property?.anunciante?.whatsapp}
+            placeholder="300 123 4567"
+            error={state.errors?.anuncianteWhatsapp}
+          />
+        </div>
+      </section>
+
       {/* Propietario + publicación */}
       <section className="rounded-2xl border border-line bg-white p-6">
         <h2 className="mb-4 text-lg font-bold tracking-tight text-ink">Propietario (privado) y publicación</h2>

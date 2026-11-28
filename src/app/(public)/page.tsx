@@ -17,6 +17,7 @@ import { agruparPorSector, sectorPath } from "@/lib/seo/sectores";
 import { tipoSingular, titularInventario } from "@/lib/seo/titular";
 import { formatPrice, formatPriceCompact } from "@/lib/utils/format";
 import { PLANS } from "@/lib/config/plans";
+import { SIN_FOTO_DE_MUESTRA } from "@/lib/utils/elegir-fotos";
 
 // Tarifa mínima de los planes de agentes, derivada del catálogo (igual que en /publica):
 // si cambia el precio, cambia aquí solo.
@@ -65,9 +66,8 @@ function TitularAnimado({ texto }: { texto: string }) {
   );
 }
 
-// Fichas cuyas fotos llevan una marca de agua ajena (Metrocuadrado.com): se quedan en el catálogo, pero
-// no se usan en las fotos grandes de la portada hasta que CIC las reemplace.
-const SIN_FOTO_GRANDE = ["puente-largo-alhambra"];
+// Fichas con marca de agua ajena: fuera de las fotos grandes de la portada (lista en elegir-fotos.ts).
+const SIN_FOTO_GRANDE = SIN_FOTO_DE_MUESTRA;
 
 // Red de seguridad: regenera la página cada hora aunque falle la
 // revalidación bajo demanda del panel admin.

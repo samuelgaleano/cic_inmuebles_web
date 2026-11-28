@@ -29,11 +29,38 @@ describe("POST /api/pagos/wompi", () => {
   afterEach(() => vi.unstubAllEnvs());
 
   it("prepara el pago con el monto del catálogo y registra la referencia", async () => {
-    const r = await POST(peticion({ planId: "alianza-90" }));
+    const r = await POST(peticion({ planId: "alianza-90", consentimiento: true }));
     const d = await r.json();
     expect(r.status).toBe(200);
     expect(d.amountInCents).toBe(1_000_000);
     expect(recordReference).toHaveBeenCalledWith(expect.objectContaining({ planId: "alianza-90", amountInCents: 1_000_000, renuevaServicioId: null }));
+  });
+
+  it("sin la casilla de autorización marcada no prepara el cobro ni registra nada", async () => {
+    for (const consentimiento of [undefined, false, "si", 1]) {
+      const r = await POST(peticion({ planId: "alianza-90", consentimiento }));
+      expect(r.status, String(consentimiento)).toBe(400);
+      expect((await r.json()).error).toMatch(/autorización/);
+    }
+    expect(recordReference).not.toHaveBeenCalled();
+  });
+
+  it("guarda la autorización con su versión y el origen ya limpio", async () => {
+    const { POLITICA_VERSION } = await import("@/lib/config/legal");
+    await POST(
+      peticion({
+        planId: "alianza-90",
+        consentimiento: true,
+        origen: { utmSource: " instagram ", referente: "www.Instagram.com", paginaEntrada: "/publica?x=1", utmMedium: 42 },
+      }),
+    );
+    expect(recordReference).toHaveBeenCalledWith(
+      expect.objectContaining({
+        consentimientoVersion: POLITICA_VERSION,
+        consentimientoAt: expect.any(String),
+        origen: { utmSource: "instagram", referente: "instagram.com", paginaEntrada: "/publica" },
+      }),
+    );
   });
 
   it("rechaza cuerpos raros sin error 500", async () => {
@@ -44,13 +71,13 @@ describe("POST /api/pagos/wompi", () => {
   });
 
   it("rechaza otro origen y otro tipo de contenido", async () => {
-    expect((await POST(peticion({ planId: "alianza-90" }, { origin: "https://evil.example" }))).status).toBe(403);
-    expect((await POST(peticion({ planId: "alianza-90" }, { "content-type": "text/plain" }))).status).toBe(415);
+    expect((await POST(peticion({ planId: "alianza-90", consentimiento: true }, { origin: "https://evil.example" }))).status).toBe(403);
+    expect((await POST(peticion({ planId: "alianza-90", consentimiento: true }, { "content-type": "text/plain" }))).status).toBe(415);
   });
 
   it("si la referencia no se puede registrar, no entrega la firma", async () => {
     recordReference.mockRejectedValueOnce(new Error("supabase caído"));
-    const r = await POST(peticion({ planId: "alianza-90" }));
+    const r = await POST(peticion({ planId: "alianza-90", consentimiento: true }));
     expect(r.status).toBe(503);
     expect((await r.json()).signature).toBeUndefined();
   });
@@ -58,9 +85,9 @@ describe("POST /api/pagos/wompi", () => {
   it("un token de renovación válido liga la referencia al servicio; uno falso no", async () => {
     const { tokenDeRenovacion } = await import("@/lib/servicios/token");
     const id = "00000000-0000-4000-8000-000000000001";
-    await POST(peticion({ planId: "alianza-90", renovar: tokenDeRenovacion(id) }));
+    await POST(peticion({ planId: "alianza-90", consentimiento: true, renovar: tokenDeRenovacion(id) }));
     expect(recordReference).toHaveBeenLastCalledWith(expect.objectContaining({ renuevaServicioId: id }));
-    await POST(peticion({ planId: "alianza-90", renovar: `${id}.1999999999.falso` }));
+    await POST(peticion({ planId: "alianza-90", consentimiento: true, renovar: `${id}.1999999999.falso` }));
     expect(recordReference).toHaveBeenLastCalledWith(expect.objectContaining({ renuevaServicioId: null }));
   });
 });

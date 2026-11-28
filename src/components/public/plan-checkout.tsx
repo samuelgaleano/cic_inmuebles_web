@@ -6,6 +6,8 @@ import { CreditCard, Loader2, ShieldCheck, X } from "lucide-react";
 import { formatPrice } from "@/lib/utils/format";
 import { buttonVariants } from "@/components/ui/button";
 import { COMERCIO_EN_PASARELA } from "@/lib/config/plans";
+import { ENLACE_POLITICA, ERROR_AUTORIZACION, TEXTO_AUTORIZACION } from "@/lib/config/legal";
+import { leerOrigen } from "@/lib/cliente/origen";
 import { CLAVE_DATOS, DATOS_VACIOS, esDatosPago, esperaDeSeguimiento, leerDatosGuardados, telefonoNacional, urlPaginaCompleta, type DatosComprador } from "./checkout-utils";
 
 type WidgetResult = { transaction?: { id?: string; status?: string } | null };
@@ -222,6 +224,8 @@ export function PlanCheckout({
   const [notice, setNotice] = useState<string | null>(null);
   const [lenta, setLenta] = useState(false);
   const [cerrada, setCerrada] = useState<string | null>(null);
+  // Autorización de tratamiento de datos: sin marcar por defecto, obligatoria para preparar el cobro.
+  const [autoriza, setAutoriza] = useState(false);
   const [form, setForm] = useState<DatosComprador>(() =>
     renovacion ? { nombre: renovacion.nombre, email: renovacion.email, telefono: telefonoNacional(renovacion.telefono) } : DATOS_VACIOS,
   );
@@ -329,6 +333,10 @@ export function PlanCheckout({
 
   const pay = async (e: React.FormEvent, modo: "ventana" | "pagina" = "ventana") => {
     e.preventDefault();
+    if (!autoriza) {
+      setError(ERROR_AUTORIZACION);
+      return;
+    }
     if (modo === "ventana" && (widget !== "ready" || !window.WidgetCheckout)) return;
     intentoRef.current?.abort();
     const intento = new AbortController();
@@ -340,7 +348,13 @@ export function PlanCheckout({
       const res = await fetch("/api/pagos/wompi", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(renovacion ? { planId, renovar: renovacion.token } : { planId }),
+        // La autorización y el origen de la visita viajan con el cobro; el servidor valida ambos.
+        body: JSON.stringify({
+          planId,
+          ...(renovacion ? { renovar: renovacion.token } : {}),
+          consentimiento: autoriza,
+          origen: leerOrigen(),
+        }),
         signal: intento.signal,
       });
       const data: unknown = await res.json().catch(() => ({}));
@@ -491,9 +505,29 @@ export function PlanCheckout({
               ))}
               <p className="text-xs leading-relaxed text-muted">
                 Con estos datos prellenamos la pasarela y te contactamos después del pago
-                {avisosActivos ? "; también te avisamos por correo antes de que venza tu publicación" : ""}. Más detalles en la{" "}
-                <a href="/privacidad" target="_blank" rel="noopener" className="underline underline-offset-2">política de datos</a>.
+                {avisosActivos ? "; también te avisamos por correo antes de que venza tu publicación" : ""}.
               </p>
+              <label htmlFor={`${uid}-autoriza`} className="flex cursor-pointer items-start gap-3 text-[14px] leading-snug text-ink-soft">
+                <input
+                  id={`${uid}-autoriza`}
+                  type="checkbox"
+                  required
+                  checked={autoriza}
+                  onChange={(e) => {
+                    setAutoriza(e.target.checked);
+                    if (e.target.checked && error === ERROR_AUTORIZACION) setError(null);
+                  }}
+                  aria-invalid={error === ERROR_AUTORIZACION}
+                  className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer rounded border-field accent-brand-700"
+                />
+                <span>
+                  {TEXTO_AUTORIZACION}{" "}
+                  <a href="/privacidad" target="_blank" rel="noopener" className="font-medium text-ink underline underline-offset-2 hover:text-brand-700">
+                    {ENLACE_POLITICA}
+                  </a>
+                  .
+                </span>
+              </label>
 
               {error && (
                 <p role="alert" className="rounded-xl bg-rose-50 px-3.5 py-2.5 text-sm font-medium text-rose-700">

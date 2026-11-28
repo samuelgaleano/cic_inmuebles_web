@@ -1,6 +1,7 @@
 import type { Lead } from "@/lib/domain";
 import { LEAD_INTENT_LABELS } from "@/lib/domain";
 import { siteConfig } from "@/lib/config/site";
+import { resumenOrigen } from "@/lib/leads/origen";
 import { sendEmail } from "./resend";
 
 /** Aviso por correo de un lead nuevo. El lead ya está guardado; el correo es best-effort. */
@@ -32,6 +33,7 @@ function renderLeadEmail(lead: Lead): string {
     lead.ciudad ? `Ciudad: ${lead.ciudad}` : null,
     lead.mensaje ? `Mensaje: ${lead.mensaje}` : null,
     `Origen: ${lead.fuente}`,
+    resumenOrigen(lead.origen) ? `Llegó: ${resumenOrigen(lead.origen)}` : null,
     `Fecha: ${lead.creadoEn}`,
   ].filter(Boolean);
   return lines.join("\n");

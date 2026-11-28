@@ -37,6 +37,12 @@ async function contactoDe(
   return crm.crearContacto(v.valor);
 }
 
+/** Lo que buscaba, sin el arranque «Avísenme si llega:» que pone el formulario del catálogo. */
+export function especificacionDeAlerta(mensaje: string | undefined): string | undefined {
+  const t = mensaje?.replace(/^\s*av[ií]s[ae]nme(\s+si\s+llega)?\s*[:,-]?\s*/i, "").trim();
+  return t || undefined;
+}
+
 export interface VinculoLead {
   contactoId: string;
   /** false si este lead ya estaba pasado al CRM. */
@@ -70,18 +76,28 @@ export async function vincularLead(crm: CrmStore, lead: Lead): Promise<VinculoLe
       estado: "nueva",
     });
   } else {
+    // «Avísenme cuando llegue uno»: lo que escribió ES la búsqueda (sin el «Avísenme si llega:» del formulario).
+    const especificacion = lead.intencion === "alerta" ? especificacionDeAlerta(lead.mensaje) : lead.mensaje?.trim();
     const b = await crm.crearBusqueda({
       contactoId: contacto.id,
       tipo: "comprador",
-      ...(lead.mensaje ? { especificacion: lead.mensaje.slice(0, 600) } : {}),
+      ...(especificacion ? { especificacion: especificacion.slice(0, 600) } : {}),
       potencial: false,
       estado: "activa",
+      ...(lead.intencion === "alerta" ? { notas: "Pidió aviso desde el catálogo: no encontró lo que buscaba." } : {}),
     });
     if (lead.propertyId) {
       await crm.proponer(b.id, lead.propertyId).catch((err) => console.warn("[crm] no se pudo proponer el inmueble del lead:", err instanceof Error ? err.message : err));
     }
   }
-  const intencion = lead.intencion === "visita" ? "quiere agendar una visita" : lead.intencion === "info" ? "pidió más información" : "dejó sus datos";
+  const intencion =
+    lead.intencion === "visita"
+      ? "quiere agendar una visita"
+      : lead.intencion === "info"
+        ? "pidió más información"
+        : lead.intencion === "alerta"
+          ? "pidió que le avisen cuando llegue un inmueble así"
+          : "dejó sus datos";
   const nota = {
     contactoId: contacto.id,
     tipo: "nota" as const,

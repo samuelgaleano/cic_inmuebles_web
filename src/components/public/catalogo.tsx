@@ -172,7 +172,7 @@ export function Catalogo({
             </summary>
             <LeadForm
               tipo="comprador"
-              intencion="info"
+              intencion="alerta"
               mensajeInicial={`Avísenme si llega: ${loQueBusca}`}
               submitLabel="Avísenme"
               className="mt-5"

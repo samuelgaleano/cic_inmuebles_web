@@ -72,7 +72,10 @@ export async function construirCsv(dataset: Dataset): Promise<string> {
   if (dataset === "leads") {
     const leads = await repo.leads.list();
     return aCsv(
-      ["Fecha", "Tipo", "Nombre", "Teléfono", "Correo", "Intención", "Inmueble", "Ciudad", "Tipo de inmueble", "Mensaje", "Origen", "Estado"],
+      [
+        "Fecha", "Tipo", "Nombre", "Teléfono", "Correo", "Intención", "Inmueble", "Ciudad", "Tipo de inmueble", "Mensaje", "Origen", "Estado",
+        "utm_source", "utm_medium", "utm_campaign", "Referente", "Página de entrada", "Autorizó datos", "Versión de la política",
+      ],
       leads.map((l): Celda[] => [
         fecha(l.creadoEn),
         l.tipo === "vendedor" ? "Vendedor" : "Comprador",
@@ -86,6 +89,13 @@ export async function construirCsv(dataset: Dataset): Promise<string> {
         l.mensaje,
         l.fuente,
         LEAD_STATUS_LABELS[l.estado],
+        l.origen?.utmSource,
+        l.origen?.utmMedium,
+        l.origen?.utmCampaign,
+        l.origen?.referente,
+        l.origen?.paginaEntrada,
+        fecha(l.consentimientoAt),
+        l.consentimientoVersion,
       ]),
     );
   }

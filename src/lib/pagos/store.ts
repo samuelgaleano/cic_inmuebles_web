@@ -1,4 +1,6 @@
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/data/supabase/client";
+import { faltaColumna, sinColumnas } from "@/lib/data/supabase/mappers";
+import type { OrigenVisita } from "@/lib/leads/origen";
 
 export type PagoSource = "webhook" | "redirect" | "cron";
 export type PagoEstado = "ok" | "revisar" | "sin_destino" | "sin_verificar";
@@ -48,7 +50,23 @@ export interface ReferenciaEmitida {
   amountInCents: number;
   /** Servicio que renueva este pago (enlace de renovación del correo). */
   renuevaServicioId?: string | null;
+  /** Autorización de tratamiento de datos dada en el paso de pago (Ley 1581): fecha y versión de la política. */
+  consentimientoAt?: string;
+  consentimientoVersion?: string;
+  /** De dónde llegó quien compra (campaña, referente, página de entrada). */
+  origen?: OrigenVisita;
 }
+
+/** Columnas de pagos_referencias que llegan con la migración 0012. */
+const COLUMNAS_0012_REFERENCIAS = [
+  "consentimiento_at",
+  "consentimiento_version",
+  "utm_source",
+  "utm_medium",
+  "utm_campaign",
+  "referente",
+  "pagina_entrada",
+] as const;
 
 export interface PagosStore {
   recordReference(ref: ReferenciaEmitida): Promise<void>;
@@ -125,9 +143,26 @@ class SupabasePagosStore implements PagosStore {
     const fila: Record<string, unknown> = { reference: ref.reference, plan_id: ref.planId, amount_in_cents: ref.amountInCents };
     // La columna llega con la migración 0004: solo se envía cuando hay una renovación, que exige esa migración.
     if (ref.renuevaServicioId) fila.renueva_servicio_id = ref.renuevaServicioId;
-    const { error } = await getSupabaseAdmin()
-      .from("pagos_referencias")
-      .upsert(fila, { onConflict: "reference", ignoreDuplicates: true });
+    // Columnas de 0012: autorización de datos y origen de la visita. Solo las que traen valor.
+    const extra: Record<string, unknown> = {
+      consentimiento_at: ref.consentimientoAt,
+      consentimiento_version: ref.consentimientoVersion,
+      utm_source: ref.origen?.utmSource,
+      utm_medium: ref.origen?.utmMedium,
+      utm_campaign: ref.origen?.utmCampaign,
+      referente: ref.origen?.referente,
+      pagina_entrada: ref.origen?.paginaEntrada,
+    };
+    for (const [k, v] of Object.entries(extra)) if (v !== undefined) fila[k] = v;
+
+    const guardar = (f: Record<string, unknown>) =>
+      getSupabaseAdmin().from("pagos_referencias").upsert(f, { onConflict: "reference", ignoreDuplicates: true });
+    let { error } = await guardar(fila);
+    // Sin la migración 0012 la referencia se registra igual (sin esas columnas): un cobro rastreable importa más.
+    if (error && faltaColumna(error, COLUMNAS_0012_REFERENCIAS)) {
+      console.warn("[pagos] la migración 0012 no está aplicada: la referencia se guarda sin autorización ni origen");
+      ({ error } = await guardar(sinColumnas(fila, COLUMNAS_0012_REFERENCIAS)));
+    }
     if (error) fail("recordReference", error);
   }
 

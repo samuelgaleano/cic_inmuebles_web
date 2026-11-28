@@ -15,6 +15,7 @@ vi.mock("@/lib/notifications/email", () => ({ sendLeadNotification: avisar }));
 vi.mock("next/server", () => ({ after: (fn: () => Promise<void>) => fn() }));
 
 import { createLeadAction } from "./leads";
+import { ERROR_AUTORIZACION, POLITICA_VERSION } from "@/lib/config/legal";
 
 function form(entries: Record<string, string>): FormData {
   const fd = new FormData();
@@ -22,7 +23,14 @@ function form(entries: Record<string, string>): FormData {
   return fd;
 }
 
-const valido = { tipo: "comprador", nombre: "Ana Pérez", telefono: "300 123 4567", intencion: "visita", propertySlug: "bella-suiza" };
+const valido = {
+  tipo: "comprador",
+  nombre: "Ana Pérez",
+  telefono: "300 123 4567",
+  intencion: "visita",
+  propertySlug: "bella-suiza",
+  consentimiento: "si",
+};
 
 beforeEach(() => {
   crear.mockReset();
@@ -36,7 +44,7 @@ describe("createLeadAction", () => {
   it("con datos inválidos devuelve el error por campo Y lo que el usuario escribió", async () => {
     const r = await createLeadAction(
       { status: "idle" },
-      form({ tipo: "vendedor", nombre: "Ana Pérez", telefono: "12", email: "ana@x.co", ciudad: "Bogotá", mensaje: "Apto 3 alcobas" }),
+      form({ tipo: "vendedor", nombre: "Ana Pérez", telefono: "12", email: "ana@x.co", ciudad: "Bogotá", mensaje: "Apto 3 alcobas", consentimiento: "si" }),
     );
     expect(r.status).toBe("error");
     expect(r.errors).toEqual({ telefono: "Ingresa un celular o teléfono válido, por ejemplo 300 123 4567" });
@@ -47,6 +55,8 @@ describe("createLeadAction", () => {
       email: "ana@x.co",
       ciudad: "Bogotá",
       mensaje: "Apto 3 alcobas",
+      // la casilla vuelve marcada: no hay que volver a autorizar por un teléfono mal escrito
+      consentimiento: "si",
     });
   });
 
@@ -117,6 +127,55 @@ describe("createLeadAction", () => {
     expect(avisar).not.toHaveBeenCalled();
   });
 
+  it("sin la casilla de autorización no guarda nada y dice qué falta", async () => {
+    const { consentimiento: _c, ...sinCasilla } = valido;
+    for (const datos of [sinCasilla, { ...valido, consentimiento: "on" }, { ...valido, consentimiento: "" }]) {
+      const r = await createLeadAction({ status: "idle" }, form(datos));
+      expect(r.status).toBe("error");
+      expect(r.errors?.consentimiento).toBe(ERROR_AUTORIZACION);
+      expect(r.message).toBe(ERROR_AUTORIZACION);
+    }
+    expect(crear).not.toHaveBeenCalled();
+  });
+
+  it("guarda la autorización (fecha y versión) y el origen de la visita ya limpio", async () => {
+    const r = await createLeadAction(
+      { status: "idle" },
+      form({
+        ...valido,
+        utm_source: "instagram",
+        utm_medium: "social",
+        utm_campaign: "  navidad ",
+        referente: "l.Instagram.com",
+        pagina_entrada: "/inmuebles/bella-suiza?fbclid=xyz",
+      }),
+    );
+    expect(r.status).toBe("success");
+    expect(crear).toHaveBeenCalledWith(
+      expect.objectContaining({
+        consentimientoVersion: POLITICA_VERSION,
+        consentimientoAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+        origen: {
+          utmSource: "instagram",
+          utmMedium: "social",
+          utmCampaign: "navidad",
+          referente: "l.instagram.com",
+          paginaEntrada: "/inmuebles/bella-suiza",
+        },
+      }),
+    );
+  });
+
+  it("acepta la intención «alerta» y arma un WhatsApp que pide el aviso", async () => {
+    const r = await createLeadAction(
+      { status: "idle" },
+      form({ tipo: "comprador", nombre: "Ana Pérez", telefono: "300 123 4567", intencion: "alerta", mensaje: "Avísenme si llega: casa en Chía", consentimiento: "si" }),
+    );
+    expect(r.status).toBe("success");
+    expect(crear).toHaveBeenCalledWith(expect.objectContaining({ intencion: "alerta" }));
+    expect(decodeURIComponent(r.whatsappUrl ?? "")).toContain("avisen cuando llegue");
+  });
+
   it("topes de longitud: un nombre de 100 KB no pasa", async () => {
     const r = await createLeadAction({ status: "idle" }, form({ ...valido, nombre: "x".repeat(100_000) }));
     expect(r.status).toBe("error");
@@ -134,6 +193,7 @@ describe("tope de avisos por correo", () => {
     fd.set("nombre", "Ana Gómez");
     fd.set("telefono", "300 123 4567");
     fd.set("fuente", "web");
+    fd.set("consentimiento", "si");
     const r = await createLeadAction({ status: "idle" }, fd);
     expect(r.status).toBe("success");
     expect(avisar).not.toHaveBeenCalled();

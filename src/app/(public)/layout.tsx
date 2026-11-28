@@ -2,6 +2,7 @@ import { SiteHeader } from "@/components/public/site-header";
 import { SiteFooter } from "@/components/public/site-footer";
 import { FloatingWhatsApp } from "@/components/public/floating-whatsapp";
 import { BandejaComparar } from "@/components/public/bandeja-comparar";
+import { CapturaOrigen } from "@/components/public/origen-visita";
 
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -13,6 +14,8 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
       >
         Saltar al contenido
       </a>
+      {/* Origen de la visita (campaña, referente, página de entrada) para los leads, sin terceros. */}
+      <CapturaOrigen />
       <SiteHeader />
       <main id="contenido" className="flex-1">{children}</main>
       <SiteFooter />

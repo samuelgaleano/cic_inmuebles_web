@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, ViewTransition } from "react";
 import { ChevronLeft, ChevronRight, Images, X } from "lucide-react";
 import { SafeImage } from "@/components/ui/safe-image";
-import { mediaLoader } from "@/lib/utils/image-loader";
+import { ANCHO_MAXIMO, ANCHOS_DISPOSITIVO, mediaLoader } from "@/lib/utils/image-loader";
 import { bloquearScroll } from "@/lib/cliente/scroll";
 import { cn } from "@/lib/utils/cn";
 
@@ -16,13 +16,34 @@ export interface FotoGaleria {
 const SIZES_VISOR = "100vw";
 
 /**
+ * Ancho real de cada celda: en móvil la tira usa 86vw; desde md el mosaico de 4 columnas vive en la caja de
+ * 75rem (1.136 px útiles), así que una celda de 2 columnas mide ≈ 564 px y una de 1, ≈ 278 px.
+ */
+function sizesCelda(celda: string | undefined): string {
+  if (celda?.includes("col-span-4")) return "(max-width: 767px) 86vw, (max-width: 1199px) calc(100vw - 4rem), 1136px";
+  if (celda?.includes("col-span-2")) return "(max-width: 767px) 86vw, (max-width: 1199px) calc(50vw - 2rem), 564px";
+  return "(max-width: 767px) 86vw, (max-width: 1199px) calc(25vw - 1rem), 278px";
+}
+
+/**
  * Galería de la ficha: mosaico en escritorio (una foto grande y cuatro
  * pequeñas, siempre recortadas con el mismo criterio), tira deslizable en el
  * móvil, y un visor a pantalla completa donde la foto se ve COMPLETA y nítida
  * (object-contain sobre tinta). El visor es un <dialog> modal: foco atrapado y
  * Escape de serie; flechas del teclado, deslizar con el dedo y miniaturas.
  */
-export function Galeria({ fotos, titulo, slug }: { fotos: FotoGaleria[]; titulo: string; slug: string }) {
+export function Galeria({
+  fotos,
+  titulo,
+  descripcion,
+  slug,
+}: {
+  fotos: FotoGaleria[];
+  titulo: string;
+  /** Tipo y lugar («Apartamento en Bella Suiza, Bogotá»): base del texto alternativo de cada foto. */
+  descripcion: string;
+  slug: string;
+}) {
   const visor = useRef<HTMLDialogElement>(null);
   const [indice, setIndice] = useState(0);
   // El visor solo pinta fotos mientras está abierto: cerrado no pide imágenes ni ocupa el DOM.
@@ -58,7 +79,7 @@ export function Galeria({ fotos, titulo, slug }: { fotos: FotoGaleria[]; titulo:
   useEffect(() => {
     if (!visor.current?.open) return;
     const necesario = window.innerWidth * window.devicePixelRatio;
-    const ancho = [640, 750, 828, 1080, 1200, 1920, 2048, 3840].find((w) => w >= necesario) ?? 3840;
+    const ancho = ANCHOS_DISPOSITIVO.find((w) => w >= necesario) ?? ANCHO_MAXIMO;
     for (const j of [(indice + 1) % total, (indice - 1 + total) % total]) {
       const img = new window.Image();
       img.src = mediaLoader({ src: fotos[j].url, width: ancho });
@@ -89,6 +110,15 @@ export function Galeria({ fotos, titulo, slug }: { fotos: FotoGaleria[]; titulo:
     return ["md:col-span-2 md:row-span-2", "", "", "", ""];
   })();
   const actual = fotos[indice];
+  /**
+   * «Apartamento en Bella Suiza, Bogotá — foto 3 de 12». Si la foto trae su propio texto («Cocina»), se suma
+   * antes del número; si solo repite el título del inmueble, se omite.
+   */
+  const textoAlt = (i: number) => {
+    const propio = fotos[i].alt?.trim();
+    const detalle = propio && propio.toLocaleLowerCase("es") !== titulo.toLocaleLowerCase("es") ? `${propio}, ` : "";
+    return `${descripcion} — ${detalle}foto ${i + 1} de ${total}`;
+  };
 
   /** La primera foto lleva el nombre de la tarjeta de origen: al navegar, la foto viaja de una a otra. */
   const conTransicion = (i: number, nodo: React.ReactElement) =>
@@ -123,15 +153,13 @@ export function Galeria({ fotos, titulo, slug }: { fotos: FotoGaleria[]; titulo:
                 >
                   <SafeImage
                     src={f.url}
-                    alt={f.alt ?? `${titulo} — foto ${i + 1}`}
+                    alt={textoAlt(i)}
                     fill
-                    loading={i === 0 ? "eager" : undefined}
-                    fetchPriority={i === 0 ? "high" : undefined}
-                    sizes={
-                      i === 0
-                        ? "(max-width: 767px) 86vw, (max-width: 1280px) 50vw, 600px"
-                        : "(max-width: 767px) 86vw, (max-width: 1280px) 25vw, 300px"
-                    }
+                    // La primera foto es el LCP de la ficha en todos los anchos (primera de la tira en móvil,
+                    // la grande del mosaico en escritorio): `preload` la pide desde el <head>, como indica la
+                    // guía de next/image para la imagen principal sobre el pliegue. Las demás, diferidas.
+                    preload={i === 0}
+                    sizes={sizesCelda(celdas[i])}
                     className="object-cover transition-transform duration-[900ms] ease-[var(--ease-fluid)] group-hover:scale-[1.04]"
                   />
                   <span className="absolute bottom-3 right-3 rounded-full bg-white/95 px-2.5 py-1 text-[12px] font-medium text-ink md:hidden">
@@ -197,7 +225,7 @@ export function Galeria({ fotos, titulo, slug }: { fotos: FotoGaleria[]; titulo:
             <div className="relative h-full w-full">
               <SafeImage
                 src={actual.url}
-                alt={actual.alt ?? `${titulo} — foto ${indice + 1}`}
+                alt={textoAlt(indice)}
                 fill
                 sizes={SIZES_VISOR}
                 className="object-contain"

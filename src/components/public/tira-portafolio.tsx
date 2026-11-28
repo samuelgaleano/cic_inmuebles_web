@@ -75,9 +75,10 @@ export function TiraPortafolio({
         aria-labelledby="portafolio"
         className="pad-tira mt-10 flex snap-x snap-mandatory gap-5 overflow-x-auto pb-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
-        {items.map((p, i) => (
+        {items.map((p) => (
           <li key={p.slug} className="w-[72vw] max-w-[21.5rem] shrink-0 snap-start sm:w-[21.5rem]">
-            <TarjetaInmueble datos={p} proporcion="4/5" parallax comparar={false} prioridad={i < 2} />
+            {/* La tira va bajo la portada: sus fotos cargan al acercarse (la del hero es la única prioritaria). */}
+            <TarjetaInmueble datos={p} proporcion="4/5" parallax comparar={false} />
           </li>
         ))}
       </ul>

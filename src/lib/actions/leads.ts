@@ -10,7 +10,9 @@ import { whatsappLink } from "@/lib/config/site";
 import type { Lead, LeadInput } from "@/lib/domain";
 import { esSpamProbable } from "@/lib/leads/spam";
 import { normalizarTelefono } from "@/lib/utils/telefono";
-import { LEAD_INTENT_LABELS } from "@/lib/domain";
+import { LEAD_INTENT_LABELS, LEAD_INTENTS } from "@/lib/domain";
+import { ERROR_AUTORIZACION, POLITICA_VERSION } from "@/lib/config/legal";
+import { origenDeFormulario } from "@/lib/leads/origen";
 
 /**
  * Acción de servidor para crear leads desde los formularios públicos.
@@ -33,13 +35,17 @@ const leadSchema = z.object({
     .union([z.string().trim().email("Revisa el correo; debe verse como nombre@correo.com").max(160), z.literal("")])
     .optional(),
   mensaje: z.string().trim().max(1000).optional(),
-  intencion: z.enum(["visita", "info"]).optional(),
+  intencion: z.enum(LEAD_INTENTS).optional(),
   propertyId: z.string().max(80).optional(),
   propertySlug: z.string().max(160).optional(),
   preferencia: z.string().trim().max(200).optional(),
   tipoInmueble: z.string().trim().max(120).optional(),
   ciudad: z.string().trim().max(120).optional(),
   fuente: z.enum(["web", "whatsapp"]).default("web"),
+  // Autorización expresa de tratamiento de datos (Ley 1581): casilla sin marcar por defecto, obligatoria.
+  // Se valida aquí aunque el navegador ya la pida: un envío sin ella no se guarda.
+  consentimiento: z.literal("si", { error: ERROR_AUTORIZACION }),
+  // El origen de la visita (utm_*, referente, página de entrada) se lee aparte con origenDeFormulario.
   // El honeypot anti-spam (`website`) se revisa ANTES de validar: ver createLeadAction.
 });
 
@@ -52,7 +58,7 @@ function mensajeExito(tipo: unknown): string {
 const TOPE_AVISOS_LEADS_DIA = 40;
 
 /** Campos visibles que se devuelven en el estado de error para repoblar el formulario. */
-const VISIBLE_FIELDS = ["nombre", "telefono", "email", "ciudad", "tipoInmueble", "preferencia", "mensaje"] as const;
+const VISIBLE_FIELDS = ["nombre", "telefono", "email", "ciudad", "tipoInmueble", "preferencia", "mensaje", "consentimiento"] as const;
 export type LeadFieldName = (typeof VISIBLE_FIELDS)[number];
 
 export interface LeadFormState {
@@ -89,6 +95,8 @@ async function buildLeadWhatsappUrl(lead: Lead): Promise<string> {
         ? `Quiero vender mi inmueble (${detalle}).`
         : "Quiero vender mi inmueble.",
     );
+  } else if (lead.intencion === "alerta") {
+    partes.push("Quiero que me avisen cuando llegue un inmueble así.");
   } else {
     let titulo = lead.propertySlug;
     if (lead.propertySlug) {
@@ -115,6 +123,7 @@ function respaldoWhatsapp(d: z.infer<typeof leadSchema>): string {
   const detalle = [d.tipoInmueble, d.ciudad].filter(Boolean).join(" en ");
   const partes = [`Hola, soy ${d.nombre}.`];
   if (d.tipo === "vendedor") partes.push(`Quiero vender mi inmueble${detalle ? ` (${detalle})` : ""}.`);
+  else if (d.intencion === "alerta") partes.push(`Quiero que me avisen cuando llegue un inmueble así.${d.mensaje ? ` ${d.mensaje}` : ""}`);
   else partes.push(d.propertySlug ? `Me interesa el inmueble "${d.propertySlug}".` : "Quiero más información.");
   if (d.preferencia) partes.push(`Preferencia: ${d.preferencia}.`);
   partes.push(`Mi teléfono: ${d.telefono}.`);
@@ -143,9 +152,10 @@ export async function createLeadAction(
       const key = issue.path[0];
       if (typeof key === "string" && !errors[key]) errors[key] = issue.message;
     }
+    const soloAutorizacion = Object.keys(errors).length === 1 && errors.consentimiento;
     return {
       status: "error",
-      message: "Falta corregir un dato. Te lo marcamos en rojo.",
+      message: soloAutorizacion ? ERROR_AUTORIZACION : "Falta corregir un dato. Te lo marcamos en rojo.",
       errors,
       values: visibleValues(raw),
     };
@@ -174,6 +184,10 @@ export async function createLeadAction(
     tipoInmueble: data.tipoInmueble || undefined,
     ciudad: data.ciudad || undefined,
     fuente: data.fuente,
+    origen: origenDeFormulario(formData),
+    // Prueba de la autorización: cuándo la dio y sobre qué versión de la política.
+    consentimientoAt: new Date().toISOString(),
+    consentimientoVersion: POLITICA_VERSION,
   };
 
   let lead: Lead;

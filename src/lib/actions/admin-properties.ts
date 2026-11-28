@@ -11,6 +11,7 @@ import { getServiciosStore } from "@/lib/servicios/store";
 import { revalidarCatalogoPublico } from "@/lib/data/inventario-tag";
 import { ensurePropertyArchive, isDriveConfigured } from "@/lib/integrations/drive";
 import { isSheetsConfigured, syncAllPropertiesToSheet, syncPropertyToSheet } from "@/lib/integrations/sheets";
+import { normalizarTelefono } from "@/lib/utils/telefono";
 import {
   PROPERTY_STATUSES,
   PROPERTY_TYPES,
@@ -91,6 +92,24 @@ function buildInput(formData: FormData): { input?: PropertyInput; state?: Proper
 
   const d = parsed.data;
 
+  // Anunciante (plan de publicación independiente): su WhatsApp sale en la ficha, así que debe abrir un chat
+  // de verdad. Vacío = la ficha solo muestra el contacto de CIC.
+  const anuncianteNombre = str(formData.get("anuncianteNombre")).slice(0, 120);
+  const anuncianteCrudo = str(formData.get("anuncianteWhatsapp"));
+  let anunciante: PropertyInput["anunciante"];
+  if (anuncianteCrudo) {
+    const tel = normalizarTelefono(anuncianteCrudo);
+    if (!tel?.e164) {
+      return {
+        state: {
+          error: "Revisa los campos obligatorios.",
+          errors: { anuncianteWhatsapp: "WhatsApp no válido: escribe un celular, por ejemplo 300 123 4567 o +57 300 123 4567." },
+        },
+      };
+    }
+    anunciante = { nombre: anuncianteNombre || undefined, whatsapp: tel.legible };
+  }
+
   // Medios: una URL de imagen por línea + URL de video opcional (YouTube).
   const imagenes = str(formData.get("imagenes"))
     .split(/[\n,]+/)
@@ -152,6 +171,8 @@ function buildInput(formData: FormData): { input?: PropertyInput; state?: Proper
       : undefined,
     notasInternas: str(formData.get("notasInternas")) || undefined,
     driveFolderId: str(formData.get("driveFolderId")) || undefined,
+    // La clave va siempre (también vacía): así borrar el WhatsApp en el panel quita el botón de la ficha.
+    anunciante,
     destacado: formData.get("destacado") === "on",
     publicado: formData.get("publicado") === "on",
   };

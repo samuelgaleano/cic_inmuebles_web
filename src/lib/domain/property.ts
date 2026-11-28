@@ -101,6 +101,12 @@ export interface PropertyOwner {
   email?: string;
 }
 
+/** Anunciante de un plan de publicación independiente: nombre visible y WhatsApp (forma legible "+57 300 123 4567"). */
+export interface PropertyAdvertiser {
+  nombre?: string;
+  whatsapp: string;
+}
+
 export interface Property {
   id: string;
   /** Código interno legible, p. ej. "1006". */
@@ -129,6 +135,12 @@ export interface Property {
   notasInternas?: string;
   /** ID de la carpeta de Google Drive del inmueble (integración híbrida). */
   driveFolderId?: string;
+  /**
+   * Quien publica el inmueble con un plan de publicación independiente (agente o inmobiliaria). Es
+   * PÚBLICO a propósito: los planes prometen un botón de contacto directo, y la ficha muestra
+   * «Escribir al anunciante» con este WhatsApp además del de CIC. Sin WhatsApp no hay botón.
+   */
+  anunciante?: PropertyAdvertiser;
 
   destacado: boolean;
   publicado: boolean;
