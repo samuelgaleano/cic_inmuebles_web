@@ -1,4 +1,5 @@
 import { CalendarPlus, Clock, Trash2, UserPlus } from "lucide-react";
+import Link from "next/link";
 import { getRepository } from "@/lib/data";
 import { formatoBogota } from "@/lib/utils/hora-bogota";
 import {
@@ -15,6 +16,7 @@ import {
   setAvailabilityAction,
 } from "@/lib/actions/admin-agenda";
 import { AppointmentStatusForm } from "@/components/admin/appointment-status-form";
+import { getCrmStore } from "@/lib/crm/store";
 
 export const dynamic = "force-dynamic";
 
@@ -39,8 +41,8 @@ function AvailabilityEditor({
       {WEEKDAY_LABELS.map((label, dia) => {
         const s = byDay.get(dia);
         return (
-          <div key={dia} className="flex items-center gap-2 text-sm">
-            <label className="flex w-28 items-center gap-2 text-ink-soft">
+          <div key={dia} className="flex flex-wrap items-center gap-2 text-sm">
+            <label className="flex w-24 items-center gap-2 text-ink-soft sm:w-28">
               <input type="checkbox" name={`dia_${dia}`} defaultChecked={Boolean(s)} className="h-4 w-4 accent-brand-600" />
               {label}
             </label>
@@ -59,13 +61,21 @@ function AvailabilityEditor({
 
 const formatDateTime = formatoBogota;
 
-export default async function AdminAgendaPage() {
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export default async function AdminAgendaPage({ searchParams }: { searchParams: Promise<{ contactoId?: string; propertyId?: string; leadId?: string }> }) {
+  const sp = await searchParams;
   const repo = getRepository();
   const [agents, appointments, properties] = await Promise.all([
     repo.agents.list(),
     repo.appointments.list(),
     repo.properties.list(),
   ]);
+  // Agendar desde la ficha del contacto, desde una propuesta o desde un lead: el formulario llega prellenado.
+  const contacto = sp.contactoId && UUID.test(sp.contactoId) ? await getCrmStore().obtenerContacto(sp.contactoId).catch(() => null) : null;
+  const lead = !contacto && sp.leadId && UUID.test(sp.leadId) ? await repo.leads.getById(sp.leadId).catch(() => null) : null;
+  const propiedadInicial = properties.some((p) => p.id === sp.propertyId) ? sp.propertyId : (lead?.propertyId ?? "");
+  const cliente = contacto ? { nombre: contacto.nombre, telefono: contacto.telefono ?? "", email: contacto.email ?? "" } : lead ? { nombre: lead.nombre, telefono: lead.telefono, email: lead.email ?? "" } : null;
   const availabilities = await Promise.all(agents.map((a) => repo.agents.listAvailability(a.id)));
   const propTitle = new Map(properties.map((p) => [p.id, p.titulo]));
   const agentName = new Map(agents.map((a) => [a.id, a.nombre]));
@@ -136,10 +146,20 @@ export default async function AdminAgendaPage() {
         <h2 className="text-lg font-bold tracking-tight text-ink">Visitas agendadas</h2>
 
         {/* Nueva cita */}
-        <form action={createAppointmentAction} className="grid gap-3 rounded-2xl border border-dashed border-line bg-white p-4 sm:grid-cols-2 lg:grid-cols-3">
+        <form id="nueva-cita" action={createAppointmentAction} className="grid scroll-mt-24 gap-3 rounded-2xl border border-dashed border-line bg-white p-4 sm:grid-cols-2 lg:grid-cols-3">
+          {contacto && (
+            <>
+              <input type="hidden" name="contactoId" value={contacto.id} />
+              <input type="hidden" name="volver" value="ficha" />
+              <p className="text-sm text-ink-soft sm:col-span-2 lg:col-span-3">
+                Visita para <strong className="text-ink">{contacto.nombre}</strong>: al marcarla «Realizada» queda en su línea de tiempo y la propuesta del inmueble pasa a «Visitó».
+              </p>
+            </>
+          )}
+          {lead && <input type="hidden" name="leadId" value={lead.id} />}
           <div>
             <label className={labelClass}>Inmueble</label>
-            <select name="propertyId" className={inputClass} required>
+            <select name="propertyId" className={inputClass} required defaultValue={propiedadInicial}>
               <option value="">Selecciona...</option>
               {properties.map((p) => (
                 <option key={p.id} value={p.id}>{p.titulo}</option>
@@ -161,11 +181,12 @@ export default async function AdminAgendaPage() {
           </div>
           <div>
             <label className={labelClass}>Cliente</label>
-            <input name="clienteNombre" className={inputClass} required />
+            <input name="clienteNombre" className={inputClass} required defaultValue={cliente?.nombre ?? ""} />
           </div>
           <div>
             <label className={labelClass}>Teléfono</label>
-            <input name="clienteTelefono" className={inputClass} required />
+            <input name="clienteTelefono" className={inputClass} required inputMode="tel" defaultValue={cliente?.telefono ?? ""} />
+            {cliente?.email && <input type="hidden" name="clienteEmail" value={cliente.email} />}
           </div>
           <div className="flex items-end">
             <button className={`${primaryBtn} w-full`}>
@@ -192,7 +213,13 @@ export default async function AdminAgendaPage() {
                   <td className="px-4 py-3 text-ink-soft">{formatDateTime(ap.inicioEn)}</td>
                   <td className="px-4 py-3 text-ink-soft">{propTitle.get(ap.propertyId) ?? "—"}</td>
                   <td className="px-4 py-3">
-                    <p className="font-medium text-ink">{ap.clienteNombre}</p>
+                    {ap.contactoId ? (
+                      <Link href={`/admin/crm/contactos/${ap.contactoId}`} className="font-medium text-brand-700 underline underline-offset-2">
+                        {ap.clienteNombre}
+                      </Link>
+                    ) : (
+                      <p className="font-medium text-ink">{ap.clienteNombre}</p>
+                    )}
                     <p className="text-xs text-muted">{ap.clienteTelefono}</p>
                   </td>
                   <td className="px-4 py-3 text-ink-soft">{ap.agentId ? agentName.get(ap.agentId) ?? "—" : "Sin asignar"}</td>

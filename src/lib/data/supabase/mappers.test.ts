@@ -44,7 +44,7 @@ describe("columnas de la migración 0012", () => {
     } as unknown as LeadRow);
     expect(lead.origen).toEqual({ utmSource: "facebook", referente: "m.facebook.com" });
     expect(lead.consentimientoVersion).toBe("2026-09");
-    expect(lead.primerContactoAt).toBe("2026-11-28T11:00:00Z");
+    expect(lead.primerContactoAt).toBe("2026-11-28T11:00:00.000Z");
     // Filas anteriores a 0012: sin origen, sin romper.
     expect(leadRowToDomain({ id: "l0", tipo: "vendedor", nombre: "B", telefono: "y", created_at: "x" } as unknown as LeadRow).origen).toBeUndefined();
   });

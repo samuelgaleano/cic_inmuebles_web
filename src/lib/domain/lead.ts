@@ -77,7 +77,20 @@ export interface Lead {
   primerContactoAt?: string;
   estado: LeadStatus;
   creadoEn: string;
+
+  // Origen en campos planos (mismos datos que `origen`; los usan los reportes del CRM)
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
+  /** Sitio desde el que llegó (document.referrer). */
+  referente?: string;
+  paginaEntrada?: string;
+  /** Datos suprimidos a pedido de la persona (Ley 1581, columna de 0013). */
+  suprimidoAt?: string;
 }
 
+/** Nombre que queda en una persona, un lead o una cita cuyos datos se suprimieron (Ley 1581). */
+export const NOMBRE_SUPRIMIDO = "Suprimido";
+
 /** Datos que llegan desde un formulario (sin campos generados por el sistema). */
-export type LeadInput = Omit<Lead, "id" | "estado" | "creadoEn" | "primerContactoAt">;
+export type LeadInput = Omit<Lead, "id" | "estado" | "creadoEn" | "primerContactoAt" | "suprimidoAt">;

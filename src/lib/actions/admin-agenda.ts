@@ -1,7 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { exigirAdmin } from "@/lib/auth";
+import { getCrmStore } from "@/lib/crm/store";
+import { registrarVisitaRealizada } from "@/lib/crm/visitas";
 import { getRepository } from "@/lib/data";
 import { desdeHoraBogota } from "@/lib/utils/hora-bogota";
 import {
@@ -61,6 +64,8 @@ export async function setAvailabilityAction(formData: FormData): Promise<void> {
 }
 
 // --- Citas -------------------------------------------------------------------
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function createAppointmentAction(formData: FormData): Promise<void> {
   await exigirAdmin();
   const propertyId = str(formData.get("propertyId"));
@@ -71,11 +76,15 @@ export async function createAppointmentAction(formData: FormData): Promise<void>
   // El campo es de hora de Bogotá; el servidor corre en UTC.
   const inicioUtc = desdeHoraBogota(inicioEn);
   if (!inicioUtc) return;
+  // Agendada desde la ficha del contacto o desde una propuesta: la cita queda enlazada a esa persona.
+  const crudo = str(formData.get("contactoId"));
+  const contactoId = UUID.test(crudo) && (await getCrmStore().obtenerContacto(crudo).catch(() => null)) ? crudo : undefined;
 
   await getRepository().appointments.create({
     propertyId,
     agentId: str(formData.get("agentId")) || undefined,
     leadId: str(formData.get("leadId")) || undefined,
+    ...(contactoId ? { contactoId } : {}),
     clienteNombre,
     clienteTelefono,
     clienteEmail: str(formData.get("clienteEmail")) || undefined,
@@ -85,6 +94,11 @@ export async function createAppointmentAction(formData: FormData): Promise<void>
     estado: "confirmada",
   });
   revalidate();
+  if (contactoId) {
+    revalidatePath(`/admin/crm/contactos/${contactoId}`);
+    // Vuelve a la ficha desde la que se agendó.
+    if (str(formData.get("volver")) === "ficha") redirect(`/admin/crm/contactos/${contactoId}`);
+  }
 }
 
 export async function setAppointmentStatusAction(formData: FormData): Promise<void> {
@@ -92,7 +106,22 @@ export async function setAppointmentStatusAction(formData: FormData): Promise<vo
   const id = str(formData.get("id"));
   const estado = str(formData.get("estado")) as AppointmentStatus;
   if (id && APPOINTMENT_STATUSES.includes(estado)) {
-    await getRepository().appointments.updateStatus(id, estado);
+    const repo = getRepository();
+    const cita = await repo.appointments.updateStatus(id, estado);
+    // Realizada: queda como actividad «visita» de la persona y su propuesta de ese inmueble pasa a «visitó».
+    if (cita && estado === "realizada") {
+      try {
+        const inmueble = await repo.properties.getById(cita.propertyId).catch(() => null);
+        const r = await registrarVisitaRealizada(getCrmStore(), cita, inmueble);
+        if (r) {
+          revalidatePath(`/admin/crm/contactos/${r.contactoId}`);
+          revalidatePath("/admin/crm");
+        }
+      } catch (err) {
+        // La cita ya quedó realizada; el CRM se puede poner al día marcándola de nuevo.
+        console.error("[agenda] no se pudo registrar la visita en el CRM:", err instanceof Error ? err.message : err);
+      }
+    }
     revalidate();
   }
 }

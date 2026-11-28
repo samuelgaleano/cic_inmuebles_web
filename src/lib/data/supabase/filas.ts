@@ -172,9 +172,11 @@ export interface LeadRow {
   consentimiento_at?: string | null;
   consentimiento_version?: string | null;
   primer_contacto_at?: string | null;
+  // 0013: datos suprimidos a pedido de la persona (Ley 1581).
+  suprimido_at?: string | null;
 }
 
-export type LeadWrite = Omit<LeadRow, "id" | "estado" | "created_at" | "primer_contacto_at">;
+export type LeadWrite = Omit<LeadRow, "id" | "estado" | "created_at" | "primer_contacto_at" | "suprimido_at">;
 
 export const SELECT_LEAD = columnas([
   "id",
@@ -247,6 +249,8 @@ export interface AppointmentRow {
   estado: AppointmentStatus;
   notas: string | null;
   created_at: string;
+  // 0013: persona del CRM de la visita.
+  contacto_id?: string | null;
 }
 
 export type AppointmentWrite = Omit<AppointmentRow, "id" | "created_at">;

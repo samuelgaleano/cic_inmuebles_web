@@ -11,7 +11,21 @@ import { isSheetsConfigured, sheetUrl } from "@/lib/integrations/sheets";
 import { resyncSheetAction } from "@/lib/actions/admin-sheets";
 import { cierresPorMes } from "@/lib/crm/reglas";
 import { getCrmStore } from "@/lib/crm/store";
-import type { Cierre } from "@/lib/crm/tipos";
+import type { Cierre, DatosEmbudo } from "@/lib/crm/tipos";
+import {
+  duracionLegible,
+  embudoCompradores,
+  embudoVendedores,
+  leadsPorInmueble,
+  leadsPorOrigen,
+  leerMes,
+  medianaPrimeraRespuesta,
+  mesDe,
+  mesesRecientes,
+  rangoDeMes,
+  type Conteo,
+  type EtapaEmbudo,
+} from "@/lib/crm/reportes";
 
 export const dynamic = "force-dynamic";
 
@@ -20,17 +34,94 @@ function nombreMes(ym: string): string {
   return new Date(`${ym}-15T12:00:00.000Z`).toLocaleDateString("es-CO", { timeZone: "UTC", month: "short", year: "numeric" });
 }
 
-export default async function AdminReportesPage() {
+/** Barras del embudo: ancho proporcional a la primera etapa, sin librerías. */
+function Embudo({ titulo, descripcion, etapas }: { titulo: string; descripcion: string; etapas: EtapaEmbudo[] }) {
+  const inicio = etapas[0]?.cantidad ?? 0;
+  return (
+    <section className="rounded-2xl border border-line bg-white p-6" aria-label={titulo}>
+      <h3 className="font-semibold text-ink">{titulo}</h3>
+      <p className="mt-0.5 text-xs text-muted">{descripcion}</p>
+      {inicio === 0 ? (
+        <p className="mt-4 text-sm text-muted">Nada creado en este mes.</p>
+      ) : (
+        <ol className="mt-4 space-y-2.5">
+          {etapas.map((e) => (
+            <li key={e.etapa}>
+              <div className="flex items-baseline justify-between gap-2 text-sm">
+                <span className="text-ink-soft">{e.etapa}</span>
+                <span className="tabular-nums">
+                  <strong className="text-ink">{e.cantidad}</strong> <span className="text-xs text-muted">({e.pctDelInicio} %)</span>
+                </span>
+              </div>
+              <div className="mt-1 h-2.5 rounded-full bg-surface" aria-hidden>
+                <div className="h-2.5 rounded-full bg-brand-600" style={{ width: `${Math.max(e.pctDelInicio, e.cantidad ? 2 : 0)}%` }} />
+              </div>
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
+  );
+}
+
+function Conteos({ titulo, filas, nombre, vacio }: { titulo: string; filas: Conteo[]; nombre: (clave: string) => string; vacio: string }) {
+  const max = filas[0]?.cantidad ?? 0;
+  return (
+    <section className="rounded-2xl border border-line bg-white p-6" aria-label={titulo}>
+      <h3 className="mb-4 font-semibold text-ink">{titulo}</h3>
+      {filas.length === 0 ? (
+        <p className="text-sm text-muted">{vacio}</p>
+      ) : (
+        <dl className="space-y-2.5 text-sm">
+          {filas.slice(0, 12).map((f) => (
+            <div key={f.clave || "_"}>
+              <div className="flex justify-between gap-3">
+                <dt className="truncate text-muted">{nombre(f.clave)}</dt>
+                <dd className="font-semibold tabular-nums text-ink">{f.cantidad}</dd>
+              </div>
+              <div className="mt-1 h-1.5 rounded-full bg-surface" aria-hidden>
+                <div className="h-1.5 rounded-full bg-accent-500" style={{ width: `${max ? Math.round((f.cantidad / max) * 100) : 0}%` }} />
+              </div>
+            </div>
+          ))}
+          {filas.length > 12 && <p className="text-xs text-muted">y {filas.length - 12} más</p>}
+        </dl>
+      )}
+    </section>
+  );
+}
+
+export default async function AdminReportesPage({ searchParams }: { searchParams: Promise<{ mes?: string }> }) {
+  const sp = await searchParams;
+  const ahora = new Date();
+  const mes = leerMes(sp.mes, ahora) ?? mesDe(ahora);
+  const { desde, hasta } = rangoDeMes(mes);
   const repo = getRepository();
-  const [properties, leads, appointments, cierres] = await Promise.all([
+  const crm = getCrmStore();
+  // Lo del mes con consultas filtradas por fecha; los totales con conteos (no se leen las tablas completas).
+  const [properties, totalLeads, porEstado, appointments, cierres, leadsDelMes, embudo] = await Promise.all([
     repo.properties.list(),
-    repo.leads.list(),
+    repo.leads.listPage({ pagina: 1, porPagina: 1 }).then((r) => r.total),
+    Promise.all(LEAD_STATUSES.map((estado) => repo.leads.listPage({ pagina: 1, porPagina: 1, estado }).then((r) => [estado, r.total] as const))),
     repo.appointments.list(),
     // Sin el CRM (migraciones 0007/0010 sin aplicar) el resto del reporte funciona igual.
-    getCrmStore()
-      .listarCierres()
-      .catch((): Cierre[] => []),
+    crm.listarCierres().catch((): Cierre[] => []),
+    repo.leads.listarEntre(desde, hasta),
+    crm.datosEmbudo(desde, hasta).catch((): DatosEmbudo => ({ captaciones: [], busquedas: [] })),
   ]);
+  const leadsPorEstado = new Map(porEstado);
+  const vendedores = embudoVendedores(embudo.captaciones);
+  const compradores = embudoCompradores(embudo.busquedas);
+  const porOrigen = leadsPorOrigen(leadsDelMes);
+  const porInmueble = leadsPorInmueble(leadsDelMes);
+  const respuesta = medianaPrimeraRespuesta(leadsDelMes);
+  const sinOrigen = leadsDelMes.length > 0 && leadsDelMes.every((l) => !l.utmSource && !l.referente);
+  const sinPrimerContacto = leadsDelMes.length > 0 && leadsDelMes.every((l) => !l.primerContactoAt);
+  const nombreInmueble = (clave: string) => {
+    if (!clave) return "Sin inmueble (consulta general o vendedor)";
+    const p = properties.find((x) => x.id === clave || x.slug === clave);
+    return p ? `${p.codigo} · ${p.titulo}` : clave;
+  };
   const ventasPorMes = cierresPorMes(cierres, new Date());
   const totalVentas = ventasPorMes.reduce(
     (t, m) => ({ cantidad: t.cantidad + m.cantidad, valorVendido: t.valorVendido + m.valorVendido, comisionPactada: t.comisionPactada + m.comisionPactada, comisionCobrada: t.comisionCobrada + m.comisionCobrada }),
@@ -53,8 +144,8 @@ export default async function AdminReportesPage() {
     { label: "Inmuebles", value: String(properties.length) },
     { label: "Valor disponible", value: formatPrice(valorDisponible) },
     { label: "Valor vendido", value: formatPrice(valorVendido) },
-    { label: "Leads totales", value: String(leads.length) },
-    { label: "Leads vendedores", value: String(leads.filter((l) => l.tipo === "vendedor").length) },
+    { label: "Leads totales", value: String(totalLeads) },
+    { label: `Leads en ${nombreMes(mes)}`, value: String(leadsDelMes.length) },
     { label: "Visitas agendadas", value: String(appointments.length) },
   ];
 
@@ -68,11 +159,60 @@ export default async function AdminReportesPage() {
         <p className="mt-0.5 text-sm text-muted">Indicadores del negocio.</p>
       </div>
 
+      {/* Embudo del mes */}
+      <section aria-labelledby="embudo" className="space-y-4">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 id="embudo" className="text-lg font-bold tracking-tight text-ink">
+              Embudo de <span className="capitalize">{nombreMes(mes)}</span>
+            </h2>
+            <p className="text-sm text-muted">Lo que entró en el mes y hasta dónde llegó hoy. Lo descartado no cuenta.</p>
+          </div>
+          <form action="/admin/reportes" className="flex items-end gap-2">
+            <label className="text-xs font-semibold text-ink-soft">
+              Mes
+              <select name="mes" defaultValue={mes} className="mt-1 block h-11 rounded-xl border border-line bg-surface px-3 text-sm text-ink sm:h-10">
+                {mesesRecientes(ahora, 12).map((m) => (
+                  <option key={m} value={m} className="capitalize">
+                    {nombreMes(m)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button className="h-11 rounded-xl bg-brand-700 px-4 text-sm font-semibold text-white hover:bg-brand-800 sm:h-10">Ver</button>
+          </form>
+        </div>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Embudo titulo="Vendedores" descripcion="Captaciones creadas en el mes: nueva, en gestión, publicada y vendida." etapas={vendedores} />
+          <Embudo titulo="Compradores" descripcion="Búsquedas creadas en el mes: con inmueble propuesto, visitó, ofertó y cerrada." etapas={compradores} />
+        </div>
+        <div className="grid gap-4 lg:grid-cols-3">
+          <section className="rounded-2xl border border-line bg-white p-6" aria-label="Primera respuesta">
+            <h3 className="font-semibold text-ink">Tiempo de primera respuesta</h3>
+            <p className="mt-0.5 text-xs text-muted">Mediana entre la llegada del lead y el primer WhatsApp, llamada o cambio de estado desde el panel.</p>
+            {respuesta ? (
+              <p className="mt-4 font-display text-3xl font-extrabold tracking-tight text-ink">
+                {duracionLegible(respuesta.minutos)}
+                <span className="ml-2 align-middle font-sans text-xs font-normal text-muted">
+                  sobre {respuesta.muestra} lead{respuesta.muestra === 1 ? "" : "s"}
+                </span>
+              </p>
+            ) : (
+              <p className="mt-4 text-sm text-muted">{sinPrimerContacto ? "Todavía no hay leads del mes contactados desde el panel (o falta aplicar la migración 0012)." : "Sin leads contactados en este mes."}</p>
+            )}
+          </section>
+          <Conteos titulo="Leads por origen" filas={porOrigen} nombre={(c) => (c === "directo" ? "Directo (sin etiqueta)" : c)} vacio="Sin leads en este mes." />
+          <Conteos titulo="Leads por inmueble" filas={porInmueble} nombre={nombreInmueble} vacio="Sin leads en este mes." />
+        </div>
+        {sinOrigen && <p className="text-xs text-muted">Ningún lead del mes trae origen: los enlaces de redes deben llevar sus etiquetas (botón «Copiar enlace» en Inmuebles) y la migración 0012 debe estar aplicada.</p>}
+      </section>
+
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
         {cards.map((c) => (
-          <div key={c.label} className="rounded-2xl border border-line bg-white p-5">
+          <div key={c.label} className="min-w-0 rounded-2xl border border-line bg-white p-4 sm:p-5">
             <p className="text-sm text-muted">{c.label}</p>
-            <p className="mt-1 font-display text-2xl font-extrabold tracking-tight text-ink">{c.value}</p>
+            {/* En el celular las cifras largas ($ 2.020.000.000) bajan de tamaño y pueden partirse. */}
+            <p className="mt-1 font-display text-lg font-extrabold tracking-tight text-ink [overflow-wrap:anywhere] sm:text-2xl">{c.value}</p>
           </div>
         ))}
       </div>
@@ -173,7 +313,7 @@ export default async function AdminReportesPage() {
             {LEAD_STATUSES.map((s) => (
               <div key={s} className="flex justify-between">
                 <dt className="text-muted">{LEAD_STATUS_LABELS[s]}</dt>
-                <dd className="font-semibold text-ink">{leads.filter((l) => l.estado === s).length}</dd>
+                <dd className="font-semibold text-ink">{leadsPorEstado.get(s) ?? 0}</dd>
               </div>
             ))}
           </dl>

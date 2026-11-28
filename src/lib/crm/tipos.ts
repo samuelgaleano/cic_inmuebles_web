@@ -183,3 +183,88 @@ export interface ContactoResumen extends Contacto {
   busquedas: number;
   ultimaActividad?: string;
 }
+
+/** Tamaño de página de los listados del CRM. */
+export const POR_PAGINA = 50;
+
+export const FILTROS_TIPO_CONTACTO = ["vendedor", "comprador"] as const;
+export type FiltroTipoContacto = (typeof FILTROS_TIPO_CONTACTO)[number];
+
+/** Filtros del listado paginado de contactos (vista `contactos_resumen`, migración 0013). */
+export interface FiltroContactos {
+  q?: string;
+  incluirArchivados?: boolean;
+  /** Vendedor: con alguna captación no descartada. Comprador: con alguna búsqueda no descartada. */
+  tipo?: FiltroTipoContacto;
+  origen?: Origen;
+  /** Solo los que no tienen fecha de próximo contacto. */
+  sinProximo?: boolean;
+  /** Desde 1. */
+  pagina?: number;
+  porPagina?: number;
+}
+
+export interface Pagina<T> {
+  filas: T[];
+  total: number;
+  pagina: number;
+  porPagina: number;
+}
+
+/** Lo mínimo de una persona para nombrarla y escribirle desde un listado. */
+export interface ContactoBreve {
+  id: string;
+  nombre: string;
+  telefono?: string;
+  email?: string;
+  archivado: boolean;
+}
+
+export interface CaptacionConContacto extends Captacion {
+  contacto: ContactoBreve;
+}
+
+export interface BusquedaConContacto extends Busqueda {
+  contacto: ContactoBreve;
+  /** Inmuebles propuestos a esta búsqueda. */
+  propuestas: number;
+}
+
+/** Una propuesta vista desde el inmueble: a quién se le propuso y cómo va. */
+export interface PropuestaDeInmueble extends Propuesta {
+  contacto: ContactoBreve;
+  estadoBusqueda: EstadoBusqueda;
+}
+
+export interface GrupoPendiente {
+  total: number;
+  /** Los primeros (para nombrarlos en «Por hacer»). */
+  items: ContactoBreve[];
+}
+
+export interface PendientesCrm {
+  porAprobar: GrupoPendiente;
+  pagoPendiente: GrupoPendiente;
+  multimedia: GrupoPendiente;
+  sinPropuestas: GrupoPendiente;
+  sinSeguimiento: GrupoPendiente;
+  totales: { contactos: number; vendedores: number; compradores: number };
+}
+
+/**
+ * De dónde viene una actividad automática: el lead, el plan pagado o la cita que la originó.
+ * Con la migración 0013 es una columna con índice único (no se repite aunque se corra dos veces);
+ * sin ella, la marca `[lead:<id>]` en el texto cumple el mismo papel.
+ */
+export interface LlaveActividad {
+  tipo: "lead" | "servicio" | "cita";
+  id: string;
+}
+
+export const marcaDe = (llave: LlaveActividad) => `[${llave.tipo}:${llave.id}]`;
+
+/** Lo que el reporte necesita de cada captación y búsqueda creadas en el mes. */
+export interface DatosEmbudo {
+  captaciones: { estado: EstadoCaptacion }[];
+  busquedas: { estado: EstadoBusqueda; propuestas: EstadoPropuesta[] }[];
+}

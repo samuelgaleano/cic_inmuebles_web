@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { normalizarInmueble } from "@/lib/domain/normalizar";
 import {
+  NOMBRE_SUPRIMIDO,
   toPublicProperty,
   type Agent,
   type AgentAvailability,
@@ -149,7 +150,37 @@ class MemoryLeadRepository implements LeadRepository {
   }
 
   async list(opciones?: ListarLeadsOpciones): Promise<Lead[]> {
-    return this.leads.slice(0, opciones?.limite ?? LEADS_LIMITE_POR_DEFECTO);
+    return this.ordenados().slice(0, Math.max(1, opciones?.limite ?? LEADS_LIMITE_POR_DEFECTO));
+  }
+
+  /** Más nuevos primero (como `order by created_at desc` en Supabase). */
+  private ordenados(): Lead[] {
+    return [...this.leads].sort((a, b) => b.creadoEn.localeCompare(a.creadoEn));
+  }
+
+  async getById(id: string): Promise<Lead | null> {
+    return this.leads.find((l) => l.id === id) ?? null;
+  }
+
+  async listPage(opts: { pagina: number; porPagina: number; estado?: LeadStatus }): Promise<{ leads: Lead[]; total: number }> {
+    const todos = this.ordenados().filter((l) => !opts.estado || l.estado === opts.estado);
+    const desde = (Math.max(1, opts.pagina) - 1) * opts.porPagina;
+    return { leads: todos.slice(desde, desde + opts.porPagina), total: todos.length };
+  }
+
+  async listarDeContacto(c: { contactoId: string; ids?: string[]; telefonos: string[]; email?: string }): Promise<Lead[]> {
+    const ids = new Set(c.ids ?? []);
+    const tels = new Set(c.telefonos.map((t) => t.trim()).filter(Boolean));
+    const email = c.email?.trim().toLowerCase();
+    return this.ordenados().filter((l) => ids.has(l.id) || tels.has(l.telefono.trim()) || Boolean(email && l.email?.toLowerCase() === email));
+  }
+
+  async listarDeInmueble(propertyId: string, slug: string): Promise<Lead[]> {
+    return this.ordenados().filter((l) => l.propertyId === propertyId || Boolean(slug && l.propertySlug === slug));
+  }
+
+  async listarEntre(desde: string, hasta: string): Promise<Lead[]> {
+    return this.ordenados().filter((l) => l.creadoEn >= desde && l.creadoEn < hasta);
   }
 
   async countSince(iso: string): Promise<number> {
@@ -161,6 +192,30 @@ class MemoryLeadRepository implements LeadRepository {
     if (!lead) return null;
     lead.estado = estado;
     return lead;
+  }
+
+  async marcarPrimerContacto(ids: string[], at: string): Promise<number> {
+    let n = 0;
+    for (const l of this.leads) {
+      if (ids.includes(l.id) && !l.primerContactoAt) {
+        l.primerContactoAt = new Date(at).toISOString();
+        n += 1;
+      }
+    }
+    return n;
+  }
+
+  async suprimir(ids: string[], at: string): Promise<number> {
+    let n = 0;
+    for (const l of this.leads) {
+      if (!ids.includes(l.id)) continue;
+      l.nombre = NOMBRE_SUPRIMIDO;
+      l.telefono = "";
+      for (const k of ["email", "mensaje", "preferencia", "ciudad"] as const) delete l[k];
+      l.suprimidoAt = new Date(at).toISOString();
+      n += 1;
+    }
+    return n;
   }
 
   async remove(id: string): Promise<boolean> {
@@ -244,11 +299,34 @@ class MemoryAppointmentRepository implements AppointmentRepository {
     return appt;
   }
 
+  async getById(id: string): Promise<Appointment | null> {
+    return this.appointments.find((a) => a.id === id) ?? null;
+  }
+
   async updateStatus(id: string, estado: AppointmentStatus): Promise<Appointment | null> {
     const appt = this.appointments.find((a) => a.id === id);
     if (!appt) return null;
     appt.estado = estado;
     return appt;
+  }
+
+  async listarDe(c: { contactoId: string; leadIds: string[] }): Promise<Appointment[]> {
+    return this.appointments
+      .filter((a) => a.contactoId === c.contactoId || Boolean(a.leadId && c.leadIds.includes(a.leadId)))
+      .sort((a, b) => a.inicioEn.localeCompare(b.inicioEn));
+  }
+
+  async suprimirDe(c: { contactoId: string; leadIds: string[] }): Promise<number> {
+    let n = 0;
+    for (const a of this.appointments) {
+      if (a.contactoId !== c.contactoId && !(a.leadId && c.leadIds.includes(a.leadId))) continue;
+      a.clienteNombre = NOMBRE_SUPRIMIDO;
+      a.clienteTelefono = "";
+      delete a.clienteEmail;
+      delete a.notas;
+      n += 1;
+    }
+    return n;
   }
 
   async remove(id: string): Promise<boolean> {

@@ -203,6 +203,14 @@ export function leadRowToDomain(row: LeadRow): Lead {
     primerContactoAt: row.primer_contacto_at ?? undefined,
     estado: row.estado ?? "nuevo",
     creadoEn: row.created_at,
+    // Columnas de 0012 y 0013: la lectura es `select *`, así que llegan solas cuando la migración está aplicada.
+    ...(row.primer_contacto_at ? { primerContactoAt: new Date(row.primer_contacto_at).toISOString() } : {}),
+    ...(row.utm_source ? { utmSource: row.utm_source } : {}),
+    ...(row.utm_medium ? { utmMedium: row.utm_medium } : {}),
+    ...(row.utm_campaign ? { utmCampaign: row.utm_campaign } : {}),
+    ...(row.referente ? { referente: row.referente } : {}),
+    ...(row.pagina_entrada ? { paginaEntrada: row.pagina_entrada } : {}),
+    ...(row.suprimido_at ? { suprimidoAt: new Date(row.suprimido_at).toISOString() } : {}),
   };
 }
 
@@ -278,6 +286,7 @@ export function appointmentRowToDomain(row: AppointmentRow): Appointment {
     propertyId: row.property_id,
     agentId: row.agent_id ?? undefined,
     leadId: row.lead_id ?? undefined,
+    ...(row.contacto_id ? { contactoId: row.contacto_id } : {}),
     clienteNombre: row.cliente_nombre,
     clienteTelefono: row.cliente_telefono,
     clienteEmail: row.cliente_email ?? undefined,
@@ -295,6 +304,8 @@ export function appointmentInputToRow(input: AppointmentInput): AppointmentWrite
     property_id: input.propertyId,
     agent_id: input.agentId ?? null,
     lead_id: input.leadId ?? null,
+    // Solo si viene: así una base sin la columna (0013 sin aplicar) acepta las citas que no la usan.
+    ...(input.contactoId ? { contacto_id: input.contactoId } : {}),
     cliente_nombre: input.clienteNombre,
     cliente_telefono: input.clienteTelefono,
     cliente_email: input.clienteEmail ?? null,

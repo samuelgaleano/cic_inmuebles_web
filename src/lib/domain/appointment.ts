@@ -28,6 +28,8 @@ export interface Appointment {
   propertyId: string;
   agentId?: string;
   leadId?: string;
+  /** Persona del CRM que visita (columna appointments.contacto_id, migración 0013). */
+  contactoId?: string;
 
   clienteNombre: string;
   clienteTelefono: string;

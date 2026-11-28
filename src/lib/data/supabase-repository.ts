@@ -1,4 +1,5 @@
 import {
+  NOMBRE_SUPRIMIDO,
   toPublicProperty,
   type Agent,
   type AgentAvailability,
@@ -106,6 +107,10 @@ async function escribirConRespaldo<T>(
 }
 
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const NOMBRE_SUPRIMIDO_LEAD = NOMBRE_SUPRIMIDO;
+
+/** La columna todavía no existe (migración sin aplicar): 42703 de Postgres o PGRST204 de la caché de PostgREST. */
 /**
  * Implementación del repositorio sobre Supabase (PostgreSQL).
  *
@@ -347,6 +352,103 @@ class SupabaseLeadRepository implements LeadRepository {
     return filas.map(leadRowToDomain);
   }
 
+  async getById(id: string): Promise<Lead | null> {
+    if (!UUID.test(id)) return null;
+    const { data, error } = await getSupabaseAdmin().from("leads").select("*").eq("id", id).maybeSingle();
+    if (error) throw error;
+    return data ? leadRowToDomain(data) : null;
+  }
+
+  async listPage(opts: { pagina: number; porPagina: number; estado?: LeadStatus }): Promise<{ leads: Lead[]; total: number }> {
+    const desde = (Math.max(1, opts.pagina) - 1) * opts.porPagina;
+    let q = getSupabaseAdmin().from("leads").select("*", { count: "exact" });
+    if (opts.estado) q = q.eq("estado", opts.estado);
+    const { data, error, count } = await q.order("created_at", { ascending: false }).order("id").range(desde, desde + opts.porPagina - 1);
+    if (error) {
+      // Página más allá del final.
+      if (error.code === "PGRST103") return { leads: [], total: 0 };
+      throw error;
+    }
+    return { leads: (data ?? []).map(leadRowToDomain), total: count ?? 0 };
+  }
+
+  async listarDeContacto(c: { contactoId: string; ids?: string[]; telefonos: string[]; email?: string }): Promise<Lead[]> {
+    const db = getSupabaseAdmin();
+    const consultas = [];
+    // Tres consultas por llave en vez de leer todos los leads y filtrar.
+    if (UUID.test(c.contactoId)) consultas.push(db.from("leads").select("*").eq("contacto_id", c.contactoId).limit(200));
+    const ids = (c.ids ?? []).filter((id) => UUID.test(id)).slice(0, 100);
+    if (ids.length) consultas.push(db.from("leads").select("*").in("id", ids).limit(200));
+    const tels = [...new Set(c.telefonos.map((t) => t.trim()).filter(Boolean))];
+    if (tels.length) consultas.push(db.from("leads").select("*").in("telefono", tels).limit(200));
+    if (c.email?.trim()) consultas.push(db.from("leads").select("*").ilike("email", c.email.trim().replace(/[%_\\]/g, "\\$&")).limit(200));
+    const porId = new Map<string, Lead>();
+    for (const r of await Promise.all(consultas)) {
+      // Sin leads.contacto_id (0008 sin aplicar) se sigue con teléfono y correo.
+      if (r.error) {
+        if (/contacto_id/i.test(r.error.message)) continue;
+        throw r.error;
+      }
+      for (const row of r.data ?? []) porId.set(row.id, leadRowToDomain(row));
+    }
+    return [...porId.values()].sort((a, b) => b.creadoEn.localeCompare(a.creadoEn));
+  }
+
+  async listarDeInmueble(propertyId: string, slug: string): Promise<Lead[]> {
+    const db = getSupabaseAdmin();
+    const [porId, porSlug] = await Promise.all([
+      UUID.test(propertyId) ? db.from("leads").select("*").eq("property_id", propertyId).limit(200) : Promise.resolve({ data: [], error: null }),
+      slug ? db.from("leads").select("*").eq("property_slug", slug).limit(200) : Promise.resolve({ data: [], error: null }),
+    ]);
+    if (porId.error) throw porId.error;
+    if (porSlug.error) throw porSlug.error;
+    const todos = new Map<string, Lead>();
+    for (const row of [...(porId.data ?? []), ...(porSlug.data ?? [])]) todos.set(row.id, leadRowToDomain(row));
+    return [...todos.values()].sort((a, b) => b.creadoEn.localeCompare(a.creadoEn));
+  }
+
+  async listarEntre(desde: string, hasta: string): Promise<Lead[]> {
+    const { data, error } = await getSupabaseAdmin()
+      .from("leads")
+      .select("*")
+      .gte("created_at", desde)
+      .lt("created_at", hasta)
+      .order("created_at", { ascending: false })
+      .limit(5000);
+    if (error) throw error;
+    return (data ?? []).map(leadRowToDomain);
+  }
+
+  async marcarPrimerContacto(ids: string[], at: string): Promise<number> {
+    const validos = ids.filter((id) => UUID.test(id));
+    if (!validos.length) return 0;
+    const { data, error } = await getSupabaseAdmin()
+      .from("leads")
+      .update({ primer_contacto_at: at })
+      .in("id", validos)
+      .is("primer_contacto_at", null)
+      .select("id");
+    if (error) {
+      // Sin la migración 0012 no hay dónde guardarlo: el panel sigue igual.
+      if (faltaColumna(error, ["primer_contacto_at"])) return 0;
+      throw error;
+    }
+    return (data ?? []).length;
+  }
+
+  async suprimir(ids: string[], at: string): Promise<number> {
+    const validos = ids.filter((id) => UUID.test(id));
+    if (!validos.length) return 0;
+    const base = { nombre: NOMBRE_SUPRIMIDO_LEAD, telefono: "", email: null, mensaje: null, preferencia: null, ciudad: null };
+    const db = getSupabaseAdmin();
+    let r = await db.from("leads").update({ ...base, suprimido_at: at }).in("id", validos).select("id");
+    if (r.error && faltaColumna(r.error, ["suprimido_at"])) {
+      r = await db.from("leads").update({ ...base, estado: "descartado" }).in("id", validos).select("id");
+    }
+    if (r.error) throw r.error;
+    return (r.data ?? []).length;
+  }
+
   async countSince(iso: string): Promise<number> {
     const { count, error } = await getSupabaseAdmin()
       .from("leads")
@@ -488,15 +590,58 @@ class SupabaseAppointmentRepository implements AppointmentRepository {
     return (data ?? []).map(appointmentRowToDomain);
   }
 
-  async create(input: AppointmentInput): Promise<Appointment> {
-    const { data, error } = await getSupabaseAdmin()
-      .from("appointments")
-      .insert(appointmentInputToRow(input))
-      .select(SELECT_CITA)
-      .single()
-      .overrideTypes<AppointmentRow, { merge: false }>();
+  async getById(id: string): Promise<Appointment | null> {
+    if (!UUID.test(id)) return null;
+    const { data, error } = await getSupabaseAdmin().from("appointments").select("*").eq("id", id).maybeSingle();
     if (error) throw error;
-    return appointmentRowToDomain(data);
+    return data ? appointmentRowToDomain(data) : null;
+  }
+
+  async create(input: AppointmentInput): Promise<Appointment> {
+    const db = getSupabaseAdmin();
+    let r = await db.from("appointments").insert(appointmentInputToRow(input)).select("*").single();
+    // Sin appointments.contacto_id (0013 sin aplicar) la cita se guarda igual, sin la persona.
+    if (r.error && input.contactoId && faltaColumna(r.error, ["contacto_id"])) {
+      r = await db.from("appointments").insert(appointmentInputToRow({ ...input, contactoId: undefined })).select("*").single();
+    }
+    if (r.error) throw r.error;
+    return appointmentRowToDomain(r.data);
+  }
+
+  async listarDe(c: { contactoId: string; leadIds: string[] }): Promise<Appointment[]> {
+    const db = getSupabaseAdmin();
+    const porId = new Map<string, Appointment>();
+    if (UUID.test(c.contactoId)) {
+      const r = await db.from("appointments").select("*").eq("contacto_id", c.contactoId).limit(200);
+      // Sin la columna (0013 sin aplicar) quedan las de sus leads.
+      if (r.error && !faltaColumna(r.error, ["contacto_id"])) throw r.error;
+      for (const row of r.data ?? []) porId.set(row.id, appointmentRowToDomain(row));
+    }
+    const leads = c.leadIds.filter((id) => UUID.test(id)).slice(0, 100);
+    if (leads.length) {
+      const r = await db.from("appointments").select("*").in("lead_id", leads).limit(200);
+      if (r.error) throw r.error;
+      for (const row of r.data ?? []) porId.set(row.id, appointmentRowToDomain(row));
+    }
+    return [...porId.values()].sort((a, b) => a.inicioEn.localeCompare(b.inicioEn));
+  }
+
+  async suprimirDe(c: { contactoId: string; leadIds: string[] }): Promise<number> {
+    const db = getSupabaseAdmin();
+    const patch = { cliente_nombre: NOMBRE_SUPRIMIDO, cliente_telefono: "", cliente_email: null, notas: null };
+    let n = 0;
+    if (UUID.test(c.contactoId)) {
+      const r = await db.from("appointments").update(patch).eq("contacto_id", c.contactoId).select("id");
+      if (r.error && !faltaColumna(r.error, ["contacto_id"])) throw r.error;
+      n += (r.data ?? []).length;
+    }
+    const leads = c.leadIds.filter((id) => UUID.test(id));
+    if (leads.length) {
+      const r = await db.from("appointments").update(patch).in("lead_id", leads).select("id");
+      if (r.error) throw r.error;
+      n += (r.data ?? []).length;
+    }
+    return n;
   }
 
   async updateStatus(id: string, estado: AppointmentStatus): Promise<Appointment | null> {
